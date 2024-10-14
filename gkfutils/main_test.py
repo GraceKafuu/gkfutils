@@ -6180,7 +6180,7 @@ if __name__ == '__main__':
 
     # =====================================================================================================================
     # ======================================== labelbee json, VOC xml<--> yolo txt ========================================
-    convert_labelbee_det_json_to_yolo_txt(data_path="/home/disk/disk7/data/004.Knife_Det/Others/knife_scissors", copy_image=True)
+    # convert_labelbee_det_json_to_yolo_txt(data_path="/home/disk/disk7/data/004.Knife_Det/Others/knife_scissors", copy_image=True)
     # convert_yolo_txt_to_labelbee_det_json(data_path="/home/disk/disk7/data/004.Knife_Det/Others/knife_scissors")
     # convert_VOC_xml_to_yolo_txt(data_path="/home/zengyifan/wujiahu/data/003.Cigar_Det/others/Others/20230609/BdSLImset-master_merged", classes=['a', 'dh', 'o', 'ga', 'oo', 'e', 'i', 'kh', 'u', 'k'], val_percent=0.1)
     # convert_labelbee_kpt_json_to_yolo_txt(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/train/part/kpt", copy_image=False)

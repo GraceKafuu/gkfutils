@@ -1755,6 +1755,53 @@ def read_ocr_lables(lbl_path):
     return alpha
 
 
+def rename_files_under_dirs(data_path):
+    dir_list = get_dir_list(data_path)
+    for d in tqdm(dir_list):
+        d_path = data_path + "/{}".format(d)
+        file_list = get_file_list(d_path)
+        for f in file_list:
+            f_abs_path = d_path + "/{}".format(f)
+            # f_dst_path = d_path + "/{}{}".format(d.replace(d.split("_")[0], ""), f)
+            f_dst_path = d_path + "/{}_{}".format(d, f)
+            os.rename(f_abs_path, f_dst_path)
+
+
+def calculate_file_hash(file_path, hash_algorithm='sha256'):
+    hash_obj = hashlib.new(hash_algorithm)
+    with open(file_path, 'rb') as file:
+        while True:
+            data = file.read(65536)
+            if not data: break
+            hash_obj.update(data)
+
+    return hash_obj.hexdigest()
+
+
+def move_same_file(data_path):
+    dir_name = os.path.basename(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "../{}_same_files".format(dir_name)))
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = get_file_list(data_path)
+    duplicates = {}
+
+    for f in tqdm(file_list):
+        f_abs_path = data_path + "/{}".format(f)
+        f_hash = calculate_file_hash(f_abs_path, hash_algorithm='sha256')
+        if f_hash in duplicates:
+            duplicates[f_hash].append(f)
+        else:
+            duplicates[f_hash] = [f]
+
+    duplicates_new = {k: v for k, v in duplicates.items() if len(v) > 1}
+
+    for k, v in duplicates_new.items():
+        for fi in v[1:]:
+            f_src_path = data_path + "/{}".format(fi)
+            f_dst_path = save_path + "/{}".format(fi)
+            shutil.move(f_src_path, f_dst_path)
+            
 
 if __name__ == '__main__':
     pass

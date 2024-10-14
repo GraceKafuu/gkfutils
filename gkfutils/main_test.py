@@ -1,13 +1,18 @@
 # -*- coding:utf-8 -*-
 
 """
-# @Time       : 2022/5/13 13:56, 2024/3/29 14:30 Update
+# @Time       : 2022/5/13 13:56 Update, 2024/3/29 14:30 Update, 2024/10/14 14:56 Update
 # @Author     : GraceKafuu
-# @Email      :
-# @File       : det.py
+# @Email      : gracekafuu@gmail.com
+# @File       : main_test.py
 # @Software   : PyCharm
 
 Description:
+1.
+2.
+3.
+
+Change Log:
 1.
 2.
 3.
@@ -185,6 +190,7 @@ if __name__ == '__main__':
     # =====================================================================================================================
     # ======================================== labelbee json, VOC xml<--> yolo txt ========================================
     # convert_labelbee_det_json_to_yolo_txt(data_path="/home/disk/disk7/data/004.Knife_Det/Others/knife_scissors", copy_image=True)
+    # convert_unknow_det_json_to_yolo_txt(data_path="/home/disk/disk7/data/004.Knife_Det/det/train/v7/data_20240730/001/train", copy_image=True)
     # convert_yolo_txt_to_labelbee_det_json(data_path="/home/disk/disk7/data/004.Knife_Det/Others/knife_scissors")
     # convert_VOC_xml_to_yolo_txt(data_path="/home/zengyifan/wujiahu/data/003.Cigar_Det/others/Others/20230609/BdSLImset-master_merged", classes=['a', 'dh', 'o', 'ga', 'oo', 'e', 'i', 'kh', 'u', 'k'], val_percent=0.1)
     # convert_labelbee_kpt_json_to_yolo_txt(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/train/part/kpt", copy_image=False)
@@ -213,14 +219,17 @@ if __name__ == '__main__':
     # =====================================================================================================================
     # ================================================== convert to gray ==================================================
     # convert_to_gray_image(data_path="")
+    # convert_to_binary_image(data_path="/home/disk/disk7/wujiahu/data/010.Digital_Rec/Others/data/yueyahu/half_cropped_20240909", thr_low=88)
 
     # =====================================================================================================================
     # ================================================ change txt content =================================================
-    # change_txt_content(txt_base_path="/home/disk/disk7/data/006.Fire_Smoke_Det/train/smoke_fire/New_v5/test")
-    # remove_yolo_txt_contain_specific_class(data_path="/home/disk/disk7/data/012.FastDeploy/train/v2", rm_cls=(2, ))
-    # merge_txt(path1="/home/disk/disk7/data/006.Fire_Smoke_Det/train/smoke_fire/New_v5/others/train/labels-orig+80", path2="/home/disk/disk7/data/006.Fire_Smoke_Det/train/smoke_fire/New_v5/others/train/labels_pred_with_coco_weights")
-    # list_yolo_labels(label_path="/home/disk/disk7/data/012.FastDeploy/train/v2/digital_pointer_meter/labels_new")
-    # merge_txt_files(data_path="/home/disk/disk7/data/000.ChineseOCR/data/test")
+    # change_txt_content(txt_base_path="/home/disk/disk7/data/013.Droplet_Det/test/v3")
+    # remove_yolo_txt_contain_specific_class(data_path="/home/disk/disk7/wujiahu/data/014.Fishing_Det/data/det/v1/train/000/New", rm_cls=(0, ))
+    # remove_yolo_txt_small_bbx(data_path="/home/disk/disk7/data/004.Knife_Det/det/train/v7/2_cls/train/20240729/New/NewFolder", rm_cls=(0, ), rmsz=(48, 48))
+    # select_yolo_txt_contain_specific_class(data_path="/home/disk/disk7/data/013.Droplet_Det/train/v3/lables-3", select_cls=(3, ))
+    # merge_txt(path1="/home/disk/disk7/wujiahu/data/014.Fishing_Det/data/det/v1/train/000/New/NewFolder/labels", path2="/home/disk/disk7/wujiahu/data/014.Fishing_Det/data/det/v1/train/000/New/NewFolder/labels_pred")
+    # list_yolo_labels(label_path="/home/disk/disk7/data/013.Droplet_Det/train/v4/labels")
+    # merge_txt_files(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/train/txt/20240925_New")
 
     # =====================================================================================================================
     # ==================================================== crop image =====================================================
@@ -235,6 +244,36 @@ if __name__ == '__main__':
     # crnn_data_makeBorder(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/others/CRNN_OpenDataset/ALL_20230907/train_renamed")
     # do_makeBorderv6(data_path="/home/disk/disk7/docker/Projects/000_ChineseOCR/ChineseOCR_images")
 
+    # alpha = read_ocr_lables(lbl_path="/home/wujiahu/code/CRNN_PyTorch_2024.05.28/utils/gen_fake/words/chinese_simple_with_special_chars.txt")
+    # alpha = read_ocr_lables(lbl_path="/home/wujiahu/GraceKafuu/GraceKafuu_v1.0.0/Python/CV_v1.0.0/OCR/PyTorchOCR/Rec/CRNN/CRNN_PyTorch_2024.08.02/words/chinese_chars_v1_21159.txt")
+    # alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC' + '℃' + 'MPa' + '㎡m³'
+    # alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC' + '℃' + 'm³'
+    # alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC'
+    # alpha = ' ' + '0123456789' + '.:/\\-' + 'ABbC'
+    # alpha = ' ' + '0123456789' + '.:/\\-' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    # print(len(alpha))
+    # ocr_data_gen_train_txt(data_path="/home/disk/disk7/data/010.Digital_Rec/crnn/train/v5/20240607_img_warp", LABEL=alpha)
+    # ocr_data_gen_train_txt_v2(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/train/016_CUTE80_ICDAR2003_ICDAR2013_ICDAR2015_IIIT5K_SVT", LABEL=alpha)
+    # ocr_data_merge_train_txt_files_v2(data_path="/home/disk/disk7/data/010.Digital_Rec/crnn/train/v7/same_chars", LABEL=alpha)
+    # check_ocr_label(data_p/ath="/home/disk/disk7/data/010.Digital_Rec/crnn/test/v5/All/merged.txt", label=alpha)
+    # random_select_files_according_txt(data_path="/home/disk/disk7/wujiahu/data/010.Digital_Rec/data/crnn/train/v7/NewFolder_20240910/merged.txt", select_percent=0.25)
+    # random_select_files_from_txt(data_path="/home/disk/disk7/data/010.Digital_Rec/crnn/train/v4_aug.txt", n=2500)
+    # convert_text_renderer_json_to_my_dataset_format(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/train/014_text_renderer/20240927_001")
+    # convert_Synthetic_Chinese_String_Dataset_labels(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/OpenDatasets/ChineseData_20240918/Synthetic_Chinese_String_Datasets_labels")
+    # convert_to_ocr_rec_data_mtwi(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/OpenDatasets/ChineseData_20240918/mtwi/icpr_mtwi_train")
+    # convert_to_ocr_rec_data_ShopSign1(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/OpenDatasets/ChineseData_20240918/ShopSign_1265/000")
+    # convert_to_ocr_rec_data_ShopSign2(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/OpenDatasets/ChineseData_20240918/ShopSign_1265/001")
+    # ocr_train_txt_change_to_abs_path()
+    # get_ocr_train_txt_alpha(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/train/txt/20240924/merged_new.txt")
+    # 003: not_in_alpha_21160:  ®íƧʌΛи—′∶┅▪☆　〇のサシジマ㸃凉＂＇＋－／＜＝＞＼＾＿｀
+    # 006: not_in_alpha_21160:  ®—∶▪　〇の㸃＂＇＋－／＝＼＿｀
+    # 008: not_in_alpha_21160:  àéüОПР–—―′※∶⑾⑿⒀⒂⒃⒄⒅⒆⒈⒉⒊─━│┌┐╱■□▲△◆◇○◎●★☆〇『』てな＋
+    # 011: not_in_alpha_21160:  üи—―′″※ⅰ∕∮⒂└○●☆　』〓〖〗ぁ﹪＂＋－／＜＞＿￠
+    # check_ocr_train_txt(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/train/txt/20240925_New/003_Chinese_Street_View_Text_Recognition_new.txt")
+    # random_select_images_from_ocr_train_txt(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/train/003_Chinese_Street_View_Text_Recognition/train.txt", select_num= 5000)
+    # ocr_train_txt_split_to_train_and_test(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/eng/OpenDatasets/Syn90k/Syn90k.txt", train_percent=0.8)
+
+
     # =====================================================================================================================
     # ======================================================= rename ======================================================
     # rnf = RenameFiles()
@@ -245,6 +284,8 @@ if __name__ == '__main__':
     # rnf.rename_add_str_before_filename(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/others/Others/dbnet_data/20240220/output/output_warp_test_resize__output_v5/unexpected", add_str="orig")
     # rnf.rename_test_20240223(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/train/crnn/train/7")
     # rnf.check_label(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/train/crnn/train/6")
+    # rename_files_under_dirs(data_path="/home/disk/disk7/wujiahu/data/013.Droplet_Det/others/data/images/20240828_frames")
+
 
     # agd = AugData()
     # agd.change_brightness_add_noise_etc_multithread(img_path="/home/zengyifan/wujiahu/data/003.Cigar_Det/others/Others/20230609/BdSLImset-master_merged/BdSLImset-master_merged_cropped_merged", mtd_num=8)
@@ -337,6 +378,9 @@ if __name__ == '__main__':
 
     # ssim_move_or_remove_same_images(img_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/test/dbnet/v1_add_20240203/GOOD", imgsz=(64, 64), move_or_remove="move")
     # ssim_move_or_remove_same_images_multithread(img_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/test/dbnet/v1_add_20240203/GOOD", imgsz=(32, 32), move_or_remove="move")
+    # by hash value: sha256, md5
+    # move_same_file(data_path="/home/disk/disk7/wujiahu/data/014.Fishing_Det/data/cls/v1/train/0_/NewFolder_merged")
+
 
     # =====================================================================================================================
     # ======================================================= copy ========================================================

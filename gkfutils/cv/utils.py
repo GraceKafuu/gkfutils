@@ -14617,6 +14617,1224 @@ def select_horizontal_images(data_path, flag="move"):
                 os.remove(f_abs_path)
 
 
+# ==============================================================================================================================
+# ==============================================================================================================================
+
+def get_color(specific_color_flag=True):
+    global color
+    color1 = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
+
+    if specific_color_flag:
+        color2, color3, color4 = (0, 0, 0), (114, 114, 114), (255, 255, 255)
+        color_rdm = np.random.rand()
+        # if color_rdm <= 0.85:
+        #     color = color1
+        # elif color_rdm > 0.85 and color_rdm <= 0.90:
+        #     color = color2
+        # elif color_rdm > 0.90 and color_rdm <= 0.95:
+        #     color = color3
+        # else:
+        #     color = color4
+
+        if color_rdm <= 0.50:
+            color = color2
+        elif color_rdm > 0.50 and color_rdm <= 0.75:
+            color = color3
+        else:
+            color = color4
+
+        # color = color3
+    else:
+        color = color1
+
+    return color
+
+
+def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific_color_flag=True):
+    """
+    :param im:
+    :param new_shape: (H, W)
+    :param r1:
+    :param r2:
+    :param sliding_window:
+    :return:
+    """
+    color = get_color(specific_color_flag=specific_color_flag)
+
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape * 4)
+
+    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
+    if shape[0] < new_shape[0] * r1:
+        padh = new_shape[0] - shape[0]
+        padh1 = padh // 2
+        padh2 = padh - padh1
+        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
+
+    shape = im.shape[:2]  # current shape [height, width]
+    r = new_shape[0] / shape[0]
+
+    # Compute padding
+    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
+    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
+
+    rdm = np.random.random()
+    if rdm > 0.5:
+        top = ph // 2
+        bottom = ph - top
+        left = pw // 2
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        else:
+            im = cv2.resize(im, new_shape[::-1])
+    else:
+        rdmh = np.random.random()
+        rmdw = np.random.random()
+        top = int(round(ph * rdmh))
+        bottom = ph - top
+        left = int(round(pw * rmdw))
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        else:
+            im = cv2.resize(im, new_shape[::-1])
+
+    return im
+
+
+def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, specific_color_flag=True):
+    cropped_imgs = []
+    imgsz = img.shape[:2]
+
+    if gap[0] == 0 and gap[1] > 0:
+        cropsz = (imgsz[0], cropsz[1])
+        for i in range(0, imgsz[1], gap[1]):
+            if i + cropsz[1] > imgsz[1]:
+                cp_img = img[0:imgsz[0], i:imgsz[1]]
+                if makeBorder:
+                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
+                cropped_imgs.append(cp_img)
+                break
+            else:
+                cp_img = img[0:imgsz[0], i:i + cropsz[1]]
+                cropped_imgs.append(cp_img)
+    elif gap[0] > 0 and gap[1] == 0:
+        cropsz = (cropsz[0], imgsz[1])
+        for j in range(0, imgsz[0], gap[0]):
+            if j + cropsz[0] > imgsz[0]:
+                cp_img = img[j:imgsz[0], 0:imgsz[1]]
+                if makeBorder:
+                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
+                cropped_imgs.append(cp_img)
+                break
+            else:
+                cp_img = img[j:j + cropsz[0], 0:imgsz[1]]
+                cropped_imgs.append(cp_img)
+    elif gap[0] == 0 and gap[1] == 0:
+        print("Error! gap[0] == 0 and gap[1] == 0!")
+    else:
+        for j in range(0, imgsz[0], gap[0]):
+            if j + cropsz[0] > imgsz[0]:
+                for i in range(0, imgsz[1], gap[1]):
+                    if i + cropsz[1] > imgsz[1]:
+                        cp_img = img[j:imgsz[0], i:imgsz[1]]
+                        if makeBorder:
+                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
+                        cropped_imgs.append(cp_img)
+                        break
+                    else:
+                        cp_img = img[j:imgsz[0], i:i + cropsz[1]]
+                        cropped_imgs.append(cp_img)
+                break
+            else:
+                for i in range(0, imgsz[1], gap[1]):
+                    if i + cropsz[1] > imgsz[1]:
+                        cp_img = img[j:j + cropsz[0], i:imgsz[1]]
+                        if makeBorder:
+                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
+                        cropped_imgs.append(cp_img)
+                        break
+                    else:
+                        cp_img = img[j:j + cropsz[0], i:i + cropsz[1]]
+                        cropped_imgs.append(cp_img)
+
+    return cropped_imgs
+
+
+def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=False, specific_color_flag=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
+    """
+    :param im:
+    :param new_shape: (H, W)
+    :param r1:
+    :param r2:
+    :param sliding_window:
+    :return:
+    """
+    color = get_color(specific_color_flag=specific_color_flag)
+
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape * 4)
+
+    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
+    if shape[0] < new_shape[0] * r1:
+        padh = new_shape[0] - shape[0]
+        padh1 = padh // 2
+        padh2 = padh - padh1
+        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
+
+    shape = im.shape[:2]  # current shape [height, width]
+    r = new_shape[0] / shape[0]
+
+    # Compute padding
+    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
+    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
+
+    rdm = np.random.random()
+    if rdm > 0.5:
+        top = ph // 2
+        bottom = ph - top
+        left = pw // 2
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
+            im = cv2.resize(im, new_shape[::-1])
+        else:  # TODO sliding window: 2023.09.27 Done
+            if sliding_window:
+                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
+                return final_imgs
+            else:
+                im = cv2.resize(im, new_shape[::-1])
+    else:
+        rdmh = np.random.random()
+        rmdw = np.random.random()
+        top = int(round(ph * rdmh))
+        bottom = ph - top
+        left = int(round(pw * rmdw))
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
+            im = cv2.resize(im, new_shape[::-1])
+        else:  # TODO sliding window: 2023.09.27 Done
+            if sliding_window:
+                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
+                return final_imgs
+            else:
+                im = cv2.resize(im, new_shape[::-1])
+
+    return im
+
+
+def makeBorder_inference(im, new_shape=(64, 256), r1=0, r2=0.25, sliding_window=False, color=(0, 0, 0), gap_r=(0, 7 / 8), last_img_makeBorder=True):
+    """
+    :param im:
+    :param new_shape: (H, W)
+    :param r1:
+    :param r2:
+    :param sliding_window:
+    :return:
+    """
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape * 4)
+
+    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
+    if shape[0] < new_shape[0] * r1:
+        padh = new_shape[0] - shape[0]
+        padh1 = padh // 2
+        padh2 = padh - padh1
+        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
+
+    shape = im.shape[:2]  # current shape [height, width]
+    r = new_shape[0] / shape[0]
+
+    # Compute padding
+    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
+    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
+
+    top = ph // 2
+    bottom = ph - top
+    left = 0
+    right = pw - left
+
+    if shape != new_unpad_size:
+        im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+    if im.shape[1] <= new_shape[1]:
+        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
+        im = cv2.resize(im, new_shape[::-1])
+    else:  # TODO sliding window: 2023.09.27 Done
+        if sliding_window:
+            final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
+            return final_imgs
+        else:
+            im = cv2.resize(im, new_shape[::-1])
+
+    return im
+
+# ==============================================================================================================================
+# ==============================================================================================================================
+
+class SegDetectorRepresenter():
+    def __init__(self, thresh=0.3, box_thresh=0.7, max_candidates=1000, unclip_ratio=1.5):
+        self.min_size = 3
+        self.thresh = thresh
+        self.box_thresh = box_thresh
+        self.max_candidates = max_candidates
+        self.unclip_ratio = unclip_ratio
+
+    def __call__(self, batch, pred, is_output_polygon=False):
+        '''
+        batch: (image, polygons, ignore_tags
+        batch: a dict produced by dataloaders.
+            image: tensor of shape (N, C, H, W).
+            polygons: tensor of shape (N, K, 4, 2), the polygons of objective regions.
+            ignore_tags: tensor of shape (N, K), indicates whether a region is ignorable or not.
+            shape: the original shape of images.
+            filename: the original filenames of images.
+        pred:
+            binary: text region segmentation map, with shape (N, H, W)
+            thresh: [if exists] thresh hold prediction with shape (N, H, W)
+            thresh_binary: [if exists] binarized with threshhold, (N, H, W)
+        '''
+        pred = pred[:, 0, :, :]
+        segmentation = self.binarize(pred)
+        boxes_batch = []
+        scores_batch = []
+        # for batch_index in range(pred.size(0)):  # train
+        for batch_index in range(pred.shape[0]):  # inference
+            height, width = batch['shape'][batch_index]
+            if is_output_polygon:
+                boxes, scores = self.polygons_from_bitmap(pred[batch_index], segmentation[batch_index], width, height)
+            else:
+                boxes, scores = self.boxes_from_bitmap(pred[batch_index], segmentation[batch_index], width, height)
+            boxes_batch.append(boxes)
+            scores_batch.append(scores)
+        return boxes_batch, scores_batch
+    
+    def binarize(self, pred):
+        return pred > self.thresh
+
+    def polygons_from_bitmap(self, pred, _bitmap, dest_width, dest_height, onnx_flag=True):
+        '''
+        _bitmap: single map with shape (H, W),
+            whose values are binarized as {0, 1}
+        '''
+
+        assert len(_bitmap.shape) == 2
+        # bitmap = _bitmap.cpu().numpy()  # The first channel
+        # pred = pred.cpu().detach().numpy()
+
+        # inference
+        if onnx_flag:
+            bitmap = _bitmap  # The first channel
+            pred = pred
+        else:
+            bitmap = _bitmap.cpu().numpy()  # The first channel
+            pred = pred.cpu().detach().numpy()
+
+        # ## train
+        # bitmap = _bitmap.cpu().numpy()  # The first channel
+        # pred = pred.cpu().detach().numpy()
+
+
+        height, width = bitmap.shape
+        boxes = []
+        scores = []
+
+        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        for contour in contours[:self.max_candidates]:
+            epsilon = 0.005 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+            points = approx.reshape((-1, 2))
+            if points.shape[0] < 4:
+                continue
+            # _, sside = self.get_mini_boxes(contour)
+            # if sside < self.min_size:
+            #     continue
+            score = self.box_score_fast(pred, contour.squeeze(1))
+            if self.box_thresh > score:
+                continue
+
+            if points.shape[0] > 2:
+                box = self.unclip(points, unclip_ratio=self.unclip_ratio)
+                if len(box) > 1:
+                    continue
+            else:
+                continue
+            box = box.reshape(-1, 2)
+            _, sside = self.get_mini_boxes(box.reshape((-1, 1, 2)))
+            if sside < self.min_size + 2:
+                continue
+
+            if not isinstance(dest_width, int):
+                dest_width = dest_width.item()
+                dest_height = dest_height.item()
+
+            box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
+            box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
+            boxes.append(box)
+            scores.append(score)
+        return boxes, scores
+
+    def boxes_from_bitmap(self, pred, _bitmap, dest_width, dest_height, onnx_flag=True):
+        '''
+        _bitmap: single map with shape (H, W),
+            whose values are binarized as {0, 1}
+        '''
+
+        assert len(_bitmap.shape) == 2
+
+        # # inference
+        if onnx_flag:
+            bitmap = _bitmap  # The first channel
+            pred = pred
+        else:
+            bitmap = _bitmap.cpu().numpy()  # The first channel
+            pred = pred.cpu().detach().numpy()
+
+        # # ## train
+        # bitmap = _bitmap.cpu().numpy()  # The first channel
+        # pred = pred.cpu().detach().numpy()
+
+        height, width = bitmap.shape
+        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        num_contours = min(len(contours), self.max_candidates)
+        boxes = np.zeros((num_contours, 4, 2), dtype=np.int16)
+        scores = np.zeros((num_contours,), dtype=np.float32)
+
+        for index in range(num_contours):
+            contour = contours[index].squeeze(1)
+            points, sside = self.get_mini_boxes(contour)
+            if sside < self.min_size:
+                continue
+            points = np.array(points)
+            score = self.box_score_fast(pred, contour)
+            if self.box_thresh > score:
+                continue
+            # print('===points:', points)
+            box = self.unclip(points, unclip_ratio=self.unclip_ratio).reshape(-1, 1, 2)
+            box, sside = self.get_mini_boxes(box)
+            if sside < self.min_size + 2:
+                continue
+            box = np.array(box)
+            if not isinstance(dest_width, int):
+                dest_width = dest_width.item()
+                dest_height = dest_height.item()
+
+            box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
+            box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
+            boxes[index, :, :] = box.astype(np.int16)
+            scores[index] = score
+        return boxes, scores
+    
+    def unclip(self, box, unclip_ratio=1.5):
+        poly = Polygon(box)
+        distance = poly.area * unclip_ratio / poly.length
+        offset = pyclipper.PyclipperOffset()
+        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        expanded = np.array(offset.Execute(distance))
+        return expanded
+
+    def get_mini_boxes(self, contour):
+        bounding_box = cv2.minAreaRect(contour)
+        points = sorted(list(cv2.boxPoints(bounding_box)), key=lambda x: x[0])
+
+        index_1, index_2, index_3, index_4 = 0, 1, 2, 3
+        if points[1][1] > points[0][1]:
+            index_1 = 0
+            index_4 = 1
+        else:
+            index_1 = 1
+            index_4 = 0
+        if points[3][1] > points[2][1]:
+            index_2 = 2
+            index_3 = 3
+        else:
+            index_2 = 3
+            index_3 = 2
+
+        box = [points[index_1], points[index_2], points[index_3], points[index_4]]
+        return box, min(bounding_box[1])
+
+    def box_score_fast(self, bitmap, _box):
+        h, w = bitmap.shape[:2]
+        box = _box.copy()
+        xmin = np.clip(np.floor(box[:, 0].min()).astype(np.int_), 0, w - 1)
+        xmax = np.clip(np.ceil(box[:, 0].max()).astype(np.int_), 0, w - 1)
+        ymin = np.clip(np.floor(box[:, 1].min()).astype(np.int_), 0, h - 1)
+        ymax = np.clip(np.ceil(box[:, 1].max()).astype(np.int_), 0, h - 1)
+
+        mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
+        box[:, 0] = box[:, 0] - xmin
+        box[:, 1] = box[:, 1] - ymin
+        cv2.fillPoly(mask, box.reshape(1, -1, 2).astype(np.int32), 1)
+        return cv2.mean(bitmap[ymin:ymax + 1, xmin:xmax + 1], mask)[0]
+
+
+def select_horizontal_images(data_path, flag="move"):
+    file_list = sorted(os.listdir(data_path))
+    dir_name = os.path.basename(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_selected_horizontal_images".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    for f in tqdm(file_list):
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        # if imgsz[0] > imgsz[1]:
+        if imgsz[0] * 1.2 < imgsz[1]:
+            f_dst_path = save_path + "/{}".format(f)
+            if flag == "copy" or flag == "cp":
+                shutil.copy(f_abs_path, f_dst_path)
+            elif flag == "move" or flag == "mv":
+                shutil.move(f_abs_path, f_dst_path)
+            elif flag == "delete" or flag == "del":
+                os.remove(f_abs_path)
+
+
+def draw_bbox(img, result, color=(0, 0, 255), thickness=2):
+    for point in result:
+        point = point.astype(int)
+        cv2.polylines(img, [point], True, color, thickness)
+    return img
+
+
+# def softmax(x):
+#     exps = np.exp(x - np.max(x))
+#     return exps / np.sum(exps)
+
+
+def expand_kpt(imgsz, pts, r):
+    minSide = min(imgsz[0], imgsz[1])
+    if minSide > 400:
+        minSide = minSide / 5
+    elif minSide > 300:
+        minSide = minSide / 4
+    elif minSide > 200:
+        minSide = minSide / 3
+    elif minSide > 100:
+        minSide = minSide / 2
+    else:
+        minSide = minSide
+
+    expandP = round(minSide * r)
+    expandP_half = round(minSide * r / 2)
+    expandP_quarter = round(minSide * r / 4)
+    expandP_one_sixth = round(minSide * r / 6)
+    expandP_one_eighth = round(minSide * r / 8)
+
+    for i in range(len(pts)):
+        if pts[i][0] - expandP >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP
+            else:
+                pts[i][0] = pts[i][0] + expandP
+        elif pts[i][0] - expandP_half >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_half
+            else:
+                pts[i][0] = pts[i][0] + expandP_half
+        elif pts[i][0] - expandP_quarter >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_quarter
+            else:
+                pts[i][0] = pts[i][0] + expandP_quarter
+        elif pts[i][0] - expandP_one_sixth >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_one_sixth
+            else:
+                pts[i][0] = pts[i][0] + expandP_one_sixth
+        elif pts[i][0] - expandP_one_eighth >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_one_eighth
+            else:
+                pts[i][0] = pts[i][0] + expandP_one_eighth
+        else:
+            pts[i][0] = pts[i][0]
+
+        if pts[i][1] - expandP >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP
+            else:
+                pts[i][1] = pts[i][1] + expandP
+        elif pts[i][1] - expandP_half >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_half
+            else:
+                pts[i][1] = pts[i][1] + expandP_half
+        elif pts[i][1] - expandP_quarter >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_quarter
+            else:
+                pts[i][1] = pts[i][1] + expandP_quarter
+        elif pts[i][1] - expandP_one_sixth >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_one_sixth
+            else:
+                pts[i][1] = pts[i][1] + expandP_one_sixth
+        elif pts[i][1] - expandP_one_eighth >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_one_eighth
+            else:
+                pts[i][1] = pts[i][1] + expandP_one_eighth
+        else:
+            pts[i][1] = pts[i][1]
+
+    for i in range(len(pts)):
+        pts[i][0] = int(round(pts[i][0]))
+        pts[i][1] = int(round(pts[i][1]))
+
+    return pts
+
+
+def cal_hw(b):
+    MIN_X = 1e6
+    MAX_X = -1e6
+    MIN_Y = 1e6
+    MAX_Y = -1e6
+
+    for bi in b:
+        if bi[0] <= MIN_X:
+            MIN_X = bi[0]
+        if bi[0] >= MAX_X:
+            MAX_X = bi[0]
+        if bi[1] <= MIN_Y:
+            MIN_Y = bi[1]
+        if bi[1] >= MAX_Y:
+            MAX_Y = bi[1]
+
+    h = int(round(abs(MAX_Y - MIN_Y)))
+    w = int(round(abs(MAX_X - MIN_X)))
+    return (h, w)
+
+def get_new_boxes(boxes, rhw, r=0.12):
+    boxes_orig = []
+    for bi in boxes:
+        bi_ = []
+        for bj in bi:
+            bi_orig = [bj[0] / rhw[1], bj[1] / rhw[0]]
+            bi_.append(bi_orig)
+        boxes_orig.append(bi_)
+
+    boxes_new = []
+    for bbi in boxes_orig:
+        # x1, x2 = round(min(bi[0], bi[0])), round(max(bi[0], bi[0]))
+        # y1, y2 = round(min(bi[1], bi[1])), round(max(bi[1], bi[1]))
+        # basesz = (abs(y2 - y1), abs(x2 - x1))
+        basesz = cal_hw(bbi)
+        bi_ = expand_kpt(basesz, bbi, r)
+        boxes_new.append(bi_)
+
+    return boxes_new
+
+
+def perspective_transform(p1, dstsz, img):
+    p1 = np.array([p1[0], p1[1], p1[3], p1[2]], dtype=np.float32)
+    p2 = np.array([[0, 0], [dstsz[1], 0], [0, dstsz[0]], [dstsz[1], dstsz[0]]], dtype=np.float32)
+
+    M = cv2.getPerspectiveTransform(p1, p2)
+    warped = cv2.warpPerspective(img, M, dstsz[::-1])
+    return warped
+
+
+def softmax(x):
+    ex = np.exp(x - np.max(x))
+    return ex / np.sum(ex)
+
+
+def median_blur(img, k=3):
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    dst = cv2.medianBlur(img, k)
+    return dst
+
+
+def clahe(img, clipLimit=40):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(8, 8))
+    dst1 = clahe.apply(gray)
+    dst = cv2.merge([dst1, dst1, dst1])
+    return dst
+
+
+def isAllDigits(string):
+    pattern = r'^\d+$'
+    if re.match(pattern, string):
+        return True
+    else:
+        return False
+
+
+def hasDigits(string):
+    pattern = r'^\d'
+    if re.match(pattern, string):
+        return True
+    else:
+        return False
+
+
+def hasChinese(string):
+    pattern = '[\u4e00-\u9fa5]'
+    if re.match(pattern, string):
+        return True
+    else:
+        return False
+
+
+def containChinese(string):
+    pattern = r'[\u4e00-\u9fff]'
+    return re.search(pattern, string) is not None
+
+
+def process_sliding_window_results(res):
+    # TODO
+    final_res = ""
+    for i, resi in enumerate(res):
+        if i == 0:
+            final_res += resi
+        else:
+            resi_new = resi
+            for j in range(len(resi)):
+                if len(resi) >= j + 1 and len(final_res) >= j + 1:
+                    if resi[0:j + 1] == final_res[-(j + 1):]:
+                        resi_new = resi[j + 1:]
+            final_res += resi_new
+
+    return final_res
+
+
+def get_label(img_name):
+    label = ""
+    if "=" in img_name:
+        equal_num = img_name.count("=")
+        if equal_num > 1:
+            print("equal_num > 1!")
+        else:
+            # label = img_name.split("=")[-1]
+
+            img_name_r = img_name[::-1]
+            idx_r = img_name_r.find("=")
+            idx = -(idx_r + 1)
+            label = img_name[(idx + 1):]
+
+    return label
+
+
+def get_alpha(flag="digits_19"):
+    global alpha
+
+    if flag == "digits_15":
+        # alpha = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        # alpha = ' ' + '0123456789.-:' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        alpha = ' ' + '0123456789.' + 'AbC'
+    elif flag == "digits_19":
+        alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC'
+    elif flag == "digits_20":
+        alpha = ' ' + '0123456789' + '.:/\\-' + 'ABbC'
+    elif flag == "digits_26":
+        alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC' + '℃' + 'MPa' + '㎡m³'
+    elif flag == "Chinese1":
+        CH_SIM_CHARS = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        CH_SIM_CHARS += ',;~!@#$%^&*()_+-={}:"<>?-=[]/|\\' + "'"
+        CH_SIM_CHARS += '、。┅《》「」【】¥®πи‰℃№Ⅱ←↑→↓①②③④▪☆❤'
+        print(len(CH_SIM_CHARS))
+
+        ch_sim_chars = open("words/ch_sim_char.txt", "r", encoding="utf-8")
+        lines = ch_sim_chars.readlines()
+        for l in lines:
+            CH_SIM_CHARS += l.strip()
+        alpha = CH_SIM_CHARS  # len = 6738  7568
+    elif flag == "Chinese_6867":
+        CH_SIM_CHARS = ' '
+        ch_sim_chars = open("words/chinese_simple_with_special_chars.txt", "r", encoding="utf-8")
+        lines = ch_sim_chars.readlines()
+        for l in lines:
+            CH_SIM_CHARS += l.strip()
+        alpha = CH_SIM_CHARS  # len = 6867
+    elif flag == "ppocr_6625":
+        CH_SIM_CHARS = ' '
+        ch_sim_chars = open("words/ppocr_keys_v1.txt", "r", encoding="utf-8")
+        lines = ch_sim_chars.readlines()
+        for l in lines:
+            CH_SIM_CHARS += l.strip()
+        alpha = CH_SIM_CHARS
+    else:
+        raise NotImplementedError
+
+    return alpha
+
+
+def resize_norm_padding_img(img, imgsz, max_wh_ratio):
+    # max_wh_ratio: 320 / 48
+    imgC, imgH, imgW = imgsz
+    assert imgC == img.shape[2]
+    imgW = int((imgH * max_wh_ratio))
+    h, w = img.shape[:2]
+    ratio = w / float(h)
+    if math.ceil(imgH * ratio) > imgW:
+        resized_w = imgW
+    else:
+        resized_w = int(math.ceil(imgH * ratio))
+    resized_image = cv2.resize(img, (resized_w, imgH))
+    resized_image = resized_image.astype('float32')
+    resized_image = resized_image.transpose((2, 0, 1)) / 255
+    resized_image -= 0.5
+    resized_image /= 0.5
+    padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
+    padding_im[:, :, 0:resized_w] = resized_image
+    return padding_im
+
+
+def putText_Chinese(img_pil, p, string, color=(255, 0, 255)):
+    # img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img_pil)
+    font = ImageFont.truetype('./utils/gen_fake/Fonts/chinese_2/仿宋_GB2312.ttf', 20)
+    draw.text(p, string, font=font, fill=color)
+    # img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+    return img_pil
+
+
+def draw_e2e_res(image, boxes, txts, font_path="utils/gen_fake/Fonts/chinese_2/楷体_GB2312.ttf"):
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(np.uint8(image))
+
+    font = ImageFont.truetype(font_path, 15, encoding="utf-8")
+    h, w = image.height, image.width
+    img_left = image.copy()
+    img_right = Image.new('RGB', (w, h), (255, 255, 255))
+
+    random.seed(0)
+    draw_left = ImageDraw.Draw(img_left)
+    draw_right = ImageDraw.Draw(img_right)
+    for idx, (box, txt) in enumerate(zip(boxes, txts)):
+        box = np.array(box)
+        box = [tuple(x) for x in box]
+        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        draw_left.polygon(box, fill=color)
+        draw_right.polygon(box, outline=color)
+        draw_right.text([box[0][0], box[0][1]], txt, fill=(0, 0, 0), font=font)
+    img_left = Image.blend(image, img_left, 0.5)
+    img_show = Image.new('RGB', (w * 2, h), (255, 255, 255))
+    img_show.paste(img_left, (0, 0, w, h))
+    img_show.paste(img_right, (w, 0, w * 2, h))
+
+    return np.array(img_show)[:, :, ::-1]
+
+
+class GKFOCR(object):
+    """
+    input support: 1.image path
+    2024.09.14
+    """
+
+    def __init__(self, cfg_path: str = "configs/cfg_gkfocr.yaml", debug: bool = False):
+        with open(cfg_path, errors='ignore') as f:
+            cfg = yaml.safe_load(f)
+
+        self.cfg = cfg
+        self.m_FLAG_DeBug = debug
+        self.alpha = get_alpha(flag="Chinese_6867")  # digits Chinese
+
+        self.det_model_path = self.cfg["det"]["model_path"]
+        self.rec_model_path = self.cfg["rec"]["model_path"]
+        self.det_input_shape = eval(self.cfg["det"]["input_shape"])
+        self.rec_input_shape = eval(self.cfg["rec"]["input_shape"])
+        self.det_mean = eval(self.cfg["det"]["mean"])
+        self.det_std = eval(self.cfg["det"]["std"])
+        self.rec_mean = eval(self.cfg["rec"]["mean"])
+        self.rec_std = eval(self.cfg["rec"]["std"])
+
+        self.det_ort_session = self.init_model(self.det_model_path)
+        print("Load det model: {}\tSuccessful".format(self.det_model_path))
+        self.rec_ort_session = self.init_model(self.rec_model_path)
+        print("Load rec model: {}\tSuccessful".format(self.rec_model_path))
+
+        self.det_thresh = float(self.cfg["det"]["thresh"])
+        self.det_box_thresh = float(self.cfg["det"]["box_thresh"])
+        self.det_max_candidates = float(self.cfg["det"]["max_candidates"])
+        self.det_unclip_ratio = float(self.cfg["det"]["unclip_ratio"])
+
+        self.rec_make_border_flag = bool(self.cfg["rec"]["make_border_flag"])
+        self.rec_batch_first = bool(self.cfg["rec"]["batch_first"])
+        self.rec_ppocr_flag = bool(self.cfg["rec"]["ppocr_flag"])
+        self.rec_c = int(self.cfg["rec"]["c"])
+        self.rec_r1 = float(self.cfg["rec"]["r1"])
+        self.rec_r2 = float(self.cfg["rec"]["r2"])
+        self.rec_sliding_window_flag = bool(self.cfg["rec"]["sliding_window_flag"])
+        self.rec_color = eval(self.cfg["rec"]["color"])
+        self.rec_gap_r = eval(self.cfg["rec"]["gap_r"])
+        self.rec_medianblur_flag = bool(self.cfg["rec"]["medianblur_flag"])
+        self.rec_k = int(self.cfg["rec"]["k"])
+        self.rec_clahe_flag = bool(self.cfg["rec"]["clahe_flag"])
+        self.rec_clipLimit = int(self.cfg["rec"]["clipLimit"])
+        self.rec_score_thr = float(self.cfg["rec"]["score_thr"])
+
+    def init_model(self, model_path: str):
+        so = ort.SessionOptions()
+        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        ort_session = ort.InferenceSession(model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        return ort_session
+
+    def inference(self, data):
+        if isinstance(data, str):
+            if os.path.isfile(data):
+                img = cv2.imread(data)
+                img_cp = img.copy()
+                mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
+                txts = self.rec_inference_v2(img_cp, boxs_new)
+                out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
+                return out_img
+            elif os.path.isdir(data):
+                dirname = os.path.basename(data)
+                save_path = os.path.abspath(os.path.join(data, "../{}_output".format(dirname)))
+                os.makedirs(save_path, exist_ok=True)
+
+                file_list = sorted(os.listdir(data))
+                for f in tqdm(file_list):
+                    fname = os.path.splitext(f)[0]
+                    f_abs_path = data + "/{}".format(f)
+                    img = cv2.imread(f_abs_path)
+                    img_cp = img.copy()
+                    mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
+                    txts = self.rec_inference(img_cp, boxs_new, save_path, fname)
+
+                    if self.m_FLAG_DeBug:
+                        pred_mask_path = save_path + "/{}_pred_mask.jpg".format(fname)
+                        cv2.imwrite(pred_mask_path, mask * 255)
+
+                    out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
+                    cv2.imwrite("{}/{}_out_img.jpg".format(save_path, fname), out_img)
+                return None
+            else:
+                print("data should be test image file path or directory path!")
+        elif isinstance(data, np.ndarray) or isinstance(data, Image.Image):
+            if isinstance(data, np.ndarray):
+                out_img = self.inference_one_array(data)
+                return out_img
+            else:
+                out_img = self.inference_one_array(np.asarray(data))
+                return out_img
+        else:
+            print("data should be: 1.test image file path. 2. test image directory path. 3. test image np.ndarray or PIL.Image.Image!")
+
+    def inference_one_array(self, img):
+        img_cp = img.copy()
+        mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
+        txts = self.rec_inference_v2(img_cp, boxs_new)
+        out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
+        return out_img
+
+    def det_inference(self, img):
+        imgsz_orig = img.shape[:2]
+        rhw = (self.det_input_shape[0] / imgsz_orig[0], self.det_input_shape[1] / imgsz_orig[1])
+
+        img, img_resize = self.det_preprocess(img)
+        outputs = self.det_ort_session.run(None, {'input': img})
+        mask, boxes, scores = self.det_postprocess(outputs)
+
+        draw_img = draw_bbox(img_resize, boxes)
+        draw_img_resize = cv2.resize(draw_img, imgsz_orig[::-1])
+        boxs_new = get_new_boxes(boxes, rhw, r=0.12)
+
+        return mask, boxes, scores, draw_img_resize, boxs_new
+    
+    def det_preprocess(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, self.det_input_shape)
+        img_resize = img.copy()
+        img = (img / 255. - np.array(self.det_mean)) / np.array(self.det_std)
+        img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0).astype(np.float32)
+        return img, img_resize
+    
+    def det_postprocess(self, outputs, is_output_polygon=False):
+        b, c, h, w = outputs[0].shape
+        mask = outputs[0][0, 0, ...]
+        batch = {'shape': [(h, w)]}
+
+        box_list, score_list = SegDetectorRepresenter(thresh=self.det_thresh, box_thresh=self.det_box_thresh, max_candidates=self.det_max_candidates, unclip_ratio=self.det_unclip_ratio)(batch, outputs[0], is_output_polygon)
+        box_list, score_list = box_list[0], score_list[0]
+
+        if len(box_list) > 0:
+            if is_output_polygon:
+                idx = [x.sum() > 0 for x in box_list]
+                box_list = [box_list[i] for i, v in enumerate(idx) if v]
+                score_list = [score_list[i] for i, v in enumerate(idx) if v]
+            else:
+                idx = box_list.reshape(box_list.shape[0], -1).sum(axis=1) > 0  # 去掉全为0的框
+                box_list, score_list = box_list[idx], score_list[idx]
+        else:
+            box_list, score_list = [], []
+
+        return mask, box_list, score_list
+
+    def rec_inference(self, img, boxes, save_path, fname):
+        txts = []
+        mask_vis = np.zeros(shape=img.shape, dtype=np.uint8)
+        mask_vis_pil = Image.fromarray(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB))
+        for b in boxes:
+            try:
+                dstsz = cal_hw(b)
+                warpped = perspective_transform(b, dstsz, img)
+
+                makeBorderRes = makeBorder_inference(warpped, new_shape=self.rec_input_shape, sliding_window=self.rec_sliding_window_flag, gap_r=self.rec_gap_r)
+                pred, score = self.rec_inference_one(makeBorderRes)
+                txts.append(pred)
+
+                if self.m_FLAG_DeBug:
+                    print("pred: {}\tscore: {}".format(pred, score))
+                    cv2.imwrite("{}/{}_cropped_img={}.jpg".format(save_path, fname, pred), warpped)
+
+                p0 = tuple(map(int, b[0]))
+                mask_vis_pil = putText_Chinese(mask_vis_pil, p0, pred, color=(255, 0, 255))
+
+            except Exception as Error:
+                print(Error)
+
+        if self.m_FLAG_DeBug:
+            mask_vis = cv2.cvtColor(np.array(mask_vis_pil), cv2.COLOR_RGB2BGR)
+            cv2.imwrite("{}/{}_vis_results.jpg".format(save_path, fname), mask_vis)
+
+        return txts
+    
+    def rec_inference_v2(self, img, boxes):
+        txts = []
+        mask_vis = np.zeros(shape=img.shape, dtype=np.uint8)
+        mask_vis_pil = Image.fromarray(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB))
+        for b in boxes:
+            try:
+                dstsz = cal_hw(b)
+                warpped = perspective_transform(b, dstsz, img)
+
+                makeBorderRes = makeBorder_inference(warpped, new_shape=self.rec_input_shape, sliding_window=self.rec_sliding_window_flag, gap_r=self.rec_gap_r)
+                pred, score = self.rec_inference_one(makeBorderRes)
+                txts.append(pred)
+
+                p0 = tuple(map(int, b[0]))
+                mask_vis_pil = putText_Chinese(mask_vis_pil, p0, pred, color=(255, 0, 255))
+
+            except Exception as Error:
+                print(Error)
+
+        return txts
+    
+    def rec_inference_one(self, img):
+        img = self.rec_preprocess(img)
+        ort_outs = self.rec_ort_session.run(["output"], {self.rec_ort_session.get_inputs()[0].name: img})
+        pred, scores_mean = self.rec_postprocess(ort_outs[0])
+        return pred, scores_mean
+
+    def rec_preprocess(self, img):
+        """
+        """
+        if self.rec_medianblur_flag:
+            img = median_blur(img, k=self.rec_k)
+        if self.rec_clahe_flag:
+            img = clahe(img, clipLimit=self.rec_clipLimit)
+
+        imgsz = (self.rec_c, self.rec_input_shape[0], self.rec_input_shape[1])
+
+        if self.rec_ppocr_flag:
+            max_wh_ratio = self.rec_input_shape[1] / self.rec_input_shape[0]
+            img = resize_norm_padding_img(img, imgsz=imgsz, max_wh_ratio=max_wh_ratio)
+            img = img[np.newaxis, :].astype(np.float32)
+        else:
+            imgsz_ = img.shape[:2]
+            if imgsz_ != self.rec_input_shape:
+                img = cv2.resize(img, self.rec_input_shape[::-1])
+            img = (img / 255. - np.array(self.rec_mean)) / np.array(self.rec_std)
+            img = img.transpose(2, 0, 1)
+            img = img[np.newaxis, :].astype(np.float32)
+
+        return img
+    
+    def rec_postprocess(self, pred):
+        res = []
+        scores = []
+
+        if self.rec_batch_first:
+            for i in range(pred.shape[1]):
+                argmax_i = np.argmax(pred[0][i])
+                res.append(argmax_i)
+
+                sc_ = softmax(pred[0][i])
+                sc = sc_[1:]
+                max_ = max(sc)
+                if max_ >= self.rec_score_thr:
+                    scores.append(max_)
+        else:
+            for i in range(pred.shape[0]):
+                argmax_i = np.argmax(pred[i][0])
+                res.append(argmax_i)
+
+                sc_ = softmax(pred[i][0])
+                sc = sc_[1:]
+                max_ = max(sc)
+                if max_ >= self.rec_score_thr:
+                    scores.append(max_)
+
+        scores_mean = np.mean(scores)
+
+        pred_ = [self.alpha[class_id] for class_id in res]
+        pred_ = [k for k, g in itertools.groupby(list(pred_))]
+        pred = ''.join(pred_).replace(' ', '')
+
+        return pred, scores_mean
+
+
+def main_gkfocr():
+    data = "data/doc/imgs"
+    # data = "data/doc/imgs/11.jpg"
+    ocr = GKFOCR(cfg_path="configs/cfg_gkfocr.yaml", debug=False)
+    out_img = ocr.inference(data)
+    if out_img is not None:
+        cv2.imwrite("data/doc/test_out_img.jpg", out_img)
+
+
+def cal_distance(p1, p2):
+    dis = np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+    return dis
+
+
+def cal_similar_height_width(rect):
+    """
+    top left --> top right --> bottom right --> bottom left
+    """
+    dis01 = cal_distance(rect[0], rect[1])
+    dis12 = cal_distance(rect[1], rect[2])
+    dis23 = cal_distance(rect[2], rect[3])
+    dis30 = cal_distance(rect[3], rect[0])
+
+    sh = int(max(dis12, dis30))
+    sw = int(max(dis01, dis23))
+
+    return (sh, sw)
+
+
+def convert_to_ocr_rec_data_mtwi(data_path):
+    save_path = data_path + "/rec_cropped"
+    os.makedirs(save_path, exist_ok=True)
+
+    img_path = data_path + "/image_train"
+    txt_path = data_path + "/txt_train"
+
+    file_list = sorted(os.listdir(img_path))
+    for f in tqdm(file_list):
+        fname = os.path.splitext(f)[0]
+        f_abs_path = img_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        # print(f)
+        if img is None: continue
+        imgsz = img.shape[:2]
+
+        txt_abs_path = txt_path + "/{}.txt".format(fname)
+
+        with open(txt_abs_path, "r", encoding="utf-8") as fr:
+            lines = fr.readlines()
+            for i, line in enumerate(lines):
+                line = line.strip()
+                pos, label = line.split(",")[:8], line.split(",")[-1]
+                pos = list(map(float, pos))
+                pos = list(map(round, pos))
+                pos = list(map(int, pos))
+                # pos = np.array([[pos[0], pos[1]], [pos[2], pos[3]], [pos[4], pos[5]], [pos[6], pos[7]]])
+                pos = np.array([[pos[0], pos[1]], [pos[6], pos[7]], [pos[4], pos[5]], [pos[2], pos[3]]])
+                similar_hw = cal_similar_height_width(pos)
+                warped = perspective_transform(pos, similar_hw, img)
+                save_path_i = save_path + "/{}_{}={}.jpg".format(fname, i, label)
+                cv2.imwrite(save_path_i, warped)
+
+
+def convert_to_ocr_rec_data_ShopSign1(data_path):
+    save_path = data_path + "/rec_cropped"
+    os.makedirs(save_path, exist_ok=True)
+
+    img_path = data_path + "/images"
+    txt_path = data_path + "/labels"
+
+    file_list = sorted(os.listdir(img_path))
+    for f in tqdm(file_list):
+        fname = os.path.splitext(f)[0]
+        f_abs_path = img_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        # print(f)
+        if img is None: continue
+        imgsz = img.shape[:2]
+
+        txt_abs_path = txt_path + "/{}.txt".format(fname)
+
+        with open(txt_abs_path, "r", encoding="utf-8") as fr:
+            lines = fr.readlines()
+            for i, line in enumerate(lines):
+                line = line.strip()
+                pos, label = line.split(",")[:8], line.split(",")[-1]
+                pos = list(map(float, pos))
+                pos = list(map(round, pos))
+                pos = list(map(int, pos))
+                pos = np.array([[pos[0], pos[1]], [pos[2], pos[3]], [pos[4], pos[5]], [pos[6], pos[7]]])
+                # pos = np.array([[pos[0], pos[1]], [pos[6], pos[7]], [pos[4], pos[5]], [pos[2], pos[3]]])
+                similar_hw = cal_similar_height_width(pos)
+                warped = perspective_transform(pos, similar_hw, img)
+                save_path_i = save_path + "/{}_{}={}.jpg".format(fname, i, label)
+                cv2.imwrite(save_path_i, warped)
+
+
+def convert_to_ocr_rec_data_ShopSign2(data_path):
+    save_path = data_path + "/rec_cropped"
+    os.makedirs(save_path, exist_ok=True)
+
+    img_path = data_path + "/images"
+    txt_path = data_path + "/labels"
+
+    file_list = sorted(os.listdir(img_path))
+    for f in tqdm(file_list):
+        fname = os.path.splitext(f)[0]
+        f_abs_path = img_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        # print(f)
+        if img is None: continue
+        imgsz = img.shape[:2]
+
+        txt_abs_path = txt_path + "/{}.txt".format(fname.replace("image", "gt_img"))
+
+        with open(txt_abs_path, "r", encoding="gbk") as fr:
+            lines = fr.readlines()
+            for i, line in enumerate(lines):
+                line = line.strip()
+                pos, label = line.split(",")[:8], line.split(",")[-1]
+                pos = list(map(float, pos))
+                pos = list(map(round, pos))
+                pos = list(map(int, pos))
+                pos = np.array([[pos[0], pos[1]], [pos[2], pos[3]], [pos[4], pos[5]], [pos[6], pos[7]]])
+                # pos = np.array([[pos[0], pos[1]], [pos[6], pos[7]], [pos[4], pos[5]], [pos[2], pos[3]]])
+                similar_hw = cal_similar_height_width(pos)
+                warped = perspective_transform(pos, similar_hw, img)
+                save_path_i = save_path + "/{}_{}={}.jpg".format(fname, i, label)
+                cv2.imwrite(save_path_i, warped)
+
+
+                
 
 
 

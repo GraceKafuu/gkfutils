@@ -1619,6 +1619,23 @@ def merge_txt_files(data_path):
     fw.close()
 
 
+def merge_txt_files_v2(data_path):
+    dirname = os.path.basename(data_path)
+    file_list = get_file_list(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "../Merged_txt"))
+    os.makedirs(save_path, exist_ok=True)
+    merged_txt_path = save_path + "/{}.txt".format(dirname)
+    fw = open(merged_txt_path, "w", encoding="utf-8")
+
+    for f in file_list:
+        f_path = data_path + "/{}".format(f)
+        if os.path.isfile(f_path) and f_path.endswith(".txt"):
+            with open(f_path, "r", encoding="utf-8") as fr:
+                lines = fr.readlines()
+                fw.writelines(lines)
+    fw.close()
+
+
 def ocr_data_gen_train_txt(data_path, LABEL):
     """
     fname=label.jpg --> fname=label.jpg label
@@ -1691,6 +1708,33 @@ def ocr_data_gen_train_txt_v2(data_path, LABEL):
     fw.close()
 
 
+def ocr_data_merge_train_txt_files_v2(data_path, LABEL):
+    """
+    fname=label.jpg --> fname=label.jpg label
+    Returns
+    -------
+
+    """
+    # save_path = data_path + ".txt"
+    #
+    # fw = open(save_path, "w", encoding="utf-8")
+
+    dirs = sorted(os.listdir(data_path))
+
+    for d in dirs:
+        d_path = data_path + "/{}".format(d)
+
+        merge_txt_files_v2(d_path)
+
+        # if os.path.isfile(d_path): continue
+        # ddirs = sorted(os.listdir(d_path))
+        # for dd in ddirs:
+        #     dd_path = d_path + "/{}".format(dd)
+        #     merge_txt_files(dd_path)
+
+    # fw.close()
+
+
 def check_ocr_label(data_path, label):
     """
     data_path: *.txt
@@ -1755,6 +1799,24 @@ def read_ocr_lables(lbl_path):
     return alpha
 
 
+def random_select_files_from_txt(data_path, n=2500):
+
+    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/selected"
+    os.makedirs(save_path, exist_ok=True)
+
+    fr = open(data_path, "r", encoding="utf-8")
+    lines = fr.readlines()
+    rs = random.sample(lines, n)
+    for line in rs:
+        f_abs_path = line.split(" ")[0]
+        f = os.path.basename(f_abs_path)
+        f_dst_path = save_path + "/{}".format(f)
+        try:
+            shutil.copy(f_abs_path, f_dst_path)
+        except Exception as Error:
+            print(Error)
+
+            
 def rename_files_under_dirs(data_path):
     dir_list = get_dir_list(data_path)
     for d in tqdm(dir_list):

@@ -21,57 +21,59 @@ import re
 import cv2
 import sys
 import json
-import numpy as np
-import pandas as pd
 import random
 import shutil
 import time
 import math
-import scipy
-import scipy.misc
 import copy
 import codecs
 import threading
-import skimage
-import skimage.io
 import imghdr
 import struct
 import pickle
 import hashlib
-from tqdm import tqdm
 import glob
-import torch
-import torchvision
-import onnxruntime
-from torchvision import transforms
-import socket
-import logging.config
-from skimage import feature, exposure
-from skimage.util import img_as_float
-from skimage.util import random_noise
-from sklearn.cluster import KMeans
-from collections import Counter
-import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw, ImageFont
-# from fontTools.ttLib import TTFont
-from skimage.color import rgb2lab, deltaE_cie76
-from skimage.metrics import structural_similarity
-from pywt import dwt, idwt, dwt2, idwt2
 import base64
-from fastai.vision import *
-from PIL import Image, ImageEnhance, ImageOps, ImageFile
-import imgaug as ia
-import imgaug.augmenters as iaa
-from imgaug.augmentables.segmaps import SegmentationMapsOnImage
-from PIL import Image
-import argparse
-from xml.dom.minidom import Document
-from xml.dom.minidom import parse
-from xml.dom import minidom
-import xml.etree.ElementTree as ET
-from lxml import etree, objectify
+import socket
 
 try:
+    import numpy as np
+    import pandas as pd
+    import torch
+    import torchvision
+    import onnxruntime
+    from torchvision import transforms
+    from tqdm import tqdm
+    import skimage
+    import skimage.io
+    import scipy
+    import scipy.misc
+    import logging.config
+    from skimage import feature, exposure
+    from skimage.util import img_as_float
+    from skimage.util import random_noise
+    from sklearn.cluster import KMeans
+    from collections import Counter
+    import matplotlib.pyplot as plt
+    from PIL import Image, ImageDraw, ImageFont
+    # from fontTools.ttLib import TTFont
+    from skimage.color import rgb2lab, deltaE_cie76
+    from skimage.metrics import structural_similarity
+    from pywt import dwt, idwt, dwt2, idwt2
+    
+    from fastai.vision import *
+    from PIL import Image, ImageEnhance, ImageOps, ImageFile
+    import imgaug as ia
+    import imgaug.augmenters as iaa
+    from imgaug.augmentables.segmaps import SegmentationMapsOnImage
+    from PIL import Image
+    import argparse
+    from xml.dom.minidom import Document
+    from xml.dom.minidom import parse
+    from xml.dom import minidom
+    import xml.etree.ElementTree as ET
+    from lxml import etree, objectify
+
     import open3d as osd
     import pypyodbc
     import labelme

@@ -308,6 +308,8 @@ class YOLOv8_ONNX(object):
                 det[:, :4] = self.scale_boxes(img_size, det[:, :4], src_size).round()
                 for *xyxy, conf, cls in reversed(det):
                     x1y1x2y2_VOC = [int(round(ci)) for ci in torch.tensor(xyxy).view(1, 4).view(-1).tolist()]
+                    x1y1x2y2_VOC.append(float(conf.numpy()))
+                    x1y1x2y2_VOC.append(int(cls.numpy()))
                     out_bbx.append(x1y1x2y2_VOC)
 
         return out_bbx

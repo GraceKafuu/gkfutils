@@ -235,6 +235,7 @@ class YOLOv5_ONNX(object):
                 for *xyxy, conf, cls in reversed(det):
                     x1y1x2y2_VOC = [int(round(ci)) for ci in torch.tensor(xyxy).view(1, 4).view(-1).tolist()]
                     x1y1x2y2_VOC.append(float(conf.numpy()))
+                    x1y1x2y2_VOC.append(int(cls.numpy()))
                     out_bbx.append(x1y1x2y2_VOC)
 
         return out_bbx

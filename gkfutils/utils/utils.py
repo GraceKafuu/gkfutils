@@ -16,25 +16,26 @@ Description:
 
 import os
 import re
-import cv2
-import numpy as np
-import json
-import pandas as pd
-import random
-import shutil
-import time
-import threading
-import struct
-import pickle
-import hashlib
-from tqdm import tqdm
-from glob import glob
-import socket
-import logging
-import logging.config
-from logging.handlers import TimedRotatingFileHandler
+
 
 try:
+    import cv2
+    import random
+    import shutil
+    import time
+    import numpy as np
+    import json
+    import pandas as pd
+    import threading
+    import struct
+    import pickle
+    import hashlib
+    from tqdm import tqdm
+    from glob import glob
+    import socket
+    import logging
+    import logging.config
+    from logging.handlers import TimedRotatingFileHandler
     from accessdbtools import AccessDatabase, AccessTableData
 except ImportError as e:
     print(e)

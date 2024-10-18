@@ -18,25 +18,25 @@ from ..utils.utils import *
 
 import os
 import re
-import cv2
 import sys
-import json
-import random
-import shutil
-import time
-import math
-import copy
-import codecs
-import threading
-import imghdr
-import struct
-import pickle
-import hashlib
-import glob
-import base64
-import socket
 
 try:
+    import cv2
+    import json
+    import random
+    import shutil
+    import time
+    import math
+    import copy
+    import codecs
+    import threading
+    import imghdr
+    import struct
+    import pickle
+    import hashlib
+    import glob
+    import base64
+    import socket
     import numpy as np
     import pandas as pd
     import torch

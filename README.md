@@ -5,9 +5,9 @@ gkf means "GraceKafuu", gkfutils is my personal python package and my study to m
 <summary>Install</summary>
 Pip install the gkfutils package.
   
-[![PyPI - Version](https://img.shields.io/pypi/v/ultralytics?logo=pypi&logoColor=white)](https://pypi.org/project/gkfutils/)
+[![PyPI - Version](https://img.shields.io/pypi/v/gkfutils?logo=pypi&logoColor=white)](https://pypi.org/project/gkfutils/)
 
 ```bash
-pip install ultralytics
+pip install gkfutils
 ```
 

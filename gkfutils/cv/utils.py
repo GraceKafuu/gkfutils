@@ -163,7 +163,7 @@ def convertBboxXML2TXT(img_name, data_path, classes):
     return class_names
 
 
-def convert_yolo_txt_to_labelbee_det_json(data_path):
+def yolo2labelbee(data_path):
     img_path = data_path + "/images"
     txt_path = data_path + "/labels"
     json_path = data_path + "/jsons"
@@ -206,7 +206,7 @@ def convert_yolo_txt_to_labelbee_det_json(data_path):
             print("txt_abs_path: ", txt_abs_path)
 
 
-def convert_VOC_xml_to_yolo_txt(data_path, classes, val_percent=0.1):
+def voc2yolo(data_path, classes, val_percent=0.1):
     # classes = ["fire"]  # own data sets which classes which category to write, in the order
     # test set proportion of the total data set, the default 0.1, if the test set and the training set have been demarcated, the corresponding code is modified
 
@@ -241,7 +241,7 @@ def convert_VOC_xml_to_yolo_txt(data_path, classes, val_percent=0.1):
     val_file.close()
 
 
-def convert_labelbee_det_json_to_yolo_txt(data_path, copy_image=False):
+def labelbee2yolo(data_path, copy_image=False):
     img_path = data_path + "/images"
     json_path = data_path + "/jsons"
 
@@ -304,7 +304,7 @@ def convert_labelbee_det_json_to_yolo_txt(data_path, copy_image=False):
             print(Error)
 
 
-def convert_labelbee_kpt_json_to_yolo_txt(data_path, copy_image=True):
+def labelbee_kpt_to_yolo(data_path, copy_image=True):
     img_path = data_path + "/images"
     json_path = data_path + "/jsons"
 
@@ -356,7 +356,7 @@ def convert_labelbee_kpt_json_to_yolo_txt(data_path, copy_image=True):
             print(Error)
 
 
-def convert_labelbee_kpt_json_to_dbnet_gt(data_path, copy_image=True):
+def labelbee_kpt_to_dbnet(data_path, copy_image=True):
     img_path = data_path + "/images"
     json_path = data_path + "/jsons"
 
@@ -746,13 +746,13 @@ def convert_labelbee_det_one_json_to_yolo_txt(json_path):
                 fw.write(txt_content)
 
 
-def convert_labelbee_seg_json_to_png(base_path):
-    images_path = base_path + "/{}".format("images")
-    json_path = base_path + "/{}".format("jsons")
+def labelbee_seg_to_png(data_path):
+    images_path = data_path + "/{}".format("images")
+    json_path = data_path + "/{}".format("jsons")
 
-    seg_images_path = base_path + "/{}".format("images_select")
-    png_vis_path = base_path + "/{}".format("masks_vis")
-    png_path = base_path + "/{}".format("masks")
+    seg_images_path = data_path + "/{}".format("images_select")
+    png_vis_path = data_path + "/{}".format("masks_vis")
+    png_path = data_path + "/{}".format("masks")
     os.makedirs(seg_images_path, exist_ok=True)
     os.makedirs(png_vis_path, exist_ok=True)
     os.makedirs(png_path, exist_ok=True)
@@ -11833,7 +11833,7 @@ def warpPerspective_img_via_labelbee_kpt_json(data_path):
             print(Error)
 
 
-def labelbee_kpt_json_to_labelme_kpt_json(data_path):
+def labelbee_kpt_to_labelme_kpt(data_path):
     save_path = make_save_path(data_path, "labelme_format")
     img_save_path = save_path + "/images"
     json_save_path = save_path + "/jsons"
@@ -11905,7 +11905,7 @@ def aug_points(pts, n=10, imgsz=None, r=0.05):
     return ptsnew
 
 
-def labelbee_kpt_json_to_labelme_kpt_json_multi_points(data_path):
+def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
     save_path = make_save_path(data_path, "labelme_format")
     img_save_path = save_path + "/images"
     json_save_path = save_path + "/jsons"

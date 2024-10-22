@@ -156,32 +156,20 @@ def LogInit(prex):
     return log
 
 
-def gen_data_txt_list(data_path, one_dir_flag=True):
-    if one_dir_flag:
-        data_list = sorted(os.listdir(data_path))
-        txt_save_path = os.path.abspath(os.path.join(data_path, "../")) + "/{}_list.txt".format(data_path.split("/")[-1])
-        with open(txt_save_path, 'w', encoding='utf-8') as fw:
-            for f in data_list:
+def gen_file_list(data_path, abspath=True):
+    dirname = os.path.basename(data_path)
+    data_list = sorted(os.listdir(data_path))
+    txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
+    with open(txt_save_path, 'w', encoding='utf-8') as fw:
+        for f in data_list:
+            if abspath:
                 f_abs_path = data_path + "/{}".format(f)
                 fw.write("{}\n".format(f_abs_path))
+            else:
+                fw.write("{}\n".format(f))
 
-        print("Success! Generated files list txt --> {}".format(txt_save_path))
-    else:
-        dirs = sorted(os.listdir(data_path))
-        unexpected_dirs = ["others"]
-
-        txt_save_path = os.path.abspath(os.path.join(data_path, "../")) + "/{}_list.txt".format(data_path.split("/")[-1])
-        with open(txt_save_path, 'w', encoding='utf-8') as fw:
-            for d in dirs:
-                d_path = data_path + "/{}".format(d)
-                if d in unexpected_dirs: continue
-                if os.path.isfile(d_path): continue
-
-                data_list = sorted(os.listdir(d_path))
-                for f in data_list:
-                    if f.endswith(".jpg") or f.endswith(".png") or f.endswith("bmp") or f.endswith(".jpeg"):
-                        f_abs_path = d_path + "/{}".format(f)
-                        fw.write("{}\n".format(f_abs_path))
+    print("Success! --> {}".format(txt_save_path))
+    
 
 
 def change_txt_content(txt_base_path):

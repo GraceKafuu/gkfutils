@@ -18,6 +18,6 @@ pip install gkfutils
 import gkfutils
 
 print(gkfutils.__version__)
-gkfutils.utils.gen_data_txt_list(data_path="data_path", one_dir_flag=True)  # Will generate a .txt file that contains file_abs_path of files in data_path.
+gkfutils.utils.gen_file_list(data_path="data_path", abspath=True)  # Will generate .txt file that contains file path.
 
 ```

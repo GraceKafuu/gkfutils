@@ -19,31 +19,33 @@ from ..utils import *
 import os
 import re
 import sys
+import cv2
+import json
+import random
+import shutil
+import time
+import math
+import copy
+import codecs
+import threading
+import imghdr
+import struct
+import pickle
+import hashlib
+import glob
+import base64
+import socket
+import numpy as np
+import pandas as pd
+from PIL import Image
+import torch
+import torchvision
+import onnxruntime
+from torchvision import transforms
+from tqdm import tqdm
+import argparse
 
 try:
-    import cv2
-    import json
-    import random
-    import shutil
-    import time
-    import math
-    import copy
-    import codecs
-    import threading
-    import imghdr
-    import struct
-    import pickle
-    import hashlib
-    import glob
-    import base64
-    import socket
-    import numpy as np
-    import pandas as pd
-    import torch
-    import torchvision
-    import onnxruntime
-    from torchvision import transforms
-    from tqdm import tqdm
     import skimage
     import skimage.io
     import scipy
@@ -66,8 +68,7 @@ try:
     import imgaug as ia
     import imgaug.augmenters as iaa
     from imgaug.augmentables.segmaps import SegmentationMapsOnImage
-    from PIL import Image
-    import argparse
+    
     from xml.dom.minidom import Document
     from xml.dom.minidom import parse
     from xml.dom import minidom

@@ -23,7 +23,7 @@ Change Log:
 
 
 from cv.utils import *
-from utils.utils import *
+from utils import *
 
 
 import os

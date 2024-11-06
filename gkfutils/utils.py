@@ -38,8 +38,6 @@ from logging.handlers import TimedRotatingFileHandler
 from logging import handlers
 
 
-
-
 def get_strftime():
     datetime = time.strftime("%Y%m%d", time.localtime(time.time()))
     return datetime
@@ -51,19 +49,21 @@ def timestamp_to_strftime(curr_timestamp):
 
 
 def strftime_to_timestamp(curr_strftime):
-    pass
+    # time_str = "2024-11-06 12:00:00"
+    struct_time = time.strptime(curr_strftime, "%Y-%m-%d %H:%M:%S")
+    timestamp = time.mktime(struct_time)
+    return timestamp
 
 
 def get_date_time(mode=0):
-    datetime1 = time.strftime("%Y %m %d %H:%M:%S", time.localtime(time.time()))
-    datetime2 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-    datetime3 = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-
     if mode == 0:
+        datetime1 = time.strftime("%Y %m %d %H:%M:%S", time.localtime(time.time()))
         return datetime1
     elif mode == 1:
+        datetime2 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         return datetime2
     elif mode == 2:
+        datetime3 = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
         return datetime3
     else:
         print("mode should be 0, 1, 2")
@@ -118,7 +118,7 @@ def get_base_name(data_path):
     return base_name
 
 
-def get_baseName_fileName_suffix(file_path):
+def get_basename_filename_suffix(file_path):
     base_name = os.path.basename(file_path)
     file_name = os.path.splitext(base_name)[0]
     suffix = os.path.splitext(base_name)[1]
@@ -155,7 +155,7 @@ def LogInit(prex):
     return log
 
 
-def gen_file_list(data_path, abspath=True):
+def save_file_path_to_txt(data_path, abspath=True):
     dirname = os.path.basename(data_path)
     data_list = sorted(os.listdir(data_path))
     txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
@@ -223,166 +223,27 @@ def change_txt_content(txt_base_path):
         #     shutil.copy(txt_abs_path, txt_new_abs_path)
 
 
-class RenameFiles(object):
-    def rename_files(self, data_path, use_orig_name=False, new_name_prefix="", zeros_num=7, start_num=0):
-        data_list = sorted(os.listdir(data_path))
-        for i in range(len(data_list)):
-            img_abs_path = data_path + "/" + data_list[i]
-            file_ends = os.path.splitext(data_list[i])[1]
-            orig_name = os.path.splitext(data_list[i])[0]
-            if use_orig_name:
-                if zeros_num == 2:
-                    new_name = "{}_{:02d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 3:
-                    new_name = "{}_{:03d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 4:
-                    new_name = "{}_{:04d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 5:
-                    new_name = "{}_{:05d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 6:
-                    new_name = "{}_{:06d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 7:
-                    new_name = "{}_{:07d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 8:
-                    new_name = "{}_{:08d}{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-            else:
-                if zeros_num == 2:
-                    new_name = "{}_{:02d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 3:
-                    new_name = "{}_{:03d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 4:
-                    new_name = "{}_{:04d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 5:
-                    new_name = "{}_{:05d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 6:
-                    new_name = "{}_{:06d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 7:
-                    new_name = "{}_{:07d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 8:
-                    new_name = "{}_{:08d}{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-
-    def rename_labelbee_json_files(self, data_path, use_orig_name=False, new_name_prefix="", zeros_num=7, start_num=0):
-        data_list = sorted(os.listdir(data_path))
-        for i in range(len(data_list)):
-            img_abs_path = data_path + "/" + data_list[i]
-            file_ends = os.path.splitext(data_list[i])[1]
-            orig_name = os.path.splitext(data_list[i])[0]
-            if use_orig_name:
-                if zeros_num == 2:
-                    new_name = "{}_{:02d}.jpg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 3:
-                    new_name = "{}_{:03d}.jpg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 4:
-                    new_name = "{}_{:04d}.jpg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 5:
-                    new_name = "{}_{:05d}.jpg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 6:
-                    new_name = "{}_{:06d}.jpg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 7:
-                    new_name = "{}_{:07d}.jpeg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 8:
-                    new_name = "{}_{:08d}.jpg{}".format(orig_name, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-            else:
-                if zeros_num == 2:
-                    new_name = "{}_{:02d}.jpg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 3:
-                    new_name = "{}_{:03d}.jpg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 4:
-                    new_name = "{}_{:04d}.jpg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 5:
-                    new_name = "{}_{:05d}.jpg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 6:
-                    new_name = "{}_{:06d}.jpg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 7:
-                    new_name = "{}_{:07d}.jpeg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-                elif zeros_num == 8:
-                    new_name = "{}_{:08d}.jpg{}".format(new_name_prefix, i + start_num, file_ends)
-                    os.rename(img_abs_path, data_path + "/" + new_name)
-
-    def rename_labelbee_json_files_test(self, data_path):
-        data_list = sorted(os.listdir(data_path))
-        for i in range(len(data_list)):
-            img_abs_path = data_path + "/" + data_list[i]
-            # file_ends = os.path.splitext(data_list[i])[1]
-            # orig_name = os.path.splitext(data_list[i])[0]
-            # new_name = "{}_{:02d}.jpg{}".format(orig_name, i + start_num, file_ends)
-            os.rename(img_abs_path, data_path + "/" + data_list[i].replace(".jpeg.json", ".jpg.json"))
-
-    def rename_add_str_before_filename(self, data_path, add_str=""):
-        data_list = sorted(os.listdir(data_path))
-        for i in range(len(data_list)):
-            img_abs_path = data_path + "/" + data_list[i]
-            # file_ends = os.path.splitext(data_list[i])[1]
-            # orig_name = os.path.splitext(data_list[i])[0]
-            # new_name = "{}_{:02d}.jpg{}".format(orig_name, i + start_num, file_ends)
-            os.rename(img_abs_path, data_path + "/{}_{}".format(add_str, data_list[i]))
-
-    def rename_test_20240223(self, data_path):
-        data_list = sorted(os.listdir(data_path))
-        for i in range(len(data_list)):
-            img_abs_path = data_path + "/" + data_list[i]
-            file_ends = os.path.splitext(data_list[i])[1]
-            orig_name = os.path.splitext(data_list[i])[0]
-            label = orig_name.split("=")[-1]
-
-            # orig_name_ = ""
-            orig_name_ = "=".join([ni for ni in orig_name.split("=")[:-1]])
-
-            if label[-2] != ".":
-                label = label[:-1] + "." + label[-1]
-
-            new_name = "{}={}{}".format(orig_name_, label, file_ends)
-
-            # new_name = "{}_{:02d}.jpg{}".format(orig_name, i + start_num, file_ends)
-            os.rename(img_abs_path, data_path + "/{}".format(new_name))
-
-    def check_label(self, data_path):
-        data_list = sorted(os.listdir(data_path))
-        for i in range(len(data_list)):
-            img_abs_path = data_path + "/" + data_list[i]
-            file_ends = os.path.splitext(data_list[i])[1]
-            orig_name = os.path.splitext(data_list[i])[0]
-            label = orig_name.split("=")[-1]
-            if label != "98.304":
-                print(img_abs_path)
-
-            # # orig_name_ = ""
-            # orig_name_ = "=".join([ni for ni in orig_name.split("=")[:-1]])
-            #
-            # if label[-2] != ".":
-            #     label = label[:-1] + "." + label[-1]
-            #
-            # new_name = "{}={}{}".format(orig_name_, label, file_ends)
-            #
-            # # new_name = "{}_{:02d}.jpg{}".format(orig_name, i + start_num, file_ends)
-            # os.rename(img_abs_path, data_path + "/{}".format(new_name))
+def rename_files(data_path, use_orig_name=False, new_name_prefix="", zeros_num=7, start_num=0):
+    data_list = sorted(os.listdir(data_path))
+    length= len(data_list)
+    for i in range(length):
+        img_abs_path = data_path + "/" + data_list[i]
+        orig_name = os.path.splitext(data_list[i])[0]
+        file_ends = os.path.splitext(data_list[i])[1]
+        if use_orig_name:
+            new_name = "{}_{:0{}d}{}".format(orig_name, i + start_num, zeros_num, file_ends)
+            os.rename(img_abs_path, data_path + "/" + new_name)
+        else:
+            new_name = "{}_{:0{}d}{}".format(new_name_prefix, i + start_num, zeros_num, file_ends)
+            os.rename(img_abs_path, data_path + "/" + new_name)
+                
+                    
+def rename_files_add_str_before_filename(data_path, add_str=""):
+    data_list = sorted(os.listdir(data_path))
+    for i in range(len(data_list)):
+        img_abs_path = data_path + "/" + data_list[i]
+        new_name = data_path + "/{}_{}".format(add_str, data_list[i])
+        os.rename(img_abs_path, new_name)
 
 
 def unzip_lots_of_files(data_path):

@@ -25,11 +25,8 @@ Change Log:
 from cv.utils import *
 from utils import *
 
-
 import os
 import re
-import numpy as np
-import pandas as pd
 import cv2
 import json
 import random
@@ -37,19 +34,18 @@ import shutil
 import time
 import math
 import scipy
-import scipy.misc
 import copy
 import codecs
 import onnxruntime
 import threading
 import skimage
-import skimage.io
 import imghdr
 import struct
 import pickle
 import hashlib
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
-from glob import glob
 import torch
 import torchvision
 from torchvision import transforms

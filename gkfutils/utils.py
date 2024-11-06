@@ -18,24 +18,20 @@ import os
 import re
 import sys
 import cv2
+import time
+import json
+import glob
 import random
 import shutil
-import time
-import numpy as np
-import json
-import pandas as pd
-import threading
 import struct
 import pickle
-import hashlib
-from tqdm import tqdm
-from glob import glob
 import socket
 import logging
-import logging.config
-from logging.handlers import TimedRotatingFileHandler
-# from accessdbtools import AccessDatabase, AccessTableData
-from logging import handlers
+import hashlib
+import threading
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
 
 
 def get_strftime():
@@ -133,6 +129,8 @@ def make_save_path(data_path, dir_name_add_str="results"):
 
 
 def LogInit(prex):
+    from logging.handlers import TimedRotatingFileHandler
+
     """
     日志按日输出 单进程适用
     """
@@ -264,7 +262,7 @@ def merge_dirs_to_one_dir(data_path, use_glob=True, n_subdir=2):
     os.makedirs(dst_path, exist_ok=True)
 
     if use_glob:
-        dir_list = glob(data_path + "{}/*".format(n_subdir * "/*"), recursive=True)
+        dir_list = glob.glob(data_path + "{}/*".format(n_subdir * "/*"), recursive=True)
         for f in dir_list:
             if os.path.isfile(f):
                 fname = os.path.basename(f)
@@ -1256,17 +1254,6 @@ def remove_list_repeat_elements(list1):
     return list2
 
 
-def rename_files(imgPath, start_idx):
-    imgList = sorted(os.listdir(imgPath))
-    for i in range(len(imgList)):
-        imgAbsPath = imgPath + "\\" + imgList[i]
-        ends = os.path.splitext(imgList[i])[1]
-        newName = "{:08d}{}".format(i + start_idx, ends)
-        os.rename(imgAbsPath, imgPath + "\\" + newName)
-
-    print("Renamed!")
-
-
 def udp_send_txt_content(txtfile, client="127.0.0.1", port=60015):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -1438,6 +1425,8 @@ def to_numpy(tensor):
 
 
 def merge_mdb_files(source_files, target_file):
+    from accessdbtools import AccessDatabase, AccessTableData
+
     # 打开目标数据库（用于存储合并后的数据）
     target_db = AccessDatabase(target_file, create_if_missing=True)
 
@@ -1723,12 +1712,14 @@ class Logger(object):
         'crit': logging.CRITICAL
     } # 日志级别关系映射
     def __init__(self, filename, level='info', when='D', backCount=3, fmt='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s'):
+        from logging.handlers import TimedRotatingFileHandler
+
         self.logger = logging.getLogger(filename)
         format_str = logging.Formatter(fmt) # 设置日志格式
         self.logger.setLevel(self.level_relations.get(level)) # 设置日志级别
         sh = logging.StreamHandler() # 往屏幕上输出
         sh.setFormatter(format_str) # 设置屏幕上显示的格式
-        th = handlers.TimedRotatingFileHandler(filename=filename, when=when, backupCount=backCount, encoding='utf-8') # 往文件里写入#指定间隔时间自动生成文件的处理器
+        th = TimedRotatingFileHandler(filename=filename, when=when, backupCount=backCount, encoding='utf-8') # 往文件里写入#指定间隔时间自动生成文件的处理器
         # 实例化TimedRotatingFileHandler
         # interval是时间间隔，backupCount是备份文件的个数，如果超过这个个数，就会自动删除，when是间隔的时间单位，单位有以下几种：
         # S 秒、M 分、H 小时、D 天、W 每星期（interval==0时代表星期一）、midnight 每天凌晨

@@ -21,68 +21,32 @@ import re
 import sys
 import cv2
 import json
-import random
-import shutil
 import time
 import math
 import copy
+import glob
+import random
+import shutil
 import codecs
-import threading
 import imghdr
 import struct
 import pickle
 import hashlib
-import glob
 import base64
 import socket
+import argparse
+import threading
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from PIL import Image
+import skimage
+import scipy
 import torch
 import torchvision
 import onnxruntime
 from torchvision import transforms
-from tqdm import tqdm
-import argparse
-
-try:
-    import skimage
-    import skimage.io
-    import scipy
-    import scipy.misc
-    import logging.config
-    from skimage import feature, exposure
-    from skimage.util import img_as_float
-    from skimage.util import random_noise
-    from sklearn.cluster import KMeans
-    from collections import Counter
-    import matplotlib.pyplot as plt
-    from PIL import Image, ImageDraw, ImageFont
-    # from fontTools.ttLib import TTFont
-    from skimage.color import rgb2lab, deltaE_cie76
-    from skimage.metrics import structural_similarity
-    from pywt import dwt, idwt, dwt2, idwt2
-    
-    from fastai.vision import *
-    from PIL import Image, ImageEnhance, ImageOps, ImageFile
-    import imgaug as ia
-    import imgaug.augmenters as iaa
-    from imgaug.augmentables.segmaps import SegmentationMapsOnImage
-    
-    from xml.dom.minidom import Document
-    from xml.dom.minidom import parse
-    from xml.dom import minidom
-    import xml.etree.ElementTree as ET
-    from lxml import etree, objectify
-
-    import open3d as osd
-    import pypyodbc
-    import labelme
-except ImportError as e:
-    print(e)
-
-
-
+import matplotlib.pyplot as plt
 
 
 # ========================================================================================================================================================================
@@ -138,6 +102,8 @@ def convertBboxYOLO2VOC(size, bbx):
 
 
 def convertBboxXML2TXT(img_name, data_path, classes):
+    import xml.etree.ElementTree as ET
+
     in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
     out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
 
@@ -558,6 +524,8 @@ def random_select_images_and_labels(data_path, select_num=1000, move_or_copy="co
 
 
 def convert_annotation(img_name, data_path, classes):
+    import xml.etree.ElementTree as ET
+
     in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
     out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
 
@@ -1003,6 +971,8 @@ def write_one(doc, root, label, value):
 
 
 def create_xml(xml_name, date, lineName, direction, startStation, endStation, startTime, endTime, startKm, endKm, startPoleNo, endPoleNo, panoramisPixel, partPixel):
+    from xml.dom import minidom
+
     doc = minidom.Document()
     root = doc.createElement("detect")
     doc.appendChild(root)
@@ -1030,6 +1000,8 @@ def create_xml(xml_name, date, lineName, direction, startStation, endStation, st
 
 
 def create_mdb_if_not_exists(ACCESS_DATABASE_FILE):
+    import pypyodbc
+
     ODBC_CONN_STR = 'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=%s;' % ACCESS_DATABASE_FILE
     if not os.path.exists(ACCESS_DATABASE_FILE):
         mdb_file = pypyodbc.win_create_mdb(ACCESS_DATABASE_FILE)
@@ -1048,6 +1020,8 @@ def create_mdb_if_not_exists(ACCESS_DATABASE_FILE):
 
 
 def write_data_to_mdb(ACCESS_DATABASE_FILE, insert_data):
+    import pypyodbc
+
     ODBC_CONN_STR = 'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=%s;' % ACCESS_DATABASE_FILE
 
     conn = pypyodbc.connect(ODBC_CONN_STR)
@@ -1063,6 +1037,8 @@ def write_data_to_mdb(ACCESS_DATABASE_FILE, insert_data):
 
 
 def change_xml_content(filename, content_orig, content_chg):
+    import xml.etree.ElementTree as ET
+
     xmlTree = ET.parse(filename)
     rootElement = xmlTree.getroot()
     for element in rootElement.findall("object"):
@@ -1125,7 +1101,7 @@ def txt2xml(args):
 
     for key in content_dict.keys():
         file_name = key
-        doc = Document()
+        doc = minidom.Document()
         annotationlist = doc.createElement('annotation')
         doc.appendChild(annotationlist)
 
@@ -1136,7 +1112,7 @@ def txt2xml(args):
 
         annotationlist.appendChild(doc.createElement('filename')).appendChild(doc.createTextNode(sys.argv[0]))
 
-        xml_size = parse(os.path.join(input_xml_file_path, '{}.xml'.format(file_name)))
+        xml_size = minidom.parse(os.path.join(input_xml_file_path, '{}.xml'.format(file_name)))
         width_value = xml_size.getElementsByTagName('width')
         width_value = width_value[0].firstChild.data
         height_value = xml_size.getElementsByTagName('height')
@@ -1198,6 +1174,8 @@ def convert(size, box):
 
 
 def convert_annotation_(base_path, image_id):
+    import xml.etree.ElementTree as ET
+
     in_file = open('{}/xmls/{}.xml'.format(base_path, image_id).replace("\\", "/"), encoding='utf-8')
     out_file = open('{}/labels/{}.txt'.format(base_path, image_id).replace("\\", "/"), 'w')
 
@@ -3139,6 +3117,8 @@ def remove_corrupt_images_opencv(img_path):
 
 
 def ssim_move_or_remove_same_images(img_path, imgsz=(64, 64), move_or_remove="move"):
+    from skimage.metrics import structural_similarity
+
     img_list = sorted(os.listdir(img_path))
     dir_name = os.path.basename(img_path)
 
@@ -3183,6 +3163,8 @@ def ssim_move_or_remove_same_images(img_path, imgsz=(64, 64), move_or_remove="mo
 
 
 def ssim_move_or_remove_base(img_path, imgsz, img_list, ii, img_i, img_list_i, move_or_remove, move_path):
+    from skimage.metrics import structural_similarity
+
     for j in range(len(img_list_i)):
         img_path_j = img_path + "/{}".format(img_list_i[j])
         img_j = cv2.imread(img_path_j)
@@ -3471,6 +3453,8 @@ def select_images_according_yolo_label(data_path="", save_path=""):
 
 
 def apply_hog(img):
+    from skimage import feature, exposure
+
     fd, hog_img = feature.hog(img, orientations=9, pixels_per_cell=(16, 16), cells_per_block=(2, 2), visualize=True)
     hog_img_rescaled = exposure.rescale_intensity(hog_img, in_range=(0, 10))
     return hog_img_rescaled
@@ -3548,6 +3532,8 @@ def cal_saliency_map_FT(src):
 
 
 def get_saliency_ft(img_path):
+    from skimage.util import img_as_float
+
     # Saliency map calculation based on:
 
     img = skimage.io.imread(img_path)
@@ -3591,6 +3577,8 @@ def binarise_saliency_map(saliency_map):
 
 
 def saliency_map_ft_test():
+    from pywt import dwt, idwt, dwt2, idwt2
+
     # img = cv2.imread("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133.jpg")
     # saliency_map = cal_saliency_map_FT(img)
     # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133_saliency_map_ft.jpg", saliency_map * 255)
@@ -3703,6 +3691,8 @@ def thresh_img(img, threshold_min_thr=10, adaptiveThreshold=True):
 
 
 def wt_test():
+    from pywt import dwt, idwt, dwt2, idwt2
+
     img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/cmp_data2/smoke"
     img_list = os.listdir(img_path)
 
@@ -3925,6 +3915,8 @@ def rotate_img_any_angle(img_path):
 
 
 def ssim_move_images(base_img_path, imgs_path, imgsz=(32, 32), ssim_thr=0.5):
+    from skimage.metrics import structural_similarity
+
     img_list = sorted(os.listdir(imgs_path))
     base_img = cv2.imread(base_img_path)
     img_i = cv2.resize(base_img, imgsz)
@@ -5624,6 +5616,8 @@ def detect_shape(c):
 
 
 def cv2ImgAddText(img, text, left, top, font_path="simsun.ttc", textColor=(0, 255, 0), textSize=20):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
     if (isinstance(img, np.ndarray)):  # 判断是否OpenCV图片类型
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     # 创建一个可以在给定图像上绘图的对象
@@ -5874,6 +5868,9 @@ def get_image(image_path):
 
 
 def get_colors(image, n_colors, show_chart, size):
+    from sklearn.cluster import KMeans
+    from collections import Counter
+
     modified_image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
     modified_image = modified_image.reshape(modified_image.shape[0] * modified_image.shape[1], 3)
 
@@ -5897,6 +5894,8 @@ def get_colors(image, n_colors, show_chart, size):
 
 
 def match_image_by_color(image, color, threshold=60, n_colors=10, size=(128, 32)):
+    from skimage.color import rgb2lab, deltaE_cie76
+
     image_colors = get_colors(image, n_colors, False, size)
     selected_color = rgb2lab(np.uint8(np.asarray([[color]])))
 
@@ -8108,6 +8107,7 @@ class DataAugmentForObjectDetection():
 
     # 加噪声
     def _addNoise(self, img):
+        from skimage.util import random_noise
         '''
         输入:
             img:图像array
@@ -8531,6 +8531,7 @@ class DataAugmentForObjectDetection():
 
 class ToolHelper():
     # def parse_xml(self, path):
+    #     import xml.etree.ElementTree as ET
     #     '''
     #     输入：
     #         xml_path: xml的文件路径
@@ -8573,6 +8574,7 @@ class ToolHelper():
 
     # # 保持xml结果
     # def save_xml(self, file_name, save_folder, img_info, height, width, channel, bboxs_info):
+    #     from lxml import etree, objectify
     #     '''
     #     :param file_name:文件名
     #     :param save_folder:#保存的xml文件的结果
@@ -10034,6 +10036,8 @@ def remove_yolo_txt_contain_specific_class(data_path, rm_cls=(1, 2,)):
 
 
 def convert_Stanford_Dogs_Dataset_annotations_to_yolo_format(data_path):
+    import xml.etree.ElementTree as ET
+
     img_path = data_path + "/Images"
     anno_path = data_path + "/annotation/Annotation"
 
@@ -10704,6 +10708,8 @@ class DataAugmentForObjectDetection():
 
     # 加噪声
     def _addNoise(self, img):
+        from skimage.util import random_noise
+
         '''
         输入:
             img:图像array
@@ -11050,6 +11056,8 @@ class DataAugmentForObjectDetection():
 class ToolHelper():
     # 从xml文件中提取bounding box信息, 格式为[[x_min, y_min, x_max, y_max, name]]
     def parse_xml(self, path):
+        import xml.etree.ElementTree as ET
+
         '''
         输入：
             xml_path: xml的文件路径
@@ -11076,6 +11084,8 @@ class ToolHelper():
 
     # 保持xml结果
     def save_xml(self, file_name, save_folder, img_info, height, width, channel, bboxs_info):
+        from lxml import etree, objectify
+
         '''
         :param file_name:文件名
         :param save_folder:#保存的xml文件的结果
@@ -11181,6 +11191,8 @@ def aug_det_dataset_with_xmls(img_path, xml_path):
 
 # 读取出图像中的目标框
 def read_xml_annotation(root, image_id):
+    import xml.etree.ElementTree as ET
+
     in_file = open(os.path.join(root, image_id))
     tree = ET.parse(in_file)
     root = tree.getroot()
@@ -11204,6 +11216,8 @@ def read_xml_annotation(root, image_id):
 # 将xml文件中的旧坐标值替换成新坐标值，并保存，这个程序里面没有使用
 # (506.0000, 330.0000, 528.0000, 348.0000) -> (520.4747, 381.5080, 540.5596, 398.6603)
 def change_xml_annotation(root, image_id, new_target):
+    import xml.etree.ElementTree as ET
+
     new_xmin = new_target[0]
     new_ymin = new_target[1]
     new_xmax = new_target[2]
@@ -11227,6 +11241,8 @@ def change_xml_annotation(root, image_id, new_target):
 
 # 仅仅是替换，并没有新建
 def change_xml_list_annotation(root, image_id, new_target, saveroot, id):
+    import xml.etree.ElementTree as ET
+
     in_file = open(os.path.join(root, str(image_id) + '.xml'))  # 读取原来的xml文件
     tree = ET.parse(in_file)  # 读取xml文件
     xmlroot = tree.getroot()
@@ -11269,6 +11285,8 @@ def change_xml_list_annotation(root, image_id, new_target, saveroot, id):
 
 
 def imgaug_aug_det_dataset_with_xmls(img_path, xml_path):
+    import imgaug as ia
+
     ia.seed(1)
 
     # parser = argparse.ArgumentParser()
@@ -11291,13 +11309,13 @@ def imgaug_aug_det_dataset_with_xmls(img_path, xml_path):
     new_bndbox = []
     new_bndbox_list = []
 
-    sometimes = lambda aug: iaa.Sometimes(0.25, aug)
-    seq = iaa.Sequential([
-        iaa.Flipud(1),
-        # sometimes(iaa.Multiply((0.7, 1.3))),
-        sometimes(iaa.GaussianBlur(sigma=(0, 3.0))),
-        sometimes(iaa.Cutout(nb_iterations=(1, 5), size=0.1, squared=False)),
-        sometimes(iaa.Affine(
+    sometimes = lambda aug: ia.augmenters.Sometimes(0.25, aug)
+    seq = ia.augmenters.Sequential([
+        ia.augmenters.Flipud(1),
+        # sometimes(ia.augmenters.Multiply((0.7, 1.3))),
+        sometimes(ia.augmenters.GaussianBlur(sigma=(0, 3.0))),
+        sometimes(ia.augmenters.Cutout(nb_iterations=(1, 5), size=0.1, squared=False)),
+        sometimes(ia.augmenters.Affine(
             translate_px={"x": 15, "y": 15},
             scale=(0.8, 0.95),
             rotate=(-30, 30)
@@ -11408,6 +11426,7 @@ def create_Camvid_trainval_txt(base_path):
 
 
 class DataAugmentation:
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
     """
     包含数据增强的八种方式
     """
@@ -11634,6 +11653,8 @@ class ImageAugmentation(object):
             os.mkdir(self.segmentationClass_aug_dir)
 
     def seed_set(self, seed=1):
+        import imgaug as ia
+
         np.random.seed(seed)
         random.seed(seed)
         ia.seed(seed)
@@ -11652,34 +11673,34 @@ class ImageAugmentation(object):
     def augmentor(self, image):
         # height, width, _ = image.shape
         height, width = image.shape
-        resize = iaa.Sequential([
-            iaa.Resize({"height": int(height / 2), "width": int(width / 2)}),
+        resize = ia.augmenters.Sequential([
+            ia.augmenters.Resize({"height": int(height / 2), "width": int(width / 2)}),
         ])  # 缩放
 
-        fliplr_flipud = iaa.Sequential([
-            iaa.Fliplr(),
-            iaa.Flipud(),
+        fliplr_flipud = ia.augmenters.Sequential([
+            ia.augmenters.Fliplr(),
+            ia.augmenters.Flipud(),
         ])  # 左右+上下翻转
 
-        rotate = iaa.Sequential([
-            iaa.Affine(rotate=(-15, 15))
+        rotate = ia.augmenters.Sequential([
+            ia.augmenters.Affine(rotate=(-15, 15))
         ])  # 旋转
 
-        translate = iaa.Sequential([
-            iaa.Affine(translate_percent=(0.2, 0.35))
+        translate = ia.augmenters.Sequential([
+            ia.augmenters.Affine(translate_percent=(0.2, 0.35))
         ])  # 平移
 
-        crop_and_pad = iaa.Sequential([
-            iaa.CropAndPad(percent=(-0.25, 0), keep_size=False),
+        crop_and_pad = ia.augmenters.Sequential([
+            ia.augmenters.CropAndPad(percent=(-0.25, 0), keep_size=False),
         ])  # 裁剪
 
-        rotate_and_crop = iaa.Sequential([
-            iaa.Affine(rotate=15),
-            iaa.CropAndPad(percent=(-0.25, 0), keep_size=False)
+        rotate_and_crop = ia.augmenters.Sequential([
+            ia.augmenters.Affine(rotate=15),
+            ia.augmenters.CropAndPad(percent=(-0.25, 0), keep_size=False)
         ])  # 旋转 + 裁剪
 
-        guassian_blur = iaa.Sequential([
-            iaa.GaussianBlur(sigma=(2, 3)),
+        guassian_blur = ia.augmenters.Sequential([
+            ia.augmenters.GaussianBlur(sigma=(2, 3)),
         ])  # 增加高斯噪声
 
         ops = [resize, fliplr_flipud, rotate, translate, crop_and_pad, rotate_and_crop, guassian_blur]
@@ -11687,6 +11708,8 @@ class ImageAugmentation(object):
         return ops
 
     def augment_img(self, image_name, segmap_name):
+        from imgaug.augmentables.segmaps import SegmentationMapsOnImage
+
         # 1.Load an image.
         image = Image.open(image_name)  # RGB
         segmap = Image.open(segmap_name)  # P
@@ -11835,6 +11858,8 @@ def warpPerspective_img_via_labelbee_kpt_json(data_path):
 
 
 def labelbee_kpt_to_labelme_kpt(data_path):
+    import labelme
+
     save_path = make_save_path(data_path, "labelme_format")
     img_save_path = save_path + "/images"
     json_save_path = save_path + "/jsons"
@@ -11907,6 +11932,8 @@ def aug_points(pts, n=10, imgsz=None, r=0.05):
 
 
 def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
+    import labelme
+
     save_path = make_save_path(data_path, "labelme_format")
     img_save_path = save_path + "/images"
     json_save_path = save_path + "/jsons"
@@ -12551,6 +12578,8 @@ def to_unicode(glyph):
 
 
 def get_font_chars(font_path):
+    from fontTools.ttLib import TTFont
+
     font = TTFont(font_path, fontNumber=0)
     glyph_names = font.getGlyphNames()
     char_list = []
@@ -12572,6 +12601,8 @@ def get_font_chars(font_path):
 
 
 def is_char_visible(font, char):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
     """
     是否可见字符
     :param font:
@@ -12586,6 +12617,8 @@ def is_char_visible(font, char):
 
 
 def get_all_font_chars(font_dir, word_set):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
     font_path_list = [os.path.join(font_dir, font_name) for font_name in os.listdir(font_dir)]
     font_list = [ImageFont.truetype(font_path, size=10) for font_path in font_path_list]
     font_chars_dict = dict()
@@ -12685,6 +12718,8 @@ def horizontal_draw(draw, text, font, color, imgsz, char_w, char_h, easyFlag):
 
 
 def gen_img(imgsz=(64, 128), font=None, alpha="0123456789.AbC", target_len=1):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
     # # font_size_list = [35, 32, 30, 28, 25]
     # font_size_list = [48]
     # font_path_list = list(FONT_CHARS_DICT.keys())
@@ -15411,6 +15446,8 @@ def resize_norm_padding_img(img, imgsz, max_wh_ratio):
 
 
 def putText_Chinese(img_pil, p, string, color=(255, 0, 255)):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
     # img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(img_pil)
     font = ImageFont.truetype('./utils/gen_fake/Fonts/chinese_2/仿宋_GB2312.ttf', 20)
@@ -15420,6 +15457,8 @@ def putText_Chinese(img_pil, p, string, color=(255, 0, 255)):
 
 
 def draw_e2e_res(image, boxes, txts, font_path="utils/gen_fake/Fonts/chinese_2/楷体_GB2312.ttf"):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
     if isinstance(image, np.ndarray):
         image = Image.fromarray(np.uint8(image))
 

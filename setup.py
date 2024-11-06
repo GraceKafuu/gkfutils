@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="gkfutils",
-    version="1.0.8",
+    version="1.0.9",
     author="GraceKafuu",
     author_email="gracekafuu@gmail.com",
     description="GraceKafuu utils",

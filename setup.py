@@ -1,7 +1,12 @@
 import setuptools
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+# 遇到的问题：
+# 1.加上encoding="utf-8"后，打包的whl上传至pypi失败。
+# 2.假如不加encoding="utf-8"，则打包不成功。所以直接去除了long_description。
+
+# with open("README.md", "r", encoding="utf-8") as fh:
+# with open("README.md", "r") as fh:
+#     long_description = fh.read()
 
 setuptools.setup(
     name="gkfutils",
@@ -9,7 +14,7 @@ setuptools.setup(
     author="GraceKafuu",
     author_email="gracekafuu@gmail.com",
     description="GraceKafuu utils",
-    long_description=long_description,
+    # long_description=long_description,
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

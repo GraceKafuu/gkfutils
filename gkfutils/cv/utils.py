@@ -49,10 +49,7 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 
 
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
-# FILE PROCESS
-def convertBboxVOC2YOLO(size, box):
+def bbox_voc_to_yolo(size, box):
     """
     VOC --> YOLO
     :param size: [H, W]
@@ -84,7 +81,7 @@ def convertBboxVOC2YOLO(size, box):
     return [x, y, w, h]
 
 
-def convertBboxYOLO2VOC(size, bbx):
+def bbox_yolo_to_voc(size, bbx):
     """
     YOLO --> VOC
     !!!!!! orig: (bbx, size) 20230329 changed to (size, bbx)
@@ -101,36 +98,55 @@ def convertBboxYOLO2VOC(size, bbx):
     return [x_min, y_min, x_max, y_max]
 
 
-def convertBboxXML2TXT(img_name, data_path, classes):
-    import xml.etree.ElementTree as ET
+def write_labelbee_det_json(bbx, size):
+    """
+    {"x":316.6583427922815,"y":554.4245175936436,"width":1419.1872871736662,"height":556.1679909194097,
+    "attribute":"1","valid":true,"id":"tNd2HY6C","sourceID":"","textAttribute":"","order":1}
+    :param bbx: x1, y1, x2, y2
+    :param size: H, W
+    :return:
+    """
 
-    in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
-    out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
+    chars = ""
+    for i in range(48, 48 + 9):
+        chars += chr(i)
+    for j in range(65, 65 + 25):
+        chars += chr(j)
+    for k in range(97, 97 + 25):
+        chars += chr(k)
 
-    tree = ET.parse(in_file)
-    root = tree.getroot()
-    size = root.find('size')
-    w = int(size.find('width').text)
-    h = int(size.find('height').text)
+    json_ = {}
+    json_["width"] = size[1]
+    json_["height"] = size[0]
+    json_["valid"] = True
+    json_["rotate"] = 0
 
-    class_names = []
-    for obj in root.iter('object'):
-        difficult = obj.find('difficult').text
-        cls = obj.find('name').text
-        if cls not in class_names:
-            class_names.append(cls)
-        if cls not in classes or int(difficult) == 1:
-            continue
-        cls_id = classes.index(cls)
-        xmlbox = obj.find('bndbox')
-        b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
-        bb = convertBboxVOC2YOLO((h, w), b)
-        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+    step_1_ = {}
+    step_1_["toolName"] = "rectTool"
 
-    return class_names
+    result_list = []
+    for i in range(len(bbx)):
+        result_list_dict = {}
+        result_list_dict["x"] = bbx[i][0]
+        result_list_dict["y"] = bbx[i][1]
+        result_list_dict["width"] = bbx[i][2] - bbx[i][0]
+        result_list_dict["height"] = bbx[i][3] - bbx[i][1]
+        result_list_dict["attribute"] = "{}".format(bbx[i][4])
+        result_list_dict["valid"] = True
+        id_ = random.sample(chars, 8)
+        result_list_dict["id"] = "".join(d for d in id_)
+        result_list_dict["sourceID"] = ""
+        result_list_dict["textAttribute"] = ""
+        result_list_dict["order"] = i + 1
+        result_list.append(result_list_dict)
+
+    step_1_["result"] = result_list
+    json_["step_1"] = step_1_
+
+    return json_
 
 
-def yolo2labelbee(data_path):
+def yolo_to_labelbee(data_path):
     img_path = data_path + "/images"
     txt_path = data_path + "/labels"
     json_path = data_path + "/jsons"
@@ -152,7 +168,7 @@ def yolo2labelbee(data_path):
                     # bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
                     # VOC_bbx = convert_bbx_yolo_to_VOC(size, bbx_)
                     bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
-                    VOC_bbx = convertBboxYOLO2VOC(size, bbx_)
+                    VOC_bbx = bbox_yolo_to_voc(size, bbx_)
                     VOC_bbx = list(VOC_bbx)
 
                     w_, h_ = VOC_bbx[2] - VOC_bbx[0], VOC_bbx[3] - VOC_bbx[1]
@@ -173,7 +189,38 @@ def yolo2labelbee(data_path):
             print("txt_abs_path: ", txt_abs_path)
 
 
-def voc2yolo(data_path, classes, val_percent=0.1):
+def convert_annotation(img_name, data_path, classes):
+    import xml.etree.ElementTree as ET
+
+    in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
+    out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
+
+    tree = ET.parse(in_file)
+    root = tree.getroot()
+    size = root.find('size')
+    w = int(size.find('width').text)
+    h = int(size.find('height').text)
+
+    class_names = []
+    for obj in root.iter('object'):
+        difficult = obj.find('difficult').text
+        cls = obj.find('name').text
+        if cls not in class_names:
+            class_names.append(cls)
+        if cls not in classes or int(difficult) == 1:
+            continue
+        cls_id = classes.index(cls)
+        xmlbox = obj.find('bndbox')
+        # b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
+        # bb = convert_bbx_VOC_to_yolo((h, w), b)
+        b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
+        bb = bbox_voc_to_yolo((h, w), b)
+        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+
+    return class_names
+
+
+def voc_to_yolo(data_path, classes, val_percent=0.1):
     # classes = ["fire"]  # own data sets which classes which category to write, in the order
     # test set proportion of the total data set, the default 0.1, if the test set and the training set have been demarcated, the corresponding code is modified
 
@@ -208,7 +255,7 @@ def voc2yolo(data_path, classes, val_percent=0.1):
     val_file.close()
 
 
-def labelbee2yolo(data_path, copy_image=False):
+def labelbee_to_yolo(data_path, copy_image=False):
     img_path = data_path + "/images"
     json_path = data_path + "/jsons"
 
@@ -261,7 +308,7 @@ def labelbee2yolo(data_path, copy_image=False):
                     y_max = y_ + h_
 
                     # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                    bb = convertBboxVOC2YOLO((h, w), (x_min, y_min, x_max, y_max))
+                    bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
                     txt_content = "{}".format(cls_id) + " " + " ".join([str(b) for b in bb]) + "\n"
                     # txt_content = "{}".format(cls_id - 1) + " " + " ".join([str(b) for b in bb]) + "\n"
                     # txt_content = "{}".format(cls_id + 1) + " " + " ".join([str(b) for b in bb]) + "\n"
@@ -269,6 +316,168 @@ def labelbee2yolo(data_path, copy_image=False):
 
         except Exception as Error:
             print(Error)
+
+
+def coco_to_yolo(root):
+    json_trainfile = root + '/annotations/instances_train2017.json'  # COCO Object Instance 类型的标注
+    json_valfile = root + '/annotations/instances_val2017.json'  # COCO Object Instance 类型的标注
+    train_ana_txt_save_path = root + '/train2017_labels/'  # 保存的路径
+    val_ana_txt_save_path = root + '/val2017_labels/'  # 保存的路径
+
+    traindata = json.load(open(json_trainfile, 'r'))
+    valdata = json.load(open(json_valfile, 'r'))
+
+    # 重新映射并保存class 文件
+    if not os.path.exists(train_ana_txt_save_path):
+        os.makedirs(train_ana_txt_save_path)
+    if not os.path.exists(val_ana_txt_save_path):
+        os.makedirs(val_ana_txt_save_path)
+
+    id_map = {}  # coco数据集的id不连续！重新映射一下再输出！
+    with open(os.path.join(root, 'classes.txt'), 'w') as f:
+        # 写入classes.txt
+        for i, category in enumerate(traindata['categories']):
+            f.write(f"{category['name']}\n")
+            id_map[category['id']] = i
+
+    '''
+    保存train txt
+    '''
+    # print(id_map)
+    # 这里需要根据自己的需要，更改写入图像相对路径的文件位置。
+    list_file = open(os.path.join(root, 'train2017.txt'), 'w')
+    for img in tqdm(traindata['images']):
+        filename = img["file_name"]
+        img_width = img["width"]
+        img_height = img["height"]
+        img_id = img["id"]
+        head, tail = os.path.splitext(filename)
+        ana_txt_name = head + ".txt"  # 对应的txt名字，与jpg一致
+        f_txt = open(os.path.join(train_ana_txt_save_path, ana_txt_name), 'w')
+        for ann in traindata['annotations']:
+            if ann['image_id'] == img_id:
+                # box = convert((img_width, img_height), ann["bbox"])
+                # box = convert_bbx_VOC_to_yolo((img_height, img_width), ann["bbox"])
+                ann_np = np.array([ann["bbox"]])
+                ann_np = ann_np[:, [0, 2, 1, 3]]
+                ann_list = list(ann_np[0])
+                box = bbox_voc_to_yolo((img_height, img_width), ann_list)
+                f_txt.write("%s %s %s %s %s\n" % (id_map[ann["category_id"]], box[0], box[1], box[2], box[3]))
+        f_txt.close()
+        # 将图片的相对路径写入train2017或val2017的路径
+        list_file.write('./images/train2017/%s.jpg\n' % (head))
+    list_file.close()
+
+    '''
+    保存val txt
+    '''
+    # print(id_map)
+    # 这里需要根据自己的需要，更改写入图像相对路径的文件位置。
+    list_file = open(os.path.join(root, 'val2017.txt'), 'w')
+    for img in tqdm(valdata['images']):
+        filename = img["file_name"]
+        img_width = img["width"]
+        img_height = img["height"]
+        img_id = img["id"]
+        head, tail = os.path.splitext(filename)
+        ana_txt_name = head + ".txt"  # 对应的txt名字，与jpg一致
+        f_txt = open(os.path.join(val_ana_txt_save_path, ana_txt_name), 'w')
+        for ann in valdata['annotations']:
+            if ann['image_id'] == img_id:
+                # box = convert((img_width, img_height), ann["bbox"])
+                # box = convert_bbx_VOC_to_yolo((img_height, img_width), ann["bbox"])
+                ann_np = np.array([ann["bbox"]])
+                ann_np = ann_np[:, [0, 2, 1, 3]]
+                ann_list = list(ann_np[0])
+                box = bbox_voc_to_yolo((img_height, img_width), ann_list)
+                f_txt.write("%s %s %s %s %s\n" % (id_map[ann["category_id"]], box[0], box[1], box[2], box[3]))
+        f_txt.close()
+        # 将图片的相对路径写入train2017或val2017的路径
+        list_file.write('./images/val2017/%s.jpg\n' % (head))
+    list_file.close()
+
+
+def write_point(doc, root, label1, label2, value1, value2):
+    root = root.appendChild(doc.createElement('points'))
+    root.appendChild(doc.createElement(label1)).appendChild(doc.createTextNode(value1))
+    root.appendChild(doc.createElement(label2)).appendChild(doc.createTextNode(value2))
+
+
+def write_one(doc, root, label, value):
+    root.appendChild(doc.createElement(label)).appendChild(doc.createTextNode(value))
+
+
+def yolo_to_voc(args):
+    # TODO: rewrite and check
+    from xml.dom import minidom
+
+    input_file_record_path = args.input_file_record_path
+    input_label_checker_path = args.input_label_checker_path
+    input_xml_file_path = args.input_xml_file_path
+    output_folder_path = args.output_folder_path
+
+    text_list = get_file_list_(input_file_record_path)
+    label_list = get_label_list_(input_label_checker_path)
+    content_dict = generate_dict_(text_list, label_list)
+
+    for key in content_dict.keys():
+        file_name = key
+        doc = minidom.Document()
+        annotationlist = doc.createElement('annotation')
+        doc.appendChild(annotationlist)
+
+        # folder = doc.createElement('folder')
+        # annotationlist.appendChild(folder)
+        # folder_name = doc.createTextNode(sys.argv[0].strip().split('/')[-2])
+        # folder.appendChild(folder_name)
+
+        annotationlist.appendChild(doc.createElement('filename')).appendChild(doc.createTextNode(sys.argv[0]))
+
+        xml_size = minidom.parse(os.path.join(input_xml_file_path, '{}.xml'.format(file_name)))
+        width_value = xml_size.getElementsByTagName('width')
+        width_value = width_value[0].firstChild.data
+        height_value = xml_size.getElementsByTagName('height')
+        height_value = height_value[0].firstChild.data
+        depth_value = xml_size.getElementsByTagName('depth')
+        depth_value = depth_value[0].firstChild.data
+
+        size = doc.createElement('size')
+        annotationlist.appendChild(size)
+        write_one(doc, size, 'width', width_value)
+        write_one(doc, size, 'height', height_value)
+        write_one(doc, size, 'depth', depth_value)
+
+        for i in range(len(content_dict[key])):
+            x_min = content_dict[key][i][0]
+            y_min = content_dict[key][i][1]
+            x_max = content_dict[key][i][2]
+            y_max = content_dict[key][i][3]
+            label = content_dict[key][i][4]
+
+            objectlist = doc.createElement('object')
+            annotationlist.appendChild(objectlist)
+            write_one(doc, objectlist, 'name', label)
+            write_one(doc, objectlist, 'difficult', '0')
+            write_one(doc, objectlist, 'truncated', '0')
+
+            bndbox = doc.createElement('bndbox')
+            objectlist.appendChild(bndbox)
+            write_one(doc, bndbox, 'xmin', x_min)
+            write_one(doc, bndbox, 'ymin', y_min)
+            write_one(doc, bndbox, 'xmax', x_max)
+            write_one(doc, bndbox, 'ymax', y_max)
+
+            segmentation = doc.createElement('segmentation')
+            objectlist.appendChild(segmentation)
+            write_point(doc, segmentation, 'x', 'y', x_min, y_min)
+            write_point(doc, segmentation, 'x', 'y', x_max, y_min)
+            write_point(doc, segmentation, 'x', 'y', x_max, y_max)
+            write_point(doc, segmentation, 'x', 'y', x_min, y_max)
+
+            if not os.path.exists(output_folder_path):
+                os.makedirs(output_folder_path)
+            with open(os.path.join(output_folder_path, '{}.xml').format(file_name), 'w', encoding='UTF-8') as fh:
+                doc.writexml(fh, indent='', addindent='\t', newl='\n', encoding='UTF-8')
 
 
 def labelbee_kpt_to_yolo(data_path, copy_image=True):
@@ -407,314 +616,6 @@ def parse_json(json_abs_path):
     return polygon_list, label_list, (w, h)
 
 
-def vis_yolo_label(data_path, print_flag=True, color_num=1000, rm_small_object=False, rm_size=32):
-    colors = []
-    for i in range(color_num * 2):
-        c = list(np.random.choice(range(256), size=3))
-        if c not in colors:
-            colors.append(c)
-
-    colors = colors[:color_num]
-
-    img_path = data_path + "/images"
-    txt_path = data_path + "/labels"
-    vis_path = data_path + "/vis_bbx"
-    # vis_path = os.path.abspath(os.path.join(data_path, "..")) + "/vis_bbx"
-    # txt_new_path = data_path + "/labels_new"
-    os.makedirs(vis_path, exist_ok=True)
-    # os.makedirs(txt_new_path, exist_ok=True)
-
-    img_list = os.listdir(img_path)
-
-    for img in tqdm(img_list):
-        try:
-            img_name = os.path.splitext(img)[0]
-            img_abs_path = img_path + "/{}".format(img)
-            txt_abs_path = txt_path + "/{}.txt".format(img_name)
-            cv2img = cv2.imread(img_abs_path)
-            h, w = cv2img.shape[:2]
-
-            # txt_new_abs_path = txt_new_path + "/{}.txt".format(img_name)
-            # txt_data_new = open(txt_new_abs_path, "w", encoding="utf-8")
-
-            with open(txt_abs_path, "r", encoding="utf-8") as fr:
-                lines = fr.readlines()
-                for l_orig in lines:
-                    l = l_orig.strip()
-                    cls = int(l.split(" ")[0])
-                    l_ = [float(l.split(" ")[1]), float(l.split(" ")[2]), float(l.split(" ")[3]), float(l.split(" ")[4])]
-                    # bbx_VOC_format = convert_bbx_yolo_to_VOC((h, w), l_)
-                    bbx_VOC_format = convertBboxYOLO2VOC((h, w), l_)
-                    # if rm_small_object:
-                    #     ow, oh = bbx_VOC_format[2] - bbx_VOC_format[0], bbx_VOC_format[3] - bbx_VOC_format[1]
-                    #     if ow >= rm_size and oh >= rm_size:
-                    #         txt_data_new.write(l_orig)
-
-                    cv2.rectangle(cv2img, (bbx_VOC_format[0], bbx_VOC_format[1]), (bbx_VOC_format[2], bbx_VOC_format[3]), (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])), 2)
-                    cv2.putText(cv2img, "{}".format(cls), (bbx_VOC_format[0], bbx_VOC_format[1] - 4), cv2.FONT_HERSHEY_PLAIN, 2, (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])))
-
-                    cv2.imwrite("{}/{}".format(vis_path, img), cv2img)
-                    if print_flag:
-                        print("--> {}/{}".format(vis_path, img))
-
-            # txt_data_new.close()
-            #
-            # # Remove empty file
-            # txt_data_new_r = open(txt_new_abs_path, "r", encoding="utf-8")
-            # lines_new_r = txt_data_new_r.readlines()
-            # txt_data_new_r.close()
-            # if not lines_new_r:
-            #     os.remove(txt_new_abs_path)
-            #     print("os.remove: {}".format(txt_new_abs_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def list_yolo_labels(label_path):
-    file_list = get_file_list(label_path)
-    labels = []
-    for f in tqdm(file_list):
-        f_abs_path = label_path + "/{}".format(f)
-        with open(f_abs_path, "r", encoding="utf-8") as fr:
-            lines = fr.readlines()
-            for l in lines:
-                cls = int(l.strip().split(" ")[0])
-                if cls not in labels:
-                    labels.append(cls)
-
-    print("\n{}:".format(label_path))
-    print("Len: {}, Labels: {}".format(len(labels), sorted(labels)))
-
-
-def random_select_images_and_labels(data_path, select_num=1000, move_or_copy="copy", select_mode=0):
-    orig_img_path = data_path + "/images"
-    orig_lbl_path = data_path + "/labels"
-    data_list = sorted(os.listdir(orig_img_path))
-
-    selected_img_save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_random_selected_{}/images".format(data_path.split("/")[-1], select_num)
-    selected_lbl_save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_random_selected_{}/labels".format(data_path.split("/")[-1], select_num)
-    os.makedirs(selected_img_save_path, exist_ok=True)
-    os.makedirs(selected_lbl_save_path, exist_ok=True)
-
-    if select_mode == 0:
-        selected = random.sample(data_list, select_num)
-    else:
-        selected = random.sample(data_list, len(data_list) - select_num)
-
-    for f in tqdm(selected):
-        f_name = os.path.splitext(f)[0]
-        img_src_path = orig_img_path + "/{}".format(f)
-        lbl_src_path = orig_lbl_path + "/{}.txt".format(f_name)
-
-        img_dst_path = selected_img_save_path + "/{}".format(f)
-        lbl_dst_path = selected_lbl_save_path + "/{}.txt".format(f_name)
-
-        if move_or_copy == "copy":
-            try:
-                shutil.copy(img_src_path, img_dst_path)
-                shutil.copy(lbl_src_path, lbl_dst_path)
-            except Exception as Error:
-                print(Error)
-        elif move_or_copy == "move":
-            shutil.move(img_src_path, img_dst_path)
-            shutil.move(lbl_src_path, lbl_dst_path)
-        else:
-            print("Error!")
-
-
-def convert_annotation(img_name, data_path, classes):
-    import xml.etree.ElementTree as ET
-
-    in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
-    out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
-
-    tree = ET.parse(in_file)
-    root = tree.getroot()
-    size = root.find('size')
-    w = int(size.find('width').text)
-    h = int(size.find('height').text)
-
-    class_names = []
-    for obj in root.iter('object'):
-        difficult = obj.find('difficult').text
-        cls = obj.find('name').text
-        if cls not in class_names:
-            class_names.append(cls)
-        if cls not in classes or int(difficult) == 1:
-            continue
-        cls_id = classes.index(cls)
-        xmlbox = obj.find('bndbox')
-        # b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
-        # bb = convert_bbx_VOC_to_yolo((h, w), b)
-        b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
-        bb = convertBboxVOC2YOLO((h, w), b)
-        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
-
-    return class_names
-
-
-def write_labelbee_det_json(bbx, size):
-    """
-    {"x":316.6583427922815,"y":554.4245175936436,"width":1419.1872871736662,"height":556.1679909194097,
-    "attribute":"1","valid":true,"id":"tNd2HY6C","sourceID":"","textAttribute":"","order":1}
-    :param bbx: x1, y1, x2, y2
-    :param size: H, W
-    :return:
-    """
-
-    chars = ""
-    for i in range(48, 48 + 9):
-        chars += chr(i)
-    for j in range(65, 65 + 25):
-        chars += chr(j)
-    for k in range(97, 97 + 25):
-        chars += chr(k)
-
-    json_ = {}
-    json_["width"] = size[1]
-    json_["height"] = size[0]
-    json_["valid"] = True
-    json_["rotate"] = 0
-
-    step_1_ = {}
-    step_1_["toolName"] = "rectTool"
-
-    result_list = []
-    for i in range(len(bbx)):
-        result_list_dict = {}
-        result_list_dict["x"] = bbx[i][0]
-        result_list_dict["y"] = bbx[i][1]
-        result_list_dict["width"] = bbx[i][2] - bbx[i][0]
-        result_list_dict["height"] = bbx[i][3] - bbx[i][1]
-        result_list_dict["attribute"] = "{}".format(bbx[i][4])
-        result_list_dict["valid"] = True
-        id_ = random.sample(chars, 8)
-        result_list_dict["id"] = "".join(d for d in id_)
-        result_list_dict["sourceID"] = ""
-        result_list_dict["textAttribute"] = ""
-        result_list_dict["order"] = i + 1
-        result_list.append(result_list_dict)
-
-    step_1_["result"] = result_list
-    json_["step_1"] = step_1_
-
-    return json_
-
-
-def merge_det_bbx_and_kpt_points_to_yolov5_pose_labels(data_path, cls=0):
-    det_path = data_path + "/det"
-    det_img_path = det_path + "/images"
-    det_lbl_path = det_path + "/labels"
-    kpt_path = data_path + "/kpt"
-    kpt_img_path = kpt_path + "/images"
-    kpt_lbl_path = kpt_path + "/labels"
-
-    save_path = data_path + "/det_kpt"
-    save_lbl_path = save_path + "/labels"
-    os.makedirs(save_lbl_path, exist_ok=True)
-
-    det_lbl_list = sorted(os.listdir(det_lbl_path))
-    kpt_lbl_list = sorted(os.listdir(kpt_lbl_path))
-    same_list = list(set(det_lbl_list) & set(kpt_lbl_list))
-
-    for s in tqdm(same_list):
-        try:
-            fname = os.path.splitext(s)[0]
-            img_s_abs_path = det_img_path + "/{}.jpg".format(fname)
-            det_s_abs_path = det_lbl_path + "/{}".format(s)
-            kpt_s_abs_path = kpt_lbl_path + "/{}".format(s)
-
-            cv2img = cv2.imread(img_s_abs_path)
-            imgsz = cv2img.shape[:2]
-
-            det_bbxs = []
-
-            with open(det_s_abs_path, "r", encoding="utf-8") as frd:
-                det_lines = frd.readlines()
-                for dl in det_lines:
-                    dl = dl.strip().split(" ")
-                    cls = int(dl[0])
-                    bbx = list(map(float, dl[1:]))
-                    bbx = np.asarray(bbx).reshape(-1, 4)
-                    for b in range(bbx.shape[0]):
-                        # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, list(bbx[b]))
-                        bbx_voc = convertBboxYOLO2VOC(imgsz, list(bbx[b]))
-                        det_bbxs.append(bbx_voc)
-
-            dst_lbl_path = save_lbl_path + "/{}.txt".format(fname)
-            with open(dst_lbl_path, "w", encoding="utf-8") as fwdk:
-                with open(kpt_s_abs_path, "r", encoding="utf-8") as frk:
-                    kpt_lines = frk.readlines()
-
-                    for detbbx in det_bbxs:
-                        # detbbx_new = [detbbx[0], detbbx[2], detbbx[1], detbbx[3]]
-                        # bbx_yolo = convert_bbx_VOC_to_yolo(imgsz, detbbx_new)
-                        detbbx_new = [detbbx[0], detbbx[1], detbbx[2], detbbx[3]]
-                        bbx_yolo = convertBboxVOC2YOLO(imgsz, detbbx_new)
-                        for kl in kpt_lines:
-                            kl_ = kl.strip().split(" ")
-                            points = list(map(float, kl_))
-                            points = np.asarray(points).reshape(-1, 3)
-                            points_ = points[:, :2]
-                            points_ = list(points_.reshape(1, -1)[0])
-                            points_ = np.asarray(points_).reshape(-1, 8)[0]
-
-                            p_bbx = [points_[0] * imgsz[1], points_[1] * imgsz[0], points_[4] * imgsz[1], points_[5] * imgsz[0]]
-                            iou = cal_iou(detbbx, p_bbx)
-                            if iou > 0:
-                                txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbx_yolo]) + " " + kl
-                                fwdk.write(txt_content)
-        except Exception as Error:
-            print(Error)
-
-
-def convert_labelbee_det_one_json_to_yolo_txt(json_path):
-    save_path = os.path.abspath(os.path.join(json_path, "../..")) + "/{}".format("labels")
-    image_move_path = save_path.replace("labels", "images")
-    os.makedirs(save_path, exist_ok=True)
-    os.makedirs(image_move_path, exist_ok=True)
-
-    json_ = json.load(open(json_path, 'r', encoding='utf-8'))
-    len_json = len(json_)
-    for i in range(len_json):
-        i_data = json_[i]
-        url_ = i_data['url']
-        fileName_ = i_data["fileName"].strip('\\')
-
-        i_data_result = i_data["result"].replace("true", "True")
-        i_data_eval = eval(i_data_result)  # Need to replace "true" --> "True"
-        if not i_data_eval: continue
-        if not i_data_eval["step_1"]["result"]: continue
-
-        w, h = i_data_eval["width"], i_data_eval["height"]
-        step_1_result_data = i_data_eval["step_1"]["result"]
-        len_step_1_result_data = len(step_1_result_data)
-
-        try:
-            shutil.move(url_, image_move_path + "/{}".format(fileName_))
-        except Exception as Error:
-            print(Error)
-
-        txt_save_path = save_path + "/{}".format(fileName_.replace(".jpg", ".txt"))
-        with open(txt_save_path, "w", encoding="utf-8") as fw:
-            for j in range(len_step_1_result_data):
-                x_ = step_1_result_data[j]["x"]
-                y_ = step_1_result_data[j]["y"]
-                w_ = step_1_result_data[j]["width"]
-                h_ = step_1_result_data[j]["height"]
-
-                x_min = x_
-                x_max = x_ + w_
-                y_min = y_
-                y_max = y_ + h_
-
-                # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                bb = convertBboxVOC2YOLO((h, w), (x_min, y_min, x_max, y_max))
-                txt_content = "0" + " " + " ".join([str(b) for b in bb]) + "\n"
-                fw.write(txt_content)
-
-
 def labelbee_seg_to_png(data_path):
     images_path = data_path + "/{}".format("images")
     json_path = data_path + "/{}".format("jsons")
@@ -754,7 +655,7 @@ def labelbee_seg_to_png(data_path):
             print(Error, Error.__traceback__.tb_lineno)
 
 
-def convert_labelbee_seg_json_to_yolo_txt(data_path):
+def labelbee_seg_json_to_yolo_txt(data_path):
     save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}".format("labels")
 
     removed_damaged_img = os.path.abspath(os.path.join(data_path, "../..")) + "/{}".format("removed")
@@ -807,7 +708,7 @@ def convert_labelbee_seg_json_to_yolo_txt(data_path):
                         y_min, y_max = min(y_), max(y_)
 
                         # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                        bb = convertBboxVOC2YOLO((h, w), (x_min, y_min, x_max, y_max))
+                        bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
                         p_res = convert_points((w, h), xy_)
 
                         txt_content = "0" + " " + " ".join([str(a) for a in bb]) + " " + " ".join([str(c) for c in p_res]) + "\n"
@@ -817,14 +718,14 @@ def convert_labelbee_seg_json_to_yolo_txt(data_path):
                     y_min, y_max = min(y_), max(y_)
 
                     # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                    bb = convertBboxVOC2YOLO((h, w), (x_min, y_min, x_max, y_max))
+                    bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
                     txt_content = "0" + " " + " ".join([str(a) for a in bb]) + "\n"
                     fw.write(txt_content)
 
             print("Saved --> {}".format(txt_save_path))
 
 
-def convert_labelme_json_to_VOC_xml(data_path):
+def labelme_json_to_voc_xml(data_path):
     img_path = data_path + "/images"
     labelme_path = data_path + "/jsons"  # Original labelme label data path
     saved_path = data_path + "/xmls"  # Save path
@@ -887,83 +788,189 @@ def convert_labelme_json_to_VOC_xml(data_path):
             xml.write('</annotation>')
 
 
-def coco2yolo(root):
-    json_trainfile = root + '/annotations/instances_train2017.json'  # COCO Object Instance 类型的标注
-    json_valfile = root + '/annotations/instances_val2017.json'  # COCO Object Instance 类型的标注
-    train_ana_txt_save_path = root + '/train2017_labels/'  # 保存的路径
-    val_ana_txt_save_path = root + '/val2017_labels/'  # 保存的路径
+def vis_yolo_label(data_path, print_flag=True, color_num=1000, rm_small_object=False, rm_size=32):
+    colors = []
+    for i in range(color_num * 2):
+        c = list(np.random.choice(range(256), size=3))
+        if c not in colors:
+            colors.append(c)
 
-    traindata = json.load(open(json_trainfile, 'r'))
-    valdata = json.load(open(json_valfile, 'r'))
+    colors = colors[:color_num]
 
-    # 重新映射并保存class 文件
-    if not os.path.exists(train_ana_txt_save_path):
-        os.makedirs(train_ana_txt_save_path)
-    if not os.path.exists(val_ana_txt_save_path):
-        os.makedirs(val_ana_txt_save_path)
+    img_path = data_path + "/images"
+    txt_path = data_path + "/labels"
+    vis_path = data_path + "/vis_bbx"
+    # vis_path = os.path.abspath(os.path.join(data_path, "..")) + "/vis_bbx"
+    # txt_new_path = data_path + "/labels_new"
+    os.makedirs(vis_path, exist_ok=True)
+    # os.makedirs(txt_new_path, exist_ok=True)
 
-    id_map = {}  # coco数据集的id不连续！重新映射一下再输出！
-    with open(os.path.join(root, 'classes.txt'), 'w') as f:
-        # 写入classes.txt
-        for i, category in enumerate(traindata['categories']):
-            f.write(f"{category['name']}\n")
-            id_map[category['id']] = i
+    img_list = os.listdir(img_path)
 
-    '''
-    保存train txt
-    '''
-    # print(id_map)
-    # 这里需要根据自己的需要，更改写入图像相对路径的文件位置。
-    list_file = open(os.path.join(root, 'train2017.txt'), 'w')
-    for img in tqdm(traindata['images']):
-        filename = img["file_name"]
-        img_width = img["width"]
-        img_height = img["height"]
-        img_id = img["id"]
-        head, tail = os.path.splitext(filename)
-        ana_txt_name = head + ".txt"  # 对应的txt名字，与jpg一致
-        f_txt = open(os.path.join(train_ana_txt_save_path, ana_txt_name), 'w')
-        for ann in traindata['annotations']:
-            if ann['image_id'] == img_id:
-                # box = convert((img_width, img_height), ann["bbox"])
-                # box = convert_bbx_VOC_to_yolo((img_height, img_width), ann["bbox"])
-                ann_np = np.array([ann["bbox"]])
-                ann_np = ann_np[:, [0, 2, 1, 3]]
-                ann_list = list(ann_np[0])
-                box = convertBboxVOC2YOLO((img_height, img_width), ann_list)
-                f_txt.write("%s %s %s %s %s\n" % (id_map[ann["category_id"]], box[0], box[1], box[2], box[3]))
-        f_txt.close()
-        # 将图片的相对路径写入train2017或val2017的路径
-        list_file.write('./images/train2017/%s.jpg\n' % (head))
-    list_file.close()
+    for img in tqdm(img_list):
+        try:
+            img_name = os.path.splitext(img)[0]
+            img_abs_path = img_path + "/{}".format(img)
+            txt_abs_path = txt_path + "/{}.txt".format(img_name)
+            cv2img = cv2.imread(img_abs_path)
+            h, w = cv2img.shape[:2]
 
-    '''
-    保存val txt
-    '''
-    # print(id_map)
-    # 这里需要根据自己的需要，更改写入图像相对路径的文件位置。
-    list_file = open(os.path.join(root, 'val2017.txt'), 'w')
-    for img in tqdm(valdata['images']):
-        filename = img["file_name"]
-        img_width = img["width"]
-        img_height = img["height"]
-        img_id = img["id"]
-        head, tail = os.path.splitext(filename)
-        ana_txt_name = head + ".txt"  # 对应的txt名字，与jpg一致
-        f_txt = open(os.path.join(val_ana_txt_save_path, ana_txt_name), 'w')
-        for ann in valdata['annotations']:
-            if ann['image_id'] == img_id:
-                # box = convert((img_width, img_height), ann["bbox"])
-                # box = convert_bbx_VOC_to_yolo((img_height, img_width), ann["bbox"])
-                ann_np = np.array([ann["bbox"]])
-                ann_np = ann_np[:, [0, 2, 1, 3]]
-                ann_list = list(ann_np[0])
-                box = convertBboxVOC2YOLO((img_height, img_width), ann_list)
-                f_txt.write("%s %s %s %s %s\n" % (id_map[ann["category_id"]], box[0], box[1], box[2], box[3]))
-        f_txt.close()
-        # 将图片的相对路径写入train2017或val2017的路径
-        list_file.write('./images/val2017/%s.jpg\n' % (head))
-    list_file.close()
+            # txt_new_abs_path = txt_new_path + "/{}.txt".format(img_name)
+            # txt_data_new = open(txt_new_abs_path, "w", encoding="utf-8")
+
+            with open(txt_abs_path, "r", encoding="utf-8") as fr:
+                lines = fr.readlines()
+                for l_orig in lines:
+                    l = l_orig.strip()
+                    cls = int(l.split(" ")[0])
+                    l_ = [float(l.split(" ")[1]), float(l.split(" ")[2]), float(l.split(" ")[3]), float(l.split(" ")[4])]
+                    # bbx_VOC_format = convert_bbx_yolo_to_VOC((h, w), l_)
+                    bbx_VOC_format = bbox_yolo_to_voc((h, w), l_)
+                    # if rm_small_object:
+                    #     ow, oh = bbx_VOC_format[2] - bbx_VOC_format[0], bbx_VOC_format[3] - bbx_VOC_format[1]
+                    #     if ow >= rm_size and oh >= rm_size:
+                    #         txt_data_new.write(l_orig)
+
+                    cv2.rectangle(cv2img, (bbx_VOC_format[0], bbx_VOC_format[1]), (bbx_VOC_format[2], bbx_VOC_format[3]), (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])), 2)
+                    cv2.putText(cv2img, "{}".format(cls), (bbx_VOC_format[0], bbx_VOC_format[1] - 4), cv2.FONT_HERSHEY_PLAIN, 2, (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])))
+
+                    cv2.imwrite("{}/{}".format(vis_path, img), cv2img)
+                    if print_flag:
+                        print("--> {}/{}".format(vis_path, img))
+
+            # txt_data_new.close()
+            #
+            # # Remove empty file
+            # txt_data_new_r = open(txt_new_abs_path, "r", encoding="utf-8")
+            # lines_new_r = txt_data_new_r.readlines()
+            # txt_data_new_r.close()
+            # if not lines_new_r:
+            #     os.remove(txt_new_abs_path)
+            #     print("os.remove: {}".format(txt_new_abs_path))
+
+        except Exception as Error:
+            print(Error)
+
+
+def list_yolo_labels(label_path):
+    file_list = get_file_list(label_path)
+    labels = []
+    for f in tqdm(file_list):
+        f_abs_path = label_path + "/{}".format(f)
+        with open(f_abs_path, "r", encoding="utf-8") as fr:
+            lines = fr.readlines()
+            for l in lines:
+                cls = int(l.strip().split(" ")[0])
+                if cls not in labels:
+                    labels.append(cls)
+
+    print("\n{}:".format(label_path))
+    print("Len: {}, Labels: {}".format(len(labels), sorted(labels)))
+
+
+def random_select_yolo_images_and_labels(data_path, select_num=1000, move_or_copy="copy", select_mode=0):
+    orig_img_path = data_path + "/images"
+    orig_lbl_path = data_path + "/labels"
+    data_list = sorted(os.listdir(orig_img_path))
+
+    assert select_num <= len(data_list), "{} is grater than total num!".format(select_num)
+
+    selected_img_save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_random_selected_{}/images".format(data_path.split("/")[-1], select_num)
+    selected_lbl_save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_random_selected_{}/labels".format(data_path.split("/")[-1], select_num)
+    os.makedirs(selected_img_save_path, exist_ok=True)
+    os.makedirs(selected_lbl_save_path, exist_ok=True)
+
+    if select_mode == 0:
+        selected = random.sample(data_list, select_num)
+    else:
+        selected = random.sample(data_list, len(data_list) - select_num)
+
+    for f in tqdm(selected):
+        f_name = os.path.splitext(f)[0]
+        img_src_path = orig_img_path + "/{}".format(f)
+        lbl_src_path = orig_lbl_path + "/{}.txt".format(f_name)
+
+        img_dst_path = selected_img_save_path + "/{}".format(f)
+        lbl_dst_path = selected_lbl_save_path + "/{}.txt".format(f_name)
+
+        if move_or_copy == "copy":
+            try:
+                shutil.copy(img_src_path, img_dst_path)
+                shutil.copy(lbl_src_path, lbl_dst_path)
+            except Exception as Error:
+                print(Error)
+        elif move_or_copy == "move":
+            shutil.move(img_src_path, img_dst_path)
+            shutil.move(lbl_src_path, lbl_dst_path)
+        else:
+            print("Error!")
+
+
+def merge_det_bbx_and_kpt_points_to_yolov5_pose_labels(data_path, cls=0):
+    det_path = data_path + "/det"
+    det_img_path = det_path + "/images"
+    det_lbl_path = det_path + "/labels"
+    kpt_path = data_path + "/kpt"
+    kpt_img_path = kpt_path + "/images"
+    kpt_lbl_path = kpt_path + "/labels"
+
+    save_path = data_path + "/det_kpt"
+    save_lbl_path = save_path + "/labels"
+    os.makedirs(save_lbl_path, exist_ok=True)
+
+    det_lbl_list = sorted(os.listdir(det_lbl_path))
+    kpt_lbl_list = sorted(os.listdir(kpt_lbl_path))
+    same_list = list(set(det_lbl_list) & set(kpt_lbl_list))
+
+    for s in tqdm(same_list):
+        try:
+            fname = os.path.splitext(s)[0]
+            img_s_abs_path = det_img_path + "/{}.jpg".format(fname)
+            det_s_abs_path = det_lbl_path + "/{}".format(s)
+            kpt_s_abs_path = kpt_lbl_path + "/{}".format(s)
+
+            cv2img = cv2.imread(img_s_abs_path)
+            imgsz = cv2img.shape[:2]
+
+            det_bbxs = []
+
+            with open(det_s_abs_path, "r", encoding="utf-8") as frd:
+                det_lines = frd.readlines()
+                for dl in det_lines:
+                    dl = dl.strip().split(" ")
+                    cls = int(dl[0])
+                    bbx = list(map(float, dl[1:]))
+                    bbx = np.asarray(bbx).reshape(-1, 4)
+                    for b in range(bbx.shape[0]):
+                        # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, list(bbx[b]))
+                        bbx_voc = bbox_yolo_to_voc(imgsz, list(bbx[b]))
+                        det_bbxs.append(bbx_voc)
+
+            dst_lbl_path = save_lbl_path + "/{}.txt".format(fname)
+            with open(dst_lbl_path, "w", encoding="utf-8") as fwdk:
+                with open(kpt_s_abs_path, "r", encoding="utf-8") as frk:
+                    kpt_lines = frk.readlines()
+
+                    for detbbx in det_bbxs:
+                        # detbbx_new = [detbbx[0], detbbx[2], detbbx[1], detbbx[3]]
+                        # bbx_yolo = convert_bbx_VOC_to_yolo(imgsz, detbbx_new)
+                        detbbx_new = [detbbx[0], detbbx[1], detbbx[2], detbbx[3]]
+                        bbx_yolo = bbox_voc_to_yolo(imgsz, detbbx_new)
+                        for kl in kpt_lines:
+                            kl_ = kl.strip().split(" ")
+                            points = list(map(float, kl_))
+                            points = np.asarray(points).reshape(-1, 3)
+                            points_ = points[:, :2]
+                            points_ = list(points_.reshape(1, -1)[0])
+                            points_ = np.asarray(points_).reshape(-1, 8)[0]
+
+                            p_bbx = [points_[0] * imgsz[1], points_[1] * imgsz[0], points_[4] * imgsz[1], points_[5] * imgsz[0]]
+                            iou = cal_iou(detbbx, p_bbx)
+                            if iou > 0:
+                                txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbx_yolo]) + " " + kl
+                                fwdk.write(txt_content)
+        except Exception as Error:
+            print(Error)
 
 
 def write_one(doc, root, label, value):
@@ -1047,179 +1054,2984 @@ def change_xml_content(filename, content_orig, content_chg):
     xmlTree.write(filename, encoding='UTF-8', xml_declaration=True)
 
 
-# def get_file_list(path):
-#     text_list = []
-#     with open(path, 'r') as f:
-#         lines = f.readlines()
-#         for line in lines:
-#             line_list = line.strip().split('\t')
-#             text_list.append(line_list)
-#     return text_list
+def extract_one_gif_frames(gif_path):
+    img_name = os.path.splitext(os.path.basename(gif_path))[0]
+    save_path = os.path.abspath(os.path.join(gif_path, "../..")) + "/{}_gif_frames".format(img_name.split("/")[-1])
+    os.makedirs(save_path, exist_ok=True)
+
+    gif_img = Image.open(gif_path)
+    try:
+        gif_img.save("{}/{}_{}.png".format(save_path, img_name, gif_img.tell()))
+        while True:
+            gif_img.seek(gif_img.tell() + 1)
+            gif_img.save("{}/{}_{}.png".format(save_path, img_name, gif_img.tell()))
+    except Exception as Error:
+        print(Error)
 
 
-def get_label_list(path):
-    label_list = []
-    with open(path, 'r') as f:
-        for line in f.readlines():
-            line_list = line.strip().split(' ')[-1]
-            if line_list == 'n':
-                line_list = 'normal'
-            label_list.append(line_list)
-    return label_list
+def extract_one_video_frames(video_path, gap=5):
+    video_name = os.path.splitext(os.path.basename(video_path))[0]
+    save_path = os.path.abspath(os.path.join(video_path, "../..")) + "/{}_video_frames".format(video_name.split("/")[-1])
+    os.makedirs(save_path, exist_ok=True)
 
+    cap = cv2.VideoCapture(video_path)
+    i = 0
+    while True:
+        ret, frame = cap.read()
+        if ret:
+            if i % gap == 0:
+                cv2.imwrite("{}/{}_{:07d}.jpg".format(save_path, video_name, i), frame)
 
-def generate_dict(text_list, label_list):
-    content_dict = {}
-    for test_part, label in zip(text_list, label_list):
-        file_name = test_part[1].split('.')[0]
-        if file_name not in content_dict:
-            content_dict[file_name] = [test_part[2].split(',') + [label]]
+            i += 1
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
         else:
-            content_dict[file_name].append(test_part[2].split(',') + [label])
-    return content_dict
+            break
+    cap.release()
 
 
-def write_point(doc, root, label1, label2, value1, value2):
-    root = root.appendChild(doc.createElement('points'))
-    root.appendChild(doc.createElement(label1)).appendChild(doc.createTextNode(value1))
-    root.appendChild(doc.createElement(label2)).appendChild(doc.createTextNode(value2))
+def extract_videos_frames(base_path, gap=5, save_path=""):
+    video_list = sorted(os.listdir(base_path))
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+    else:
+        save_path = os.path.abspath(os.path.join(base_path, "../..")) + "/{}_video_frames".format(base_path.split("/")[-1])
+        os.makedirs(save_path, exist_ok=True)
+
+    for v in tqdm(video_list):
+        try:
+            video_abs_path = base_path + "/{}".format(v)
+            video_name = os.path.splitext(v)[0]
+            v_save_path = save_path + "/{}".format(video_name)
+            if not os.path.exists(v_save_path): os.makedirs(v_save_path)
+
+            cap = cv2.VideoCapture(video_abs_path)
+            i = 0
+            while True:
+
+                ret, frame = cap.read()
+                if ret:
+                    if i % gap == 0:
+                        cv2.imwrite("{}/{}_{:07d}.jpg".format(v_save_path, video_name, i), frame)
+
+                    i += 1
+
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                else:
+                    break
+            cap.release()
+        except Exception as Error:
+            print(Error)
 
 
-def write_one(doc, root, label, value):
-    root.appendChild(doc.createElement(label)).appendChild(doc.createTextNode(value))
+def scale_uint16(img, size):
+    img1 = img // 256
+    img2 = img % 256
+    img1 = cv2.resize(img1.astype('uint8'), size, interpolation=cv2.INTER_NEAREST)
+    img2 = cv2.resize(img2.astype('uint8'), size, interpolation=cv2.INTER_NEAREST)
+    img3 = img1.astype('uint16') * 256 + img2.astype('uint16')
+    return img3
 
 
-def txt2xml(args):
-    input_file_record_path = args.input_file_record_path
-    input_label_checker_path = args.input_label_checker_path
-    input_xml_file_path = args.input_xml_file_path
-    output_folder_path = args.output_folder_path
+def cal_mean_std_var(data_path, size=(64, 64)):
+    img_h, img_w = size[0], size[1]  # 根据自己数据集适当调整，影响不大
+    means, stds, vars = [], [], []
+    img_list = []
 
-    text_list = get_file_list(input_file_record_path)
-    label_list = get_label_list(input_label_checker_path)
-    content_dict = generate_dict(text_list, label_list)
+    i = 0
+    dir_list = os.listdir(data_path)
+    for d in dir_list:
+        imgs_path_list = os.listdir(data_path + "/{}".format(d))
+        for item in tqdm(imgs_path_list):
+            img = cv2.imread(os.path.join(data_path + "/{}".format(d), item))
+            img = cv2.resize(img, (img_w, img_h))
+            img = img[:, :, :, np.newaxis]
+            img_list.append(img)
+            i += 1
 
-    for key in content_dict.keys():
-        file_name = key
-        doc = minidom.Document()
-        annotationlist = doc.createElement('annotation')
-        doc.appendChild(annotationlist)
+    imgs = np.concatenate(img_list, axis=3)
+    imgs = imgs.astype(np.float32) / 255.
 
-        # folder = doc.createElement('folder')
-        # annotationlist.appendChild(folder)
-        # folder_name = doc.createTextNode(sys.argv[0].strip().split('/')[-2])
-        # folder.appendChild(folder_name)
+    for i in range(3):
+        pixels = imgs[:, :, i, :].ravel()  # 拉成一行
+        means.append(np.mean(pixels))
+        stds.append(np.std(pixels))
+        vars.append(np.var(pixels))
 
-        annotationlist.appendChild(doc.createElement('filename')).appendChild(doc.createTextNode(sys.argv[0]))
-
-        xml_size = minidom.parse(os.path.join(input_xml_file_path, '{}.xml'.format(file_name)))
-        width_value = xml_size.getElementsByTagName('width')
-        width_value = width_value[0].firstChild.data
-        height_value = xml_size.getElementsByTagName('height')
-        height_value = height_value[0].firstChild.data
-        depth_value = xml_size.getElementsByTagName('depth')
-        depth_value = depth_value[0].firstChild.data
-
-        size = doc.createElement('size')
-        annotationlist.appendChild(size)
-        write_one(doc, size, 'width', width_value)
-        write_one(doc, size, 'height', height_value)
-        write_one(doc, size, 'depth', depth_value)
-
-        for i in range(len(content_dict[key])):
-            x_min = content_dict[key][i][0]
-            y_min = content_dict[key][i][1]
-            x_max = content_dict[key][i][2]
-            y_max = content_dict[key][i][3]
-            label = content_dict[key][i][4]
-
-            objectlist = doc.createElement('object')
-            annotationlist.appendChild(objectlist)
-            write_one(doc, objectlist, 'name', label)
-            write_one(doc, objectlist, 'difficult', '0')
-            write_one(doc, objectlist, 'truncated', '0')
-
-            bndbox = doc.createElement('bndbox')
-            objectlist.appendChild(bndbox)
-            write_one(doc, bndbox, 'xmin', x_min)
-            write_one(doc, bndbox, 'ymin', y_min)
-            write_one(doc, bndbox, 'xmax', x_max)
-            write_one(doc, bndbox, 'ymax', y_max)
-
-            segmentation = doc.createElement('segmentation')
-            objectlist.appendChild(segmentation)
-            write_point(doc, segmentation, 'x', 'y', x_min, y_min)
-            write_point(doc, segmentation, 'x', 'y', x_max, y_min)
-            write_point(doc, segmentation, 'x', 'y', x_max, y_max)
-            write_point(doc, segmentation, 'x', 'y', x_min, y_max)
-
-            if not os.path.exists(output_folder_path):
-                os.makedirs(output_folder_path)
-            with open(os.path.join(output_folder_path, '{}.xml').format(file_name), 'w', encoding='UTF-8') as fh:
-                doc.writexml(fh, indent='', addindent='\t', newl='\n', encoding='UTF-8')
+    return means, stds, vars
 
 
-def convert(size, box):
-    dw = 1. / (size[0])
-    dh = 1. / (size[1])
-    x = (box[0] + box[1]) / 2.0 - 1
-    y = (box[2] + box[3]) / 2.0 - 1
-    w = box[1] - box[0]
-    h = box[3] - box[2]
-    x = int(x) * dw
-    w = int(w) * dw
-    y = int(y) * dh
-    h = int(h) * dh
-    return (x, y, w, h)
+def convert_to_jpg_format(data_path):
+    img_list = sorted(os.listdir(data_path))
 
+    for img in img_list:
+        img_name = os.path.splitext(img)[0]
+        img_abs_path = data_path + "/{}".format(img)
 
-def convert_annotation_(base_path, image_id):
-    import xml.etree.ElementTree as ET
-
-    in_file = open('{}/xmls/{}.xml'.format(base_path, image_id).replace("\\", "/"), encoding='utf-8')
-    out_file = open('{}/labels/{}.txt'.format(base_path, image_id).replace("\\", "/"), 'w')
-
-    tree = ET.parse(in_file)
-    root = tree.getroot()
-    size = root.find('size')
-    w = int(size.find('width').text)
-    h = int(size.find('height').text)
-
-    for obj in root.iter('object'):
-        difficult = obj.find('difficult').text
-        cls = obj.find('name').text
-        if cls not in classes or int(difficult) == 1:
+        if img.endswith(".jpeg") or img.endswith(".png") or img.endswith(".bmp") or img.endswith(".JPG") or img.endswith(".JPEG") or img.endswith(".PNG") or img.endswith(".BMP"):
+            cv2img = cv2.imread(img_abs_path)
+            cv2.imwrite("{}/{}.jpg".format(data_path, img_name), cv2img)
+            os.remove(img_abs_path)
+            print("remove --> {} | write --> {}.jpg".format(img_abs_path, img_name))
+        elif img.endswith(".jpg"):
             continue
-        cls_id = classes.index(cls)
-        xmlbox = obj.find('bndbox')
-        b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
-        bb = convert((w, h), b)
-        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+        elif img.endswith(".gif") or img.endswith(".GIF") or img.endswith(".webp"):
+            os.remove(img_abs_path)
+            print("remove --> {}".format(img_abs_path))
+        else:
+            print(img_abs_path)
 
 
-def xml2txt_and_create_train_val(base_path, classes=["c1", "c2"]):
-    val_percent = 0.1  # test set proportion of the total data set, the default 0.1, if the test set and the training set have been demarcated, the corresponding code is modified
-    data_path = '{}/images/'.format(base_path).replace("\\", "/")  # darknet relative path folder, see description github, and they need to modify, according to note here the absolute path can also be used
+def convert_to_png_format(data_path):
+    img_list = sorted(os.listdir(data_path))
 
-    if not os.path.exists("{}/labels".format(base_path).replace("\\", "/")):
-        os.makedirs("{}/labels".format(base_path).replace("\\", "/"))
+    for img in img_list:
+        img_abs_path = data_path + "/{}".format(img)
+        try:
+            img_name = os.path.splitext(img)[0]
+            if img.endswith(".jpeg") or img.endswith(".jpg") or img.endswith(".bmp") or img.endswith(".JPEG") or img.endswith(".JPG") or img.endswith(".BMP"):
+                # img_abs_path = data_path + "/{}".format(img)
+                cv2img = cv2.imread(img_abs_path)
+                cv2.imwrite("{}/{}.png".format(data_path, img_name), cv2img)
+                os.remove(img_abs_path)
+                print("write --> {}.png  |  remove --> {}".format(img_name, img))
 
-    image_ids = [f for f in os.listdir('{}/images').format(base_path).replace("\\", "/")]  # XML data storage folder
-    train_file = open('{}/train.txt', 'w')
-    val_file = open('{}/val.txt', 'w')
-    for i, image_id in enumerate(image_ids):
-        if image_id[-3:] == "jpg":  # Sometimes jpg and xml files are placed in the same folder, so to determine what suffixes
-            if i < (len(image_ids) * val_percent):
-                val_file.write(data_path + '%s\n' % (image_id[:-3] + 'jpg'))
+            elif img.endswith(".png"):
+                continue
             else:
-                train_file.write(data_path + '%s\n' % (image_id[:-3] + 'jpg'))
-        convert_annotation_(image_id[:-4])
-    train_file.close()
-    val_file.close()
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
+                print(img)
+        except Exception as Error:
+            os.remove(img_abs_path)
+            print("os.remove: {}".format(img_abs_path))
 
 
+def HORIZON_quant_cal_mean_std(torchvision_mean, torchvision_std, print_flag=True):
+    """
+    ll = [0.5079259, 0.43544242, 0.40075096]
+    for i in ll:
+        print(i * 255)
+
+    ll2 = [0.27482128, 0.26032233, 0.2618361]
+    for i in ll2:
+        print(1 / (i * 255))
+    :param torchvision_mean:
+    :param torchvision_std:
+    :return:
+    """
+    HORIZON_quant_mean = []
+    HORIZON_quant_std = []
+
+    for i in torchvision_mean:
+        HORIZON_quant_mean.append(i * 255)
+
+    for i in torchvision_std:
+        HORIZON_quant_std.append(1 / (i * 255))
+
+    if print_flag:
+        print("HORIZON_quant_mean: {} HORIZON_quant_std: {}".format(HORIZON_quant_mean, HORIZON_quant_std))
+
+    return HORIZON_quant_mean, HORIZON_quant_std
+
+
+def cal_green_sensitivity(hsv_img, mask_img):
+    """
+    My patent calculation
+    :param hsv_img:
+    :param mask_img:
+    :return:
+    """
+
+    assert hsv_img.shape[:2] == mask_img.shape, "hsv_img.shape != mask_img.shape"
+    mask = np.where((mask_img[:, :] > 127))
+
+    h_, s_, v_ = [], [], []
+    for x, y in zip(mask[1], mask[0]):
+        try:
+            h_.append(hsv_img[y, x, 0])
+            s_.append(hsv_img[y, x, 1])
+            v_.append(hsv_img[y, x, 2])
+        except Exception as Error:
+            print(Error)
+
+    h_mean = np.mean(h_)
+    s_mean = np.mean(s_)
+    v_mean = np.mean(v_)
+
+    h_green1, h_green2 = [], []
+    for hi in h_:
+        if hi >= 35 and hi <= 90:
+            h_green1.append(hi)
+        if hi > 45 and hi < 70:
+            h_green2.append(hi)
+    sigma1, sigma2 = 0.3, 0.7
+    phi = len(h_green1) / len(mask[0]) * sigma1 + len(h_green2) / len(mask[0]) * sigma2
+    sen = 1 / 3 * np.pi * s_mean ** 1.2 * v_mean ** 0.6 * phi
+
+    return sen
+
+
+def exit_light_patent_algorithm_test(img_path):
+    cv2img = cv2.imread(img_path)
+    g_img = cv2.split(cv2img)[1]
+    hsvimg = cv2.cvtColor(cv2img, cv2.COLOR_BGR2HSV)
+
+    ret, thresh = cv2.threshold(g_img, 127, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+
+    # hsvimg = cv2.resize(hsvimg, (96, 64))
+    # thresh = cv2.resize(thresh, (96, 64))
+
+    t1 = time.time()
+    sensitivity = cal_green_sensitivity(hsvimg, thresh)
+    t2 = time.time()
+    print(t2 - t1)
+    print(sensitivity)
+
+    if sensitivity > 1000:
+        res = "ON"
+        print(res)
+    else:
+        res = "OFF"
+        print(res)
+
+
+def black_area_change_pixel(img_path):
+    save_path = img_path.replace(img_path.split("/")[-1], "{}_change_10".format(img_path.split("/")[-1]))
+    os.makedirs(save_path, exist_ok=True)
+
+    img_list = os.listdir(img_path)
+
+    for img in img_list:
+        img_abs_path = img_path + "/{}".format(img)
+        cv2img = cv2.imread(img_abs_path)
+        cv2img_cp = cv2img.copy()
+
+        # black_area = np.where((cv2img[:, :, 0] < 5) & (cv2img[:, :, 1] < 5) & (cv2img[:, :, 2] < 5))
+        black_area = np.where((cv2img[:, :, 0] < 10) & (cv2img[:, :, 1] < 10) & (cv2img[:, :, 2] < 10))
+        # black_area = np.where((cv2img[:, :, 0] < 20) & (cv2img[:, :, 1] < 20) & (cv2img[:, :, 2] < 20))
+        # black_area = np.where((cv2img[:, :, 0] < 30) & (cv2img[:, :, 1] < 30) & (cv2img[:, :, 2] < 30))
+
+        # bg_cv2img = bg_cv2img.copy()
+        for x_b, y_b in zip(black_area[1], black_area[0]):
+            try:
+                cv2img_cp[y_b, x_b] = (255, 0, 255)
+            except Exception as Error:
+                print(Error)
+
+        cv2.imwrite("{}/{}".format(save_path, img), cv2img_cp)
+
+
+def perspective_transform(image, rect):
+    """
+    透视变换
+    """
+    tl, tr, br, bl = rect
+    # tl, tr, br, bl = np.array([tl[0] - 20, tl[1] - 20]), np.array([tr[0] + 20, tr[1] - 20]), np.array([br[0] + 20, br[1] + 20]), np.array([bl[0] - 20, bl[1] + 20])
+    # rect_new = np.array([tl[0] - 20, tl[1] - 20]), np.array([tr[0] + 20, tr[1] - 20]), np.array([br[0] + 20, br[1] + 20]), np.array([bl[0] - 20, bl[1] + 20])
+    # 计算宽度
+    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    maxWidth = max(int(widthA), int(widthB))
+    # 计算高度
+    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    maxHeight = max(int(heightA), int(heightB))
+    # 定义变换后新图像的尺寸
+    dst = np.array([[0, 0], [maxWidth-1, 0], [maxWidth-1, maxHeight-1],
+                   [0, maxHeight-1]], dtype='float32')
+    # 变换矩阵
+    M = cv2.getPerspectiveTransform(rect, dst)
+    # 透视变换
+    warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+    return warped
+
+
+def crop_img_via_perspective_transform(img_path):
+    # Need to test
+    
+    def click_event(event, x, y, flags, param):
+        xy = []
+        if event == cv2.EVENT_LBUTTONDOWN:
+            xy.append((x, y))
+            cv2.circle(img, (x, y), 1, (255, 0, 255), -1)
+            cv2.putText(img, "({}, {})".format(x, y), (x, y), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 1)
+            cv2.imshow("img", img)
+
+    img = cv2.imread(img_path)
+    h, w = img.shape[:2]
+
+    global xy
+    xy = []
+
+    cv2.imshow("img", img)
+    cv2.setMouseCallback("img", click_event)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    print("xy: ", xy)
+
+    # p1 = np.array([[8, 26], [137, 44], [16, 162], [147, 209]], dtype=np.float32)
+    p1 = np.array(xy, dtype=np.float32)
+    p2 = np.array([[0, 0], [w, 0], [0, h], [w, h]], dtype=np.float32)
+
+    M = cv2.getPerspectiveTransform(p1, p2)
+    warped = cv2.warpPerspective(img, M, (w, h))
+    cv2.imwrite("{}".format(img_path.replace(".jpg", "_perspective_transform_cropped.jpg")), warped)
+
+
+def process_black_images(img_path, flag="mv", pixel_sum=100000):
+    img_list = sorted(os.listdir(img_path))
+
+    if flag == "mv":
+        dir_name = os.path.basename(img_path)
+        save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved_black_images_{}".format(dir_name, pixel_sum)
+        os.makedirs(save_path, exist_ok=True)
+
+    for img in img_list:
+        if os.path.isdir(img): continue
+        img_abs_path = img_path + "/{}".format(img)
+        try:
+
+            cv2img = cv2.imread(img_abs_path)
+            cv2img = cv2.resize(cv2img, (128, 128))
+            h, w = cv2img.shape[:2]
+            sum_ = np.sum(cv2img[:, :, :])
+            if sum_ < pixel_sum:
+                if flag == "mv":
+                    shutil.move(img_abs_path, save_path)
+                elif flag == "rm":
+                    os.remove(img_abs_path)
+
+            # if w > 120 and h > 200:
+            #     shutil.move(img_abs_path, save_path)
+
+        except Exception as Error:
+            if flag == "mv":
+                shutil.move(img_abs_path, save_path)
+            elif flag == "rm":
+                os.remove(img_abs_path)
+            print(Error)
+
+
+def check_image(img_path):
+    """
+    remove file: Corrupt JPEG data: premature end of file / data segment.
+    :param img_path:
+    :return:
+    """
+
+    try:
+        img = Image.open(img_path).load()
+        img.verify()
+        return True
+    except:
+        # os.remove(img_path)
+        print("PIL check_image: Error! {}".format(img_path))
+        return False
+
+
+def remove_corrupt_images_pil(img_path, move_or_delete="delete"):
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+
+    if move_or_delete == "move":
+        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
+        os.makedirs(move_path, exist_ok=True)
+
+    for img in img_list:
+        img_abs_path = img_path + "/{}".format(img)
+        if move_or_delete == "move":
+            img_dst_path = move_path + "/{}".format(img)
+        # cv2img = cv2.imread(img_abs_path)
+        try:
+            res = check_image(img_abs_path)
+            if not res:
+                if move_or_delete == "move":
+                    shutil.move(img_abs_path, img_dst_path)
+                    print("shutil.move {} --> {}".format(img_abs_path, img_dst_path))
+                elif move_or_delete == "delete":
+                    os.remove(img_abs_path)
+                    print("Removed --> {}".format(img_abs_path))
+
+        except Exception as Error:
+            print(Error)
+            os.remove(img_abs_path)
+            print("Removed --> {}".format(img_abs_path))
+
+
+def remove_corrupt_images_pil_v2(img_path, move_or_delete="delete"):
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+
+    if move_or_delete == "move":
+        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
+        os.makedirs(move_path, exist_ok=True)
+
+    for img in img_list:
+        img_abs_path = img_path + "/{}".format(img)
+        if move_or_delete == "move":
+            img_dst_path = move_path + "/{}".format(img)
+        try:
+            img = Image.open(img_abs_path)
+            img = np.asarray(img)
+        except Exception as Error:
+            print(Error)
+            if move_or_delete == "move":
+                shutil.move(img_abs_path, img_dst_path)
+                print("shutil.move: {} --> {}".format(img_abs_path, img_dst_path))
+            elif move_or_delete == "delete":
+                os.remove(img_abs_path)
+                print("Removed: --> {}".format(img_abs_path))
+
+
+def badImgFast(fn, imgType=None):
+    if os.path.getsize(fn) < 512:
+        return True
+    valid = False
+    with open(fn, "rb") as f:
+        f.seek(-2, 2)
+        buf = f.read()
+        valid = buf.endswith(b'\xff\xd9') or buf.endswith(b'\xae\x82') or buf.endswith(b'\x00\x3B') or buf.endswith(b'\x60\x82')  # 检测jpg图片完整性， 检测png图片完整性
+        buf.endswith(b'\x00\x00')
+    # return valid or (imghdr.what(nm) =="webp")
+    return valid
+
+
+def remove_corrupt_images_pil_v2_base(img_path, move_or_delete, img_list_i):
+    dir_name = os.path.basename(img_path)
+    if move_or_delete == "move":
+        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
+        os.makedirs(move_path, exist_ok=True)
+
+    for img in tqdm(img_list_i):
+        suffix = os.path.splitext(img)[1][1:]
+        img_abs_path = img_path + "/{}".format(img)
+        if move_or_delete == "move":
+            img_dst_path = move_path + "/{}".format(img)
+        try:
+            res = imghdr.what(img_abs_path)
+
+            flag = False
+            if suffix.lower()[:2] == res.lower()[:2]:
+                flag = True
+
+            if res == None or not flag:
+                if move_or_delete == "move":
+                    shutil.move(img_abs_path, img_dst_path)
+                    print("shutil.move: {} --> {}".format(img_abs_path, img_dst_path))
+                elif move_or_delete == "delete":
+                    os.remove(img_abs_path)
+                    print("Removed: --> {}".format(img_abs_path))
+        except Exception as Error:
+            print(Error)
+
+
+def remove_corrupt_images_pil_v2_main(img_path, move_or_delete="delete"):
+    img_list = sorted(os.listdir(img_path))
+
+    len_ = len(img_list)
+    img_lists = []
+    split_n = 8
+    for j in range(split_n):
+        img_lists.append(img_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
+
+    t_list = []
+    for i in range(split_n):
+        img_list_i = img_lists[i]
+        t = threading.Thread(target=remove_corrupt_images_pil_v2_base, args=(img_path, move_or_delete, img_list_i,))
+        t_list.append(t)
+
+    for t in t_list:
+        t.start()
+    for t in t_list:
+        t.join()
+
+
+def remove_corrupt_images_cv2_v2_base(img_path, move_or_delete, img_list_i):
+    dir_name = os.path.basename(img_path)
+    if move_or_delete == "move":
+        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
+        os.makedirs(move_path, exist_ok=True)
+
+    for img in tqdm(img_list_i):
+        suffix = os.path.splitext(img)[1][1:]
+        img_abs_path = img_path + "/{}".format(img)
+        if move_or_delete == "move":
+            img_dst_path = move_path + "/{}".format(img)
+        try:
+            # res = imghdr.what(img_abs_path)
+
+            res = cv2.imread(img_abs_path)
+            if res is None:
+                if move_or_delete == "move":
+                    shutil.move(img_abs_path, img_dst_path)
+                    print("shutil.move: {} --> {}".format(img_abs_path, img_dst_path))
+                elif move_or_delete == "delete":
+                    os.remove(img_abs_path)
+                    print("Removed: --> {}".format(img_abs_path))
+        except Exception as Error:
+            print(Error)
+
+
+def remove_corrupt_images_cv2_v2_main(img_path, move_or_delete="delete"):
+    img_list = sorted(os.listdir(img_path))
+
+    len_ = len(img_list)
+    img_lists = []
+    split_n = 8
+    for j in range(split_n):
+        img_lists.append(img_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
+
+    t_list = []
+    for i in range(split_n):
+        img_list_i = img_lists[i]
+        t = threading.Thread(target=remove_corrupt_images_cv2_v2_base, args=(img_path, move_or_delete, img_list_i,))
+        t_list.append(t)
+
+    for t in t_list:
+        t.start()
+    for t in t_list:
+        t.join()
+
+
+def remove_corrupt_images_opencv(img_path):
+    img_list = sorted(os.listdir(img_path))
+    for img in img_list:
+        img_abs_path = img_path + "/{}".format(img)
+        try:
+            # cv2img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+            cv2img = cv2.imread(img_abs_path)
+
+            if cv2img is None:
+                os.remove(img_abs_path)
+                print("[img is None]: Removed --> {}".format(img_abs_path))
+                continue
+
+            cv2img_ = np.asarray(cv2img)
+
+        except Exception as Error:
+            print(Error)
+            os.remove(img_abs_path)
+            print("Removed --> {}".format(img_abs_path))
+
+
+def process_same_images_via_ssim(img_path, imgsz=(64, 64), flag="move"):
+    from skimage.metrics import structural_similarity
+
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+
+    if flag == "move":
+        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_same_images_moved".format(dir_name)
+        os.makedirs(move_path, exist_ok=True)
+
+    for i in range(len(img_list)):
+        try:
+            img_path_i = img_path + "/{}".format(img_list[i])
+            img_i = cv2.imread(img_path_i)
+            imgisz = img_i.shape[:2]
+            if imgisz[0] < 10 or imgisz[1] < 10: continue
+            if img_i is None: continue
+            img_i = cv2.resize(img_i, imgsz)
+
+            for j in range(i + 1, len(img_list)):
+                img_path_j = img_path + "/{}".format(img_list[j])
+                img_j = cv2.imread(img_path_j)
+                imgjsz = img_j.shape[:2]
+                if imgjsz[0] < 10 or imgjsz[1] < 10: continue
+                if img_j is None: continue
+                img_j = cv2.resize(img_j, imgsz)
+
+                ssim = structural_similarity(img_i, img_j, multichannel=True)
+                print("N: {} i: {}, j: {}, ssim: {}".format(len(img_list), i, j, ssim))
+
+                if ssim > 0.95:
+                    if flag == "remove" or flag == "delete":
+                        os.remove(img_path_j)
+                        print("{}, {} 两张图片相似度很高, ssim: {}  |  Removed: {}".format(img_list[i], img_list[j], ssim, img_path_j))
+                    elif flag == "move":
+                        shutil.move(img_path_j, move_path + "/{}".format(img_list[j]))
+                        print("{}, {} 两张图片相似度很高, ssim: {}   |  {} --> {}/{}.".format(img_list[i], img_list[j], ssim, img_path_j, move_path, img_list[j]))
+                    else:
+                        print("'flag' should be one of [remove, delete, move]!")
+
+            print(" ----------- {} ----------- ".format(i))
+
+        except Exception as Error:
+            print(Error, Error.__traceback__.tb_lineno)
+
+
+def ssim_process_base(img_path, imgsz, img_list, ii, img_i, img_list_i, flag, move_path):
+    from skimage.metrics import structural_similarity
+
+    for j in range(len(img_list_i)):
+        img_path_j = img_path + "/{}".format(img_list_i[j])
+        img_j = cv2.imread(img_path_j)
+        imgsz = img_j.shape[:2]
+        if imgsz[0] < 7 or imgsz[1] < 7: continue
+        if img_j is None: continue
+        img_j = cv2.resize(img_j, imgsz)
+
+        ssim = structural_similarity(img_i, img_j, multichannel=True)
+        print("N: {} i: {}, j: {}, ssim: {}".format(len(img_list), ii, j, ssim))
+
+        if ssim > 0.95:
+            if flag == "remove" or flag == "delete":
+                os.remove(img_path_j)
+                print("{}, {} 两张图片相似度很高, ssim: {}  |  Removed: {}".format(img_list[ii], img_list_i[j], ssim, img_path_j))
+            elif flag == "move":
+                shutil.move(img_path_j, move_path + "/{}".format(img_list_i[j]))
+                print("{}, {} 两张图片相似度很高, ssim: {}   |  {} --> {}/{}.".format(img_list[ii], img_list_i[j], ssim, img_path_j, move_path, img_list_i[j]))
+            else:
+                print("'flag' should be one of [remove, delete, move]!")
+
+    print(" ----------- {} ----------- ".format(ii))
+
+
+def process_same_images_multithread_via_ssim(img_path, imgsz=(64, 64), flag="move"):
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+
+    if flag == "move" or flag == "mv":
+        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_same_images_moved".format(dir_name)
+        os.makedirs(move_path, exist_ok=True)
+
+    for ii in range(len(img_list)):
+        try:
+            img_path_i = img_path + "/{}".format(img_list[ii])
+            img_i = cv2.imread(img_path_i)
+            if img_i is None: continue
+            img_i = cv2.resize(img_i, imgsz)
+
+            img_list_left = img_list[ii + 1:]
+
+            len_ = len(img_list_left)
+            img_lists_left = []
+            split_n = 8
+            for j in range(split_n):
+                img_lists_left.append(img_list_left[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
+
+            t_list = []
+            for i in range(split_n):
+                img_list_i = img_lists_left[i]
+                t = threading.Thread(target=ssim_process_base, args=(img_path, imgsz, img_list, ii, img_i, img_list_i, flag, move_path,))
+                t_list.append(t)
+
+            for t in t_list:
+                t.start()
+            for t in t_list:
+                t.join()
+
+        except Exception as Error:
+            print(Error)
+
+
+def remove_small_area(img_path):
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_removed_small_area".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    for img in img_list:
+        try:
+            img_abs_path = img_path + "/{}".format(img)
+            cv2img = cv2.imread(img_abs_path)
+            cv2img_gray = cv2.cvtColor(cv2img, cv2.COLOR_BGR2GRAY)
+
+            ret, thresh = cv2.threshold(cv2img_gray.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
+            cnts, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            for c in cnts:
+                cx, cy, cw, ch = cv2.boundingRect(c)
+                if cw * ch < 5000:
+                    cv2img[cy:cy + ch, cx:cx + cw] = (0, 0, 0)
+                    print("{}: {}_{}_{}_{}".format(img, cx, cy, cw, ch))
+
+            cv2.imwrite("{}/{}".format(save_path, img), cv2img)
+
+        except Exception as Error:
+            print(Error)
+
+
+def process_small_images(img_path, rmsz=48, mode=0):
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_small".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    for img in tqdm(img_list):
+        if os.path.isdir(img): continue
+        try:
+            img_abs_path = img_path + "/{}".format(img)
+            img_dst_path = save_path + "/{}".format(img)
+            cv2img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+            h, w = cv2img.shape[:2]
+            if mode == 0:
+                if (h < rmsz and w < rmsz) or (h > 8 * w or w > 5 * h):
+                    shutil.move(img_abs_path, img_dst_path)
+            elif mode == 1:
+                if h < rmsz or w < rmsz:
+                    shutil.move(img_abs_path, img_dst_path)
+            else:
+                if (h < rmsz or w < rmsz) or (h > 3 * w or w > 5 * h):
+                    shutil.move(img_abs_path, img_dst_path)
+
+        except Exception as Error:
+            print(Error)
+
+
+def apply_hog(img):
+    from skimage import feature, exposure
+
+    fd, hog_img = feature.hog(img, orientations=9, pixels_per_cell=(16, 16), cells_per_block=(2, 2), visualize=True)
+    hog_img_rescaled = exposure.rescale_intensity(hog_img, in_range=(0, 10))
+    return hog_img_rescaled
+
+
+def MinFilterGray(src, r=7):
+    '''最小值滤波，r是滤波器半径'''
+    # 使用opencv的erode函数更高效
+
+    return cv2.erode(src, np.ones((2 * r + 1, 2 * r + 1)))
+
+
+def guidedfilter(I, p, r, eps):
+    ''''引导滤波，直接参考网上的matlab代码'''
+    height, width = I.shape
+    m_I = cv2.boxFilter(I, -1, (r, r))
+    m_p = cv2.boxFilter(p, -1, (r, r))
+    m_Ip = cv2.boxFilter(I * p, -1, (r, r))
+    cov_Ip = m_Ip - m_I * m_p
+
+    m_II = cv2.boxFilter(I * I, -1, (r, r))
+    var_I = m_II - m_I * m_I
+
+    a = cov_Ip / (var_I + eps)
+    b = m_p - a * m_I
+
+    m_a = cv2.boxFilter(a, -1, (r, r))
+    m_b = cv2.boxFilter(b, -1, (r, r))
+    return m_a * I + m_b
+
+
+def getV1(m, r, eps, w, maxV1):
+    # 输入rgb图像，值范围[0,1]
+    '''计算大气遮罩图像V1和光照值A, V1 = 1-t/A'''
+    V1 = np.min(m, 2)  # 得到暗通道图像
+    V1 = guidedfilter(V1, MinFilterGray(V1, 7), r, eps)  # 使用引导滤波优化
+    bins = 2000
+    ht = np.histogram(V1, bins)  # 计算大气光照A
+    d = np.cumsum(ht[0]) / float(V1.size)
+    for lmax in range(bins - 1, 0, -1):
+        if d[lmax] <= 0.999:
+            break
+    A = np.mean(m, 2)[V1 >= ht[1][lmax]].max()
+    V1 = np.minimum(V1 * w, maxV1)  # 对值范围进行限制
+
+    return V1, A
+
+
+def deHaze(m, r=81, eps=0.001, w=0.95, maxV1=0.80, bGamma=False):
+    Y = np.zeros(m.shape)
+    V1, A = getV1(m, r, eps, w, maxV1)  # 得到遮罩图像和大气光照
+    for k in range(3):
+        Y[:, :, k] = (m[:, :, k] - V1) / (1 - V1 / A)  # 颜色校正
+    Y = np.clip(Y, 0, 1)
+    if bGamma:
+        Y = Y ** (np.log(0.5) / np.log(Y.mean()))  # gamma校正,默认不进行该操作
+    return Y
+
+
+def cal_saliency_map(src, algorithm="FT"):
+    if algorithm == "FT":
+        lab = cv2.cvtColor(src, cv2.COLOR_BGR2LAB)
+        # gaussian_blur = cv2.GaussianBlur(src, (17, 17), 0)
+        blur = cv2.medianBlur(src, 7)
+
+        mean_lab = np.mean(lab, axis=(0, 1))
+        saliency_map = (blur - mean_lab) * (blur - mean_lab)
+        saliency_map = (saliency_map - np.amin(saliency_map)) / (np.amax(saliency_map) - np.amin(saliency_map))
+
+        return saliency_map
+
+
+def get_saliency_ft(img_path):
+    from skimage.util import img_as_float
+
+    # Saliency map calculation based on:
+
+    img = skimage.io.imread(img_path)
+
+    img_rgb = img_as_float(img)
+
+    img_lab = skimage.color.rgb2lab(img_rgb)
+    avgl, avga, avgb = np.mean(img_lab, axis=(0, 1))
+
+    mean_val = np.mean(img_lab, axis=(0, 1))
+    kernel_h = (1.0 / 16.0) * np.array([[1, 4, 6, 4, 1]])
+    # kernel_h = (1.0/4.0) * np.array([[1,2,1]])
+    kernel_w = kernel_h.transpose()
+
+    blurred_l = scipy.signal.convolve2d(img_lab[:, :, 0], kernel_h, mode='same')
+    blurred_a = scipy.signal.convolve2d(img_lab[:, :, 1], kernel_h, mode='same')
+    blurred_b = scipy.signal.convolve2d(img_lab[:, :, 2], kernel_h, mode='same')
+
+    blurred_l2 = scipy.signal.convolve2d(blurred_l, kernel_w, mode='same')
+    blurred_a2 = scipy.signal.convolve2d(blurred_a, kernel_w, mode='same')
+    blurred_b2 = scipy.signal.convolve2d(blurred_b, kernel_w, mode='same')
+
+    im_blurred = np.dstack([blurred_l2, blurred_a2, blurred_b2])
+
+    # sal = np.linalg.norm(mean_val - im_blurred,axis = 2)
+    sal = np.square(blurred_l2 - avgl) + np.square(blurred_a2 - avga) + np.square(blurred_b2 - avgb)
+    sal_max = np.max(sal)
+    sal_min = np.min(sal)
+    range = sal_max - sal_min
+    if range == 0:
+        range = 1
+    sal = 255 * ((sal - sal_min) / range)
+
+    sal = sal.astype(int)
+    return sal
+
+
+def binarise_saliency_map(saliency_map):
+    adaptive_threshold = 2.0 * saliency_map.mean()
+    return (saliency_map > adaptive_threshold)
+
+
+def saliency_map_ft_test():
+    from pywt import dwt, idwt, dwt2, idwt2
+
+    # img = cv2.imread("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133.jpg")
+    # saliency_map = cal_saliency_map_FT(img)
+    # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133_saliency_map_ft.jpg", saliency_map * 255)
+    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/smoke_PS/data"
+
+    bg_path = os.path.abspath(os.path.join(data_path, "../..")) + "/bg"
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/output"
+    os.makedirs(save_path, exist_ok=True)
+
+    img_list = sorted(os.listdir(data_path))
+    for imgi in img_list:
+        img_name = os.path.splitext(imgi)[0]
+        img_abs_path = data_path + "/{}".format(imgi)
+        bg_abs_path = bg_path + "/{}".format(imgi)
+        img = cv2.imread(img_abs_path)
+        H, W = img.shape[:2]
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_cp = img.copy()
+        bg_img = cv2.imread(bg_abs_path)
+        bg_b, bg_g, bg_r = cv2.split(bg_img)
+        bg_img_gray = cv2.cvtColor(bg_img, cv2.COLOR_BGR2GRAY)
+        # bg_img_cp = bg_img.copy()
+        saliency_map2 = get_saliency_ft(img_abs_path)
+        saliency_map2_merge = cv2.merge([saliency_map2, saliency_map2, saliency_map2])
+        saliency_map = cal_saliency_map_FT(img) * 255
+        b, g, r = cv2.split(saliency_map)
+        ret, b_bin = cv2.threshold(np.uint8(b), 70, 255, cv2.THRESH_BINARY)
+        cv2.imwrite("{}/{}_saliency_map2.jpg".format(save_path, img_name), saliency_map2)
+        cv2.imwrite("{}/{}_saliency_map2_merge.jpg".format(save_path, img_name), saliency_map2_merge)
+        cv2.imwrite("{}/{}_saliency_map.jpg".format(save_path, img_name), saliency_map)
+        cv2.imwrite("{}/{}_saliency_map_b.jpg".format(save_path, img_name), b)
+        cv2.imwrite("{}/{}_saliency_map_g.jpg".format(save_path, img_name), g)
+        cv2.imwrite("{}/{}_saliency_map_r.jpg".format(save_path, img_name), r)
+        cv2.imwrite("{}/{}_saliency_map_b_bin.jpg".format(save_path, img_name), b_bin)
+
+        b_bin_merge = cv2.merge([b_bin, b_bin, b_bin])
+
+        cnts, hierarchy = cv2.findContours(b_bin.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        max_cnts = max(cnts, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(max_cnts)
+        cv2.rectangle(b_bin, (x, y), (x + w, y + h), (255, 0, 255), 5)
+        cv2.rectangle(img_cp, (x, y), (x + w, y + h), (255, 0, 255), 5)
+        cv2.imwrite("{}/{}_saliency_map_b_bin_rect.jpg".format(save_path, img_name), b_bin)
+        # cv2.imwrite("{}/{}_saliency_map_img_rect.jpg".format(data_path, img_name), img_cp)
+
+        bg_roi = bg_img_gray[y:y + h, x:x + w]
+        bgcA, (bgcH, bgcV, bgcD) = dwt2(bg_roi, "haar")
+        # bgcAH = np.hstack((bgcA, bgcH))
+        # bgcVD = np.hstack((bgcV, bgcD))
+        # bgcAHVD = np.vstack((bgcAH, bgcVD))
+        # bg_cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
+        bg_energy_gray = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
+        print("E_bg_gray: ", bg_energy_gray)
+
+        bg_roi = bg_b[y:y + h, x:x + w]
+        bgcA, (bgcH, bgcV, bgcD) = dwt2(bg_roi, "haar")
+        # bgcAH = np.hstack((bgcA, bgcH))
+        # bgcVD = np.hstack((bgcV, bgcD))
+        # bgcAHVD = np.vstack((bgcAH, bgcVD))
+        # bg_cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
+        bg_energy = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
+        print("E_bg_b: ", bg_energy)
+
+        b_roi = img_gray[y:y + h, x:x + w]
+        cA, (cH, cV, cD) = dwt2(b_roi, "haar")
+        cAH = np.hstack((cA, cH))
+        cVD = np.hstack((cV, cD))
+        cAHVD = np.vstack((cAH, cVD))
+        cv2img_resz = cv2.resize(cAHVD, (W, H))
+        cv2img_resz_merge = cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz])
+        energy_gray = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
+        print("E_gray: ", energy_gray)
+
+        b_roi = b[y:y + h, x:x + w]
+        cA, (cH, cV, cD) = dwt2(b_roi, "haar")
+        cAH = np.hstack((cA, cH))
+        cVD = np.hstack((cV, cD))
+        cAHVD = np.vstack((cAH, cVD))
+        cv2img_resz = cv2.resize(cAHVD, (W, H))
+        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
+        print("E_b: ", energy)
+
+        E_ratio_gray = energy_gray / bg_energy_gray
+        E_ratio_b = energy / bg_energy
+        print("E_ratio_gray: {}".format(E_ratio_gray))
+        print("E_ratio_b: {}".format(E_ratio_b))
+
+        img_roi = img[y:y + h, x:x + w]
+        # img_roi_b, img_roi_g, img_roi_r = cv2.split(img_roi)
+        B_, G_, R_ = np.mean(img_roi[:, :, 0]), np.mean(img_roi[:, :, 1]), np.mean(img_roi[:, :, 2])
+        print("B_, G_, R_: ", B_, G_, R_)
+
+        cv2.putText(img_cp, "E_bg: {:.2f}".format(bg_energy), (20, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+        cv2.putText(img_cp, "E: {:.2f}".format(energy), (20, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+        cv2.putText(img_cp, "E_ratio: {:.2f}".format(E_ratio_b), (20, 150), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+        cv2.putText(img_cp, "B_, G_, R_: {:.2f} {:.2f} {:.2f}".format(B_, G_, R_), (20, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+
+        cv2.imwrite("{}/{}_saliency_map_img_cp.jpg".format(save_path, img_name), img_cp)
+        out_img = np.hstack((img, saliency_map, b_bin_merge, cv2img_resz_merge, img_cp))
+        cv2.imwrite("{}/{}_saliency_map_stacked.jpg".format(save_path, img_name), out_img)
+
+
+def thresh_img(img, threshold_min_thr=10, adaptiveThreshold=True):
+    if adaptiveThreshold:
+        thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 5, 5)
+        return None, thresh
+    else:
+        ret, thresh = cv2.threshold(img, threshold_min_thr, 255, cv2.THRESH_BINARY)
+        return ret, thresh
+
+
+def wt_test():
+    from pywt import dwt, idwt, dwt2, idwt2
+
+    img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/cmp_data2/smoke"
+    img_list = os.listdir(img_path)
+
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/output/cmp_data2/smoke"
+    os.makedirs(save_path, exist_ok=True)
+
+    Es = []
+
+    for img in img_list:
+        img_name = os.path.splitext(img)[0]
+        img_abs_path = img_path + "/{}".format(img)
+        cv2img = cv2.imread(img_abs_path, 0)
+        cA, (cH, cV, cD) = dwt2(cv2img, "haar")
+
+        cAH = np.hstack((cA, cH))
+        cVD = np.hstack((cV, cD))
+        cAHVD = np.vstack((cAH, cVD))
+        cv2.imwrite("{}/{}_dwt2.jpg".format(save_path, img_name), cAHVD)
+
+        cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
+        img_cha = cv2.subtract(np.uint8(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz])), np.uint8(cv2.merge([cA, cA, cA])))
+        # img_cha = cv2.subtract(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz]), cv2.merge([cA, cA, cA]))
+        # img_cha = cv2.subtract(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz]), cv2.merge([cA, cA, cA]))
+        print(img_cha.sum())
+        cv2.imwrite("{}/{}_img_cha.jpg".format(save_path, img_name), img_cha)
+
+        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / cv2img.size
+        print("E: ", energy)
+
+        Es.append(energy)
+
+    print("E mean: ", np.mean(Es))
+
+
+def dehaze_test():
+    m = deHaze(cv2.imread('/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/20221111152824_8b46d8_75_0028505.jpg') / 255.0) * 255
+    cv2.imwrite('/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/20221111152824_8b46d8_75_0028505_defog.jpg', m)
+
+
+def hog_test():
+    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data"
+    img_list = sorted(os.listdir(data_path))
+    for img in img_list:
+        img_name = os.path.splitext(img)[0]
+        img_abs_path = data_path + "/{}".format(img)
+        img = cv2.imread(img_abs_path, 0)
+        hog_res = apply_hog(img)
+        cv2.imwrite("{}/{}_hog.jpg".format(data_path, img_name), hog_res * 255)
+
+
+def convert_to_gray_image(data_path):
+    img_list = sorted(os.listdir(data_path))
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/images_gray"
+    os.makedirs(save_path, exist_ok=True)
+
+    for i in img_list:
+        img_abs_path = data_path + "/{}".format(i)
+        img = cv2.imread(img_abs_path, 0)
+        cv2.imwrite("{}/{}".format(save_path, i), img)
+
+
+def crop_one_image(img_path, crop_area):
+    cv2img = cv2.imread(img_path)
+    par_path = os.path.abspath(os.path.join(img_path, "../.."))
+    img_name = os.path.splitext(os.path.basename(img_path))[0]
+    cropped = cv2img[crop_area[0]:crop_area[1], crop_area[2]:crop_area[3]]
+    cv2.imwrite("{}/{}_cropped.jpg".format(par_path, img_name), cropped)
+
+
+def create_pure_images(save_path, size=(1080, 1920), max_pixel_value=20, save_num=1000, p=0.8):
+    os.makedirs(save_path, exist_ok=True)
+    colors = [[0, 0, 0],
+              [10, 0, 0],
+              [0, 10, 0],
+              [0, 0, 10],
+              [10, 10, 0],
+              [10, 0, 10],
+              [0, 10, 10],
+              [10, 10, 10],
+              [10, 15, 0],
+              [10, 0, 15],
+              [15, 10, 0],
+              [2, 3, 5],
+              [5, 2, 2],
+              [5, 6, 2],
+              [5, 7, 2],
+              [5, 2, 8],
+              [5, 54, 2],
+              [5, 5, 2],
+              ]
+
+    colors2 = []
+    for i in range(save_num):
+        r = np.random.random()
+        if r < p:
+            c0 = np.random.choice(range(max_pixel_value))
+            c1 = np.random.choice(range(max_pixel_value))
+            c = [np.random.choice([c0, c1]), np.random.choice([c0, c1]), np.random.choice([c0, c1])]
+        else:
+            c = list(np.random.choice(range(max_pixel_value), size=3))
+        if c not in colors2:
+            colors2.append(c)
+
+    if len(colors2) > 1000 and len(colors2) < 5000:
+        colors2 = colors2 * 5
+    elif len(colors2) <= 1000:
+        colors2 = colors2 * 10
+    elif len(colors2) >= 5000:
+        colors2 = colors2 * 2
+
+    for i in range(len(colors2)):
+        img_init = np.ones(shape=[size[0], size[1], 3])
+        img_b = img_init[:, :, 0] * colors2[i][0]
+        img_g = img_init[:, :, 1] * colors2[i][1]
+        img_r = img_init[:, :, 2] * colors2[i][2]
+        img = cv2.merge([img_b, img_g, img_r])
+        cv2.imwrite("{}/{}.jpg".format(save_path, i), img)
+
+
+def classify_images_via_bgr_values(img_path):
+    img_list = sorted(os.listdir(img_path))
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/cls_res"
+    save_path_0 = save_path + "/0"
+    save_path_1 = save_path + "/1"
+    os.makedirs(save_path_0, exist_ok=True)
+    os.makedirs(save_path_1, exist_ok=True)
+
+    for i in img_list:
+        img_abs_path = img_path + "/{}".format(i)
+        cv2img = cv2.imread(img_abs_path)
+        imgsz = cv2img.shape[:2]
+        b, g, r = cv2.split(cv2img)
+        b_ = np.mean(np.asarray(b).reshape(1, -1))
+        g_ = np.mean(np.asarray(g).reshape(1, -1))
+        r_ = np.mean(np.asarray(r).reshape(1, -1))
+
+        print("b_, g_, r_: ", b_, g_, r_)
+
+        bg_mean = np.mean([b_, g_])
+
+        if abs(r_ - bg_mean) < 30:
+            img_dst_path = save_path_0 + "/{}".format(i)
+            shutil.move(img_abs_path, img_dst_path)
+        else:
+            img_dst_path = save_path_1 + "/{}".format(i)
+            shutil.move(img_abs_path, img_dst_path)
+
+
+def GetRed(img):
+    """
+    提取图中的红色部分
+    """
+    # 转化为hsv空间
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # print(hsv.shape)
+    # 颜色在HSV空间下的上下限
+    low_hsv = np.array([0, 180, 80])
+    high_hsv = np.array([10, 255, 255])
+
+    # 使用opencv的inRange函数提取颜色
+    mask = cv2.inRange(hsv, lowerb=low_hsv, upperb=high_hsv)
+    Red = cv2.bitwise_and(img, img, mask=mask)
+    return Red
+
+
+def find_red_bbx(img, expand_p=2):
+    src = GetRed(img)
+    binary = cv2.Canny(src, 80, 80 * 2)
+    k = np.ones((3, 3), dtype=np.uint8)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_DILATE, k)
+
+    results = []
+    contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for c in range(len(contours)):
+        area = cv2.contourArea(contours[c])
+        arclen = cv2.arcLength(contours[c], True)
+        if area < 20 or arclen < 100:
+            continue
+        rect = cv2.minAreaRect(contours[c])
+        cx, cy = rect[0]
+
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        listX = [box[0][0], box[1][0], box[2][0], box[3][0]]
+        listY = [box[0][1], box[1][1], box[2][1], box[3][1]]
+        x1 = min(listX)
+        y1 = min(listY)
+        x2 = max(listX)
+        y2 = max(listY)
+        # print(x1, y1, x2, y2)
+        width = np.int32(x2 - x1)
+        height = np.int32(y2 - y1)
+
+        roi = cv2img[y1 + expand_p: y2 - expand_p, x1 + expand_p:x2 - expand_p]
+        # print
+        # print(x1,y1,x2,y2)
+        if width < 80 or height < 80:
+            continue
+
+        # cv2.imshow("roi", roi)
+        # cv2.waitKey(0)
+        if len(roi):
+            # cv2.imwrite("{}/{}_{}.jpg".format(lbl_path, img_name, c), roi)
+            bbx_voc = [int(round(x1)) + expand_p, int(round(x2)) - expand_p, int(round(y1)) + expand_p, int(round(y2)) - expand_p]
+            results.append(bbx_voc)
+
+    return results
+
+
+def detect_shape(c):
+    """
+    approxPolyDP()函数是opencv中对指定的点集进行多边形逼近的函数
+    :param c:
+    :return: 返回形状和折点的坐标
+    """
+    peri = cv2.arcLength(c, True)
+    approx = cv2.approxPolyDP(c, 0.04 * peri, True)
+
+    if len(approx) == 3:
+        shape = "triangle"
+        return shape, approx
+
+    elif len(approx) == 4:
+        (x, y, w, h) = cv2.boundingRect(approx)
+        ar = w / float(h)
+        shape = "square" if ar >= 0.95 and ar <= 1.05 else "rectangle"
+        return shape, approx
+
+    elif len(approx) == 5:
+        shape = "pentagon"
+        return shape, approx
+
+    elif len(approx) == 6:
+        shape = "hexagon"
+        return shape, approx
+
+    elif len(approx) == 8:
+        shape = "octagon"
+        return shape, approx
+
+    elif len(approx) == 10:
+        shape = "star"
+        return shape, approx
+
+    else:
+        shape = "circle"
+        return shape, approx
+
+
+def seg_crop_object(cv2img, bgimg, maskimg):
+    # imgsz = cv2img.shape
+    outimg = np.zeros(cv2img.shape)
+    # outimg2 = bgimg.copy()
+    # roi = np.where(maskimg[:, :, 0] != 0 & maskimg[:, :, 1] != 0 & maskimg[:, :, 2] != 0)
+    roi = np.where(maskimg[:, :, 0] != 0)
+    outimg[roi] = cv2img[roi]
+    # outimg2[roi] = (0, 0, 0)
+
+    conts, hierarchy = cv2.findContours(maskimg[:, :, 0].astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    maxc = max(conts, key=cv2.contourArea)
+    bbox = cv2.boundingRect(maxc)
+    outimg_crop = outimg[bbox[1]:(bbox[1] + bbox[3]), bbox[0]:(bbox[0] + bbox[2])]
+    # outimg2_crop = outimg2[bbox[1]:(bbox[1] + bbox[3]), bbox[0]:(bbox[0] + bbox[2])]
+    # merged = outimg_crop + outimg2_crop
+
+    # relative_roi = []
+    # for ri in range(len(roi[0])):
+    #     y_new, x_new = y - bbox[1], x - bbox[0]
+    #     relative_roi.append([y_new, x_new])
+
+    # relative_roi = np.asarray(relative_roi)
+
+    relative_roi = (roi[0] - bbox[1], roi[1] - bbox[0])
+
+    return outimg_crop, bbox, relative_roi
+
+
+def vstack_two_images(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/0-9_white"):
+    # save_path = os.path.abspath(os.path.join(data_path, "..")) + "/llj_0-9_vstack_output"
+    # os.makedirs(save_path, exist_ok=True)
+    #
+    # for i in range(10):
+    #     imgi_path = data_path + "/{}.png".format(i)
+    #     imgi1_path = data_path + "/{}.png".format(i + 1)
+    #     imgi = cv2.imread(imgi_path)
+    #     imgi1 = cv2.imread(imgi1_path)
+    #
+    #     vstack = np.vstack((imgi, imgi1))
+    #     vstacksz = vstack.shape
+    #
+    #     # while (True):
+    #     #     rdm = np.random.random()
+    #     #     if rdm < 0.25:
+    #     #         break
+    #     # out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
+    #     # cv2.imwrite("{}/{}.jpg".format(save_path, i), out)
+    #
+    #     rdm = np.random.random()
+    #     out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
+    #     if rdm < 0.25:
+    #         cv2.imwrite("{}/{}.jpg".format(save_path, i), out)
+    #     # else:
+    #     #     cv2.imwrite("{}/{}.jpg".format(save_path, i + 1), out)
+
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/llj_0-9_vstack_output"
+    os.makedirs(save_path, exist_ok=True)
+
+    for i in range(10):
+        imgi_path = data_path + "/{}N.png".format(i)
+        imgi1_path = data_path + "/{}N.png".format(i + 1)
+        imgi = cv2.imread(imgi_path)
+        imgi1 = cv2.imread(imgi1_path)
+
+        vstack = np.vstack((imgi, imgi1))
+        vstacksz = vstack.shape
+
+        # while (True):
+        #     rdm = np.random.random()
+        #     if rdm < 0.25:
+        #         break
+        # out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
+        # cv2.imwrite("{}/{}.jpg".format(save_path, i), out)
+
+        rdm = np.random.random()
+        out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
+        if rdm < 0.25:
+            cv2.imwrite("{}/{}_{}.jpg".format(save_path, i, str(rdm).replace(".", "")), out)
+        # else:
+        #     cv2.imwrite("{}/{}_{}.jpg".format(save_path, i + 1, str(rdm).replace(".", "")), out)
+
+
+def cut_images(data_path):
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/0-9_output_ud"
+    os.makedirs(save_path, exist_ok=True)
+
+    for i in range(10):
+        imgi_path = data_path + "/{}N.png".format(i)
+        imgi = cv2.imread(imgi_path)
+        imgisz = imgi.shape
+        for j in range(1, 10):
+            outi_u = imgi[int(round(j * 0.1 * imgisz[0])):imgisz[0], 0:imgisz[1]]
+            outi_d = imgi[0:int(round((1 - j * 0.1) * imgisz[0])), 0:imgisz[1]]
+            cv2.imwrite("{}/{}_{}_u.png".format(save_path, i, j), outi_u)
+            cv2.imwrite("{}/{}_{}_d.png".format(save_path, i, j), outi_d)
+
+
+def stack_images(data_path):
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/0-9_output_ud_stack"
+    os.makedirs(save_path, exist_ok=True)
+
+    for i in range(10):
+        for j in range(1, 10):
+            imgi_j_u_path = data_path + "/{}_{}_u.png".format(i, j)
+            if i == 9:
+                imgi1_j_d_path = data_path + "/{}_{}_d.png".format(0, 10 - j)
+            else:
+                imgi1_j_d_path = data_path + "/{}_{}_d.png".format(i + 1, 10 - j)
+            imgi_j_u = cv2.imread(imgi_j_u_path)
+            imgi1_j_d = cv2.imread(imgi1_j_d_path)
+            # imgi_j_u_sz = imgi_j_u.shape
+
+            stack = np.vstack((imgi_j_u, imgi1_j_d))
+            if j <= 5:
+                cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, i), stack)
+            else:
+                if i == 9:
+                    cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, 0), stack)
+                else:
+                    cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, i + 1), stack)
+
+
+def crop_images(data_path):
+    dir_name = os.path.basename(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_cropped".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    data_list = sorted(os.listdir(data_path))
+    for f in tqdm(data_list):
+        f_abs_path = data_path + "/{}".format(f)
+        cv2img = cv2.imread(f_abs_path)
+        imgsz = cv2img.shape[:2]
+        # cropped = cv2img[212:imgsz[0], :]
+        cropped = cv2img[0:165, :]
+        cv2.imwrite("{}/{}".format(save_path, f), cropped)
+
+
+def get_color(specific=True):
+    global color
+    color1 = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
+
+    if specific:
+        color2, color3, color4 = (0, 0, 0), (114, 114, 114), (255, 255, 255)
+        color_rdm = np.random.rand()
+        if color_rdm <= 0.85:
+            color = color1
+        elif color_rdm > 0.85 and color_rdm <= 0.90:
+            color = color2
+        elif color_rdm > 0.90 and color_rdm <= 0.95:
+            color = color3
+        else:
+            color = color4
+    else:
+        color = color1
+
+    return color
+
+
+def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific=True):
+    """
+    :param im:
+    :param new_shape: (H, W)
+    :param r1:
+    :param r2:
+    :param sliding_window:
+    :return:
+    """
+    color = get_color(specific=specific)
+
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape * 4)
+
+    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
+    if shape[0] < new_shape[0] * r1:
+        padh = new_shape[0] - shape[0]
+        padh1 = padh // 2
+        padh2 = padh - padh1
+        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
+
+    shape = im.shape[:2]  # current shape [height, width]
+    r = new_shape[0] / shape[0]
+
+    # Compute padding
+    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
+    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
+
+    rdm = np.random.random()
+    if rdm > 0.5:
+        top = ph // 2
+        bottom = ph - top
+        left = pw // 2
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        else:
+            im = cv2.resize(im, new_shape[::-1])
+    else:
+        rdmh = np.random.random()
+        rmdw = np.random.random()
+        top = int(round(ph * rdmh))
+        bottom = ph - top
+        left = int(round(pw * rmdw))
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        else:
+            im = cv2.resize(im, new_shape[::-1])
+
+    return im
+
+
+def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, r2=0.25, specific=True):
+    cropped_imgs = []
+    imgsz = img.shape[:2]
+
+    if gap[0] == 0 and gap[1] > 0:
+        cropsz = (imgsz[0], cropsz[1])
+        for i in range(0, imgsz[1], gap[1]):
+            if i + cropsz[1] > imgsz[1]:
+                cp_img = img[0:imgsz[0], i:imgsz[1]]
+                if makeBorder:
+                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                cropped_imgs.append(cp_img)
+                break
+            else:
+                cp_img = img[0:imgsz[0], i:i + cropsz[1]]
+                cropped_imgs.append(cp_img)
+    elif gap[0] > 0 and gap[1] == 0:
+        cropsz = (cropsz[0], imgsz[1])
+        for j in range(0, imgsz[0], gap[0]):
+            if j + cropsz[0] > imgsz[0]:
+                cp_img = img[j:imgsz[0], 0:imgsz[1]]
+                if makeBorder:
+                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                cropped_imgs.append(cp_img)
+                break
+            else:
+                cp_img = img[j:j + cropsz[0], 0:imgsz[1]]
+                cropped_imgs.append(cp_img)
+    elif gap[0] == 0 and gap[1] == 0:
+        print("Error! gap[0] == 0 and gap[1] == 0!")
+    else:
+        for j in range(0, imgsz[0], gap[0]):
+            if j + cropsz[0] > imgsz[0]:
+                for i in range(0, imgsz[1], gap[1]):
+                    if i + cropsz[1] > imgsz[1]:
+                        cp_img = img[j:imgsz[0], i:imgsz[1]]
+                        if makeBorder:
+                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                        cropped_imgs.append(cp_img)
+                        break
+                    else:
+                        cp_img = img[j:imgsz[0], i:i + cropsz[1]]
+                        cropped_imgs.append(cp_img)
+                break
+
+            else:
+                for i in range(0, imgsz[1], gap[1]):
+                    if i + cropsz[1] > imgsz[1]:
+                        cp_img = img[j:j + cropsz[0], i:imgsz[1]]
+                        if makeBorder:
+                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                        cropped_imgs.append(cp_img)
+                        break
+                    else:
+                        cp_img = img[j:j + cropsz[0], i:i + cropsz[1]]
+                        cropped_imgs.append(cp_img)
+
+    return cropped_imgs
+
+
+def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=False, specific=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
+    """
+    :param im:
+    :param new_shape: (H, W)
+    :param r1:
+    :param r2:
+    :param sliding_window:
+    :return:
+    """
+    color = get_color(specific=specific)
+
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape * 4)
+
+    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
+    if shape[0] < new_shape[0] * r1:
+        padh = new_shape[0] - shape[0]
+        padh1 = padh // 2
+        padh2 = padh - padh1
+        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
+
+    shape = im.shape[:2]  # current shape [height, width]
+    r = new_shape[0] / shape[0]
+
+    # Compute padding
+    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
+    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
+
+    rdm = np.random.random()
+    if rdm > 0.5:
+        top = ph // 2
+        bottom = ph - top
+        left = pw // 2
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
+            im = cv2.resize(im, new_shape[::-1])
+        else:  # TODO sliding window: 2023.09.27 Done
+            if sliding_window:
+                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
+                return final_imgs
+            else:
+                im = cv2.resize(im, new_shape[::-1])
+    else:
+        rdmh = np.random.random()
+        rmdw = np.random.random()
+        top = int(round(ph * rdmh))
+        bottom = ph - top
+        left = int(round(pw * rmdw))
+        right = pw - left
+
+        if shape != new_unpad_size:
+            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+        if im.shape[1] <= new_shape[1]:
+            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
+            im = cv2.resize(im, new_shape[::-1])
+        else:  # TODO sliding window: 2023.09.27 Done
+            if sliding_window:
+                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
+                return final_imgs
+            else:
+                im = cv2.resize(im, new_shape[::-1])
+
+    return im
+
+
+def makeBorder_inference(im, new_shape=(64, 256), r1=0, r2=0.25, sliding_window=False, color=(0, 0, 0), gap_r=(0, 7 / 8), last_img_makeBorder=True):
+    """
+    :param im:
+    :param new_shape: (H, W)
+    :param r1:
+    :param r2:
+    :param sliding_window:
+    :return:
+    """
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape * 4)
+
+    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
+    if shape[0] < new_shape[0] * r1:
+        padh = new_shape[0] - shape[0]
+        padh1 = padh // 2
+        padh2 = padh - padh1
+        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
+
+    shape = im.shape[:2]  # current shape [height, width]
+    r = new_shape[0] / shape[0]
+
+    # Compute padding
+    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
+    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
+
+    top = ph // 2
+    bottom = ph - top
+    left = 0
+    right = pw - left
+
+    if shape != new_unpad_size:
+        im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+
+    if im.shape[1] <= new_shape[1]:
+        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
+        im = cv2.resize(im, new_shape[::-1])
+    else:  # TODO sliding window: 2023.09.27 Done
+        if sliding_window:
+            final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
+            return final_imgs
+        else:
+            im = cv2.resize(im, new_shape[::-1])
+
+    return im
+
+
+def sample_asym(magnitude, size=None):
+    return np.random.beta(1, 4, size) * magnitude
+
+
+def sample_sym(magnitude, size=None):
+    return (np.random.beta(4, 4, size=size) - 0.5) * 2 * magnitude
+
+
+def sample_uniform(low, high, size=None):
+    return np.random.uniform(low, high, size=size)
+
+
+def get_interpolation(type='random'):
+    if type == 'random':
+        choice = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA]
+        interpolation = choice[random.randint(0, len(choice) - 1)]
+    elif type == 'nearest':
+        interpolation = cv2.INTER_NEAREST
+    elif type == 'linear':
+        interpolation = cv2.INTER_LINEAR
+    elif type == 'cubic':
+        interpolation = cv2.INTER_CUBIC
+    elif type == 'area':
+        interpolation = cv2.INTER_AREA
+    else:
+        raise TypeError('Interpolation types only nearest, linear, cubic, area are supported!')
+    return interpolation
+
+
+def blend_mask(image, mask, alpha=0.5, cmap='jet', color='b', color_alpha=1.0):
+    # normalize mask
+    mask = (mask - mask.min()) / (mask.max() - mask.min() + np.finfo(float).eps)
+    if mask.shape != image.shape:
+        mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
+    # get color map
+    color_map = plt.get_cmap(cmap)
+    mask = color_map(mask)[:, :, :3]
+    # convert float to uint8
+    mask = (mask * 255).astype(dtype=np.uint8)
+
+    # set the basic color
+    basic_color = np.array(colors.to_rgb(color)) * 255
+    basic_color = np.tile(basic_color, [image.shape[0], image.shape[1], 1])
+    basic_color = basic_color.astype(dtype=np.uint8)
+    # blend with basic color
+    blended_img = cv2.addWeighted(image, color_alpha, basic_color, 1 - color_alpha, 0)
+    # blend with mask
+    blended_img = cv2.addWeighted(blended_img, alpha, mask, 1 - alpha, 0)
+
+    return blended_img
+
+
+def onehot(label, depth, device=None):
+    """
+    Args:
+        label: shape (n1, n2, ..., )
+        depth: a scalar
+
+    Returns:
+        onehot: (n1, n2, ..., depth)
+    """
+    if not isinstance(label, torch.Tensor):
+        label = torch.tensor(label, device=device)
+    onehot = torch.zeros(label.size() + torch.Size([depth]), device=device)
+    onehot = onehot.scatter_(-1, label.unsqueeze(-1), 1)
+
+    return onehot
+
+
+def apply_clahe(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(3, (4, 4))
+    dst = clahe.apply(gray)
+
+    return dst
+
+
+def bmp2jpg(bmp_abs_path):
+    base_name = os.path.basename(bmp_abs_path)
+    save_name = base_name.replace(".bmp", ".jpg")
+    cv2_img = cv2.imread(bmp_abs_path)
+
+    return cv2_img, save_name
+
+
+def dcm2jpg(dcm_path):
+    import pydicom
+    ds = pydicom.read_file(dcm_path)  # 读取.dcm文件
+    img = ds.pixel_array  # 提取图像信息
+    # scipy.misc.imsave(out_path, img)
+    return img
+
+
+def calc_brightness(img):
+    # 把图片转换为单通道的灰度图
+    img = cv2.resize(img, (16, 16))
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # 获取形状以及长宽
+    img_shape = gray_img.shape
+    height, width = img_shape[0], img_shape[1]
+    size = gray_img.size
+    # 灰度图的直方图
+    hist = cv2.calcHist([gray_img], [0], None, [256], [0, 256])
+    # 计算灰度图像素点偏离均值(128)程序
+    a = 0
+    ma = 0
+    reduce_matrix = np.full((height, width), 128)
+    shift_value = gray_img - reduce_matrix
+    shift_sum = sum(map(sum, shift_value))
+    da = shift_sum / size
+    # 计算偏离128的平均偏差
+    for i in range(256):
+        ma += (abs(i - 128 - da) * hist[i])
+    m = abs(ma / size)
+
+    # 亮度系数
+    if m == 0:
+        print("ZeroDivisionError!")
+        return 100, -100
+    else:
+        k = abs(da) / m
+        return k[0], da
+
+
+def cv2_img_add_text(img, text, left, top, font_path="simsun.ttc", textColor=(0, 255, 0), textSize=20):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
+    if (isinstance(img, np.ndarray)):  # 判断是否OpenCV图片类型
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    # 创建一个可以在给定图像上绘图的对象
+    draw = ImageDraw.Draw(img)
+    fontStyle = ImageFont.truetype(font_path, textSize, encoding="utf-8")
+    draw.text((left, top), text, textColor, font=fontStyle)
+
+    return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+
+
+def random_color():
+    b = random.randint(0, 256)
+    g = random.randint(0, 256)
+    r = random.randint(0, 256)
+
+    return (b, g, r)
+
+
+def cal_SVD_var(img):
+    img_r, img_g, img_b = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+    u_r, sigma_r, v_r = np.linalg.svd(img_r)
+    u_g, sigma_g, v_g = np.linalg.svd(img_r)
+    u_b, sigma_b, v_b = np.linalg.svd(img_r)
+    # r
+    len_sigma_r = len(sigma_r)
+    len_sigma_r_50 = int(round(.5 * len_sigma_r))
+    len_sigma_r_20 = int(round(.2 * len_sigma_r))
+    var_r_50 = np.var(sigma_r[:len_sigma_r_50])
+    var_r_last_20 = np.var(sigma_r[-len_sigma_r_20:])
+    # g
+    len_sigma_g = len(sigma_g)
+    len_sigma_g_50 = int(round(.5 * len_sigma_g))
+    len_sigma_g_20 = int(round(.2 * len_sigma_g))
+    var_g_50 = np.var(sigma_r[:len_sigma_g_50])
+    var_g_last_20 = np.var(sigma_r[-len_sigma_g_20:])
+    # b
+    len_sigma_b = len(sigma_b)
+    len_sigma_b_50 = int(round(.5 * len_sigma_b))
+    len_sigma_b_20 = int(round(.2 * len_sigma_b))
+    var_b_50 = np.var(sigma_r[:len_sigma_b_50])
+    var_b_last_20 = np.var(sigma_r[-len_sigma_b_20:])
+
+    var_50 = np.mean([var_r_50, var_g_50, var_b_50])
+    var_last_20 = np.mean([var_r_last_20, var_g_last_20, var_b_last_20])
+
+    return var_50, var_last_20
+
+
+def find_specific_color(img, lower=(0, 0, 100), upper=(80, 80, 255)):
+    """
+    https://stackoverflow.com/questions/42592234/python-opencv-morphologyex-remove-specific-color
+    Parameters
+    ----------
+    img
+
+    Returns
+    -------
+
+    """
+    mask = cv2.inRange(img, np.array(lower), np.array(upper))
+    # mask = 255 - mask
+    res = cv2.bitwise_and(img, img, mask=mask)  # -- Contains pixels having the gray color--
+
+    return res
+
+
+def change_pixels_value(cv2img):
+    hsv = cv2.cvtColor(cv2img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    thresh1 = cv2.threshold(s, 92, 255, cv2.THRESH_BINARY)[1]
+    thresh2 = cv2.threshold(v, 10, 255, cv2.THRESH_BINARY)[1]
+    thresh2 = 255 - thresh2
+    mask = cv2.add(thresh1, thresh2)
+
+    H, W, _ = cv2img.shape
+    newimg = cv2img.copy()
+
+    for i in range(H):
+        for j in range(W):
+            if mask[i, j] != 0:
+                newimg[i, j] = cv2img[i - 12, j - 12]
+
+    return newimg
+
+
+def resize_images(imgPath, savePath, size_=(256, 32)):
+    imgList = sorted(os.listdir(imgPath))
+    for i in range(len(imgList)):
+        imgAbsPath = imgPath + "\\" + imgList[i]
+        img_name = os.path.basename(imgAbsPath).split(".")[0]
+        ends = os.path.splitext(imgList[i])[1]
+        cv2_img = cv2.imread(imgAbsPath)
+        resized_img = cv2.resize(cv2_img, size_)
+        cv2.imwrite(savePath + "\\{}{}".format(img_name, ends), resized_img)
+
+    print("Resized!")
+
+
+def get_peak_points(heatmaps):
+    """
+
+    :param heatmaps: numpy array (N,4,256,256)
+    :return:numpy array (N,4,2) #
+    """
+    N,C,H,W = heatmaps.shape   # N= batch size C=4 hotmaps
+    all_peak_points = []
+    for i in range(N):
+        peak_points = []
+        for j in range(C):
+            yy,xx = np.where(heatmaps[i, j] == heatmaps[i, j].max())
+            y = yy[0]
+            x = xx[0]
+            peak_points.append([x, y])
+        all_peak_points.append(peak_points)
+    all_peak_points = np.array(all_peak_points)
+    return all_peak_points
+
+
+# ========================================= Color Identification =========================================
+def RGB2HEX(color):
+    return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+
+
+def get_image(image_path):
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    return image
+
+
+def get_colors(image, n_colors, show_chart, size):
+    from sklearn.cluster import KMeans
+    from collections import Counter
+
+    modified_image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+    modified_image = modified_image.reshape(modified_image.shape[0] * modified_image.shape[1], 3)
+
+    clf = KMeans(n_clusters=n_colors)
+    labels = clf.fit_predict(modified_image)
+
+    counts = Counter(labels)
+    counts = dict(sorted(counts.items()))
+
+    center_colors = clf.cluster_centers_
+    ordered_colors = [center_colors[i] for i in counts.keys()]
+    hex_colors = [RGB2HEX(ordered_colors[i]) for i in counts.keys()]
+    rgb_colors = [ordered_colors[i] for i in counts.keys()]
+
+    if show_chart:
+        plt.figure(figsize=(8, 6))
+        plt.pie(counts.values(), labels=hex_colors, colors=hex_colors)
+        plt.show()
+
+    return rgb_colors
+
+
+def match_image_by_color(image, color, threshold=60, n_colors=10, size=(128, 32)):
+    from skimage.color import rgb2lab, deltaE_cie76
+
+    image_colors = get_colors(image, n_colors, False, size)
+    selected_color = rgb2lab(np.uint8(np.asarray([[color]])))
+
+    selected_image = False
+    for i in range(n_colors):
+        curr_color = rgb2lab(np.uint8(np.asarray([[image_colors[i]]])))
+        diff = deltaE_cie76(selected_color, curr_color)
+        if diff < threshold:
+            selected_image = True
+
+    return selected_image
+
+
+def show_selected_images(images, color, threshold, colors_to_match):
+    index = 1
+    for i in range(len(images)):
+        selected = match_image_by_color(images[i], color, threshold, colors_to_match)
+        if selected:
+            # image_ = cv2.resize(images[i], (1920, 1080))
+            # cv2.imshow("image_{}".format(i), image_)
+            # cv2.waitKey(0)
+            plt.subplot(1, 5, index)
+            plt.imshow(images[i])
+            index += 1
+
+
+def colors_dict():
+    COLORS = {
+        # 'RED_128': [128, 0, 0],
+        'GREEN_128': [0, 128, 0],
+        # 'BLUE_128': [0, 0, 128],
+        # 'RED_255': [255, 0, 0],
+        'GREEN_255': [0, 255, 0],
+        # 'BLUE_255': [0, 0, 255],
+        # 'YELLOW_128': [128, 128, 0],
+        'CYAN_128': [0, 128, 128],
+        # 'MAGENTA_128': [128, 0, 128],
+        # 'YELLOW_255': [255, 255, 0],
+        'CYAN_255': [0, 255, 255],
+        # 'MAGENTA_255': [255, 0, 255],
+        'BLACK': [0, 0, 0],
+        # 'GRAY': [128, 128, 128],
+        'WHITE': [255, 255, 255]
+    }
+
+    return COLORS
+
+
+def identify_colors(img, COLORS, THRESHOLD=60, N_COLORS=5, SIZE=(32, 16)):
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    RES = {}
+    for k in COLORS:
+        selected = match_image_by_color(img, COLORS[k], THRESHOLD, N_COLORS, SIZE)
+        RES[k] = selected
+
+    return RES
+
+
+def color_identify(data_path):
+    """
+    An example.
+    :param data_path:
+    :return:
+    """
+    off_path = os.path.abspath(os.path.join(data_path, "../..")) + "/cropped_on_or_off/off"
+    on_path = os.path.abspath(os.path.join(data_path, "../..")) + "/cropped_on_or_off/on"
+    unsure_path = os.path.abspath(os.path.join(data_path, "../..")) + "/cropped_on_or_off/unsure"
+    os.makedirs(off_path, exist_ok=True)
+    os.makedirs(on_path, exist_ok=True)
+    os.makedirs(unsure_path, exist_ok=True)
+
+    COLORS = colors_dict()
+
+    img_list = os.listdir(data_path)
+    for img in img_list:
+        img_abs_path = data_path + "/{}".format(img)
+        cv2img = cv2.imread(img_abs_path)
+        RES = identify_colors(cv2img, COLORS, THRESHOLD=60, N_COLORS=5, SIZE=(32, 16))
+        if RES["WHITE"] and not RES["GREEN_128"] and not RES["GREEN_255"]:
+            img_dst_path = off_path + "/{}".format(img)
+            shutil.copy(img_abs_path, img_dst_path)
+            print("{}: {} --> {}".format("OFF", img_abs_path, img_dst_path))
+        elif RES["GREEN_128"] and RES["GREEN_255"] and not RES["WHITE"]:
+            img_dst_path = on_path + "/{}".format(img)
+            shutil.copy(img_abs_path, img_dst_path)
+            print("{}: {} --> {}".format("ON", img_abs_path, img_dst_path))
+        else:
+            img_dst_path = unsure_path + "/{}".format(img)
+            shutil.copy(img_abs_path, img_dst_path)
+            print("{}: {} --> {}".format("ON", img_abs_path, img_dst_path))
+
+
+def rotate_image_90(img_path):
+    dir_name = os.path.basename(img_path)
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_rotated".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    img_list = sorted(os.listdir(img_path))
+    for img in img_list:
+        img_abs_path = img_path + "/{}".format(img)
+        cv2img = cv2.imread(img_abs_path)
+        img90 = np.rot90(cv2img, 1)
+        cv2.imwrite("{}/{}".format(save_path, img), img90)
+    
+
+def cal_images_mean_height_width(data_path):
+    img_list = sorted(os.listdir(data_path))
+
+    hs, ws = [], []
+
+    for img in img_list:
+        img_abs_path = data_path + "/{}".format(img)
+        cv2img = cv2.imread(img_abs_path)
+        h, w = cv2img.shape[:2]
+        hs.append(h)
+        ws.append(w)
+
+    h_mean = np.mean(hs)
+    w_mean = np.mean(ws)
+
+    print(h_mean)  # 511.35578569681155
+    print(w_mean)  # 478.03767430481935
+
+    return h_mean, w_mean
+
+
+# PCL
+def mat2pcl(img, K):
+    import open3d as o3d
+
+    f_x = K[0, 0]
+    f_y = K[1, 1]
+    s = K[0, 1]
+    p_x = K[0, 2]
+    p_y = K[1, 2]
+
+    y_values, x_values = np.where(img > 300)
+    z_values = img[y_values, x_values]
+
+    Y_values = (y_values - p_y) * z_values / f_y
+    X_values = (x_values - p_x - (y_values - p_y) * s / f_y) * z_values / f_x
+
+    points_3d = np.array([X_values, Y_values, z_values]).T
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points_3d)
+
+    return pcd
+
+
+def main_pcl():
+    import open3d as o3d
+
+    fs = cv2.FileStorage(r"data/matrix.yml", cv2.FileStorage_READ)
+    K = fs.getNode("M").mat()
+    fs.release()
+
+    image_path = r"data/2111043208/1-1067.data"
+    h_image = cv2.imread(image_path, 2)
+
+    # h_image = (h_image/65535)*900+200
+
+    pcd = mat2pcl(h_image, K)
+    o3d.io.write_point_cloud(image_path.replace(".data", ".ply"), pcd)
+
+    return 0
+
+
+# OCR
+class SegDetectorRepresenter():
+    def __init__(self, thresh=0.3, box_thresh=0.7, max_candidates=1000, unclip_ratio=1.5):
+        self.min_size = 3
+        self.thresh = thresh
+        self.box_thresh = box_thresh
+        self.max_candidates = max_candidates
+        self.unclip_ratio = unclip_ratio
+
+    def __call__(self, batch, pred, is_output_polygon=False):
+        '''
+        batch: (image, polygons, ignore_tags
+        batch: a dict produced by dataloaders.
+            image: tensor of shape (N, C, H, W).
+            polygons: tensor of shape (N, K, 4, 2), the polygons of objective regions.
+            ignore_tags: tensor of shape (N, K), indicates whether a region is ignorable or not.
+            shape: the original shape of images.
+            filename: the original filenames of images.
+        pred:
+            binary: text region segmentation map, with shape (N, H, W)
+            thresh: [if exists] thresh hold prediction with shape (N, H, W)
+            thresh_binary: [if exists] binarized with threshhold, (N, H, W)
+        '''
+        pred = pred[:, 0, :, :]
+        segmentation = self.binarize(pred)
+        boxes_batch = []
+        scores_batch = []
+        # for batch_index in range(pred.size(0)):  # train
+        for batch_index in range(pred.shape[0]):  # inference
+            height, width = batch['shape'][batch_index]
+            if is_output_polygon:
+                boxes, scores = self.polygons_from_bitmap(pred[batch_index], segmentation[batch_index], width, height)
+            else:
+                boxes, scores = self.boxes_from_bitmap(pred[batch_index], segmentation[batch_index], width, height)
+            boxes_batch.append(boxes)
+            scores_batch.append(scores)
+        return boxes_batch, scores_batch
+    
+    def binarize(self, pred):
+        return pred > self.thresh
+
+    def polygons_from_bitmap(self, pred, _bitmap, dest_width, dest_height, onnx_flag=True):
+        '''
+        _bitmap: single map with shape (H, W),
+            whose values are binarized as {0, 1}
+        '''
+
+        assert len(_bitmap.shape) == 2
+        # bitmap = _bitmap.cpu().numpy()  # The first channel
+        # pred = pred.cpu().detach().numpy()
+
+        # inference
+        if onnx_flag:
+            bitmap = _bitmap  # The first channel
+            pred = pred
+        else:
+            bitmap = _bitmap.cpu().numpy()  # The first channel
+            pred = pred.cpu().detach().numpy()
+
+        # ## train
+        # bitmap = _bitmap.cpu().numpy()  # The first channel
+        # pred = pred.cpu().detach().numpy()
+
+
+        height, width = bitmap.shape
+        boxes = []
+        scores = []
+
+        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        for contour in contours[:self.max_candidates]:
+            epsilon = 0.005 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+            points = approx.reshape((-1, 2))
+            if points.shape[0] < 4:
+                continue
+            # _, sside = self.get_mini_boxes(contour)
+            # if sside < self.min_size:
+            #     continue
+            score = self.box_score_fast(pred, contour.squeeze(1))
+            if self.box_thresh > score:
+                continue
+
+            if points.shape[0] > 2:
+                box = self.unclip(points, unclip_ratio=self.unclip_ratio)
+                if len(box) > 1:
+                    continue
+            else:
+                continue
+            box = box.reshape(-1, 2)
+            _, sside = self.get_mini_boxes(box.reshape((-1, 1, 2)))
+            if sside < self.min_size + 2:
+                continue
+
+            if not isinstance(dest_width, int):
+                dest_width = dest_width.item()
+                dest_height = dest_height.item()
+
+            box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
+            box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
+            boxes.append(box)
+            scores.append(score)
+        return boxes, scores
+
+    def boxes_from_bitmap(self, pred, _bitmap, dest_width, dest_height, onnx_flag=True):
+        '''
+        _bitmap: single map with shape (H, W),
+            whose values are binarized as {0, 1}
+        '''
+
+        assert len(_bitmap.shape) == 2
+
+        # # inference
+        if onnx_flag:
+            bitmap = _bitmap  # The first channel
+            pred = pred
+        else:
+            bitmap = _bitmap.cpu().numpy()  # The first channel
+            pred = pred.cpu().detach().numpy()
+
+        # # ## train
+        # bitmap = _bitmap.cpu().numpy()  # The first channel
+        # pred = pred.cpu().detach().numpy()
+
+        height, width = bitmap.shape
+        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        num_contours = min(len(contours), self.max_candidates)
+        boxes = np.zeros((num_contours, 4, 2), dtype=np.int16)
+        scores = np.zeros((num_contours,), dtype=np.float32)
+
+        for index in range(num_contours):
+            contour = contours[index].squeeze(1)
+            points, sside = self.get_mini_boxes(contour)
+            if sside < self.min_size:
+                continue
+            points = np.array(points)
+            score = self.box_score_fast(pred, contour)
+            if self.box_thresh > score:
+                continue
+            # print('===points:', points)
+            box = self.unclip(points, unclip_ratio=self.unclip_ratio).reshape(-1, 1, 2)
+            box, sside = self.get_mini_boxes(box)
+            if sside < self.min_size + 2:
+                continue
+            box = np.array(box)
+            if not isinstance(dest_width, int):
+                dest_width = dest_width.item()
+                dest_height = dest_height.item()
+
+            box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
+            box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
+            boxes[index, :, :] = box.astype(np.int16)
+            scores[index] = score
+        return boxes, scores
+    
+    def unclip(self, box, unclip_ratio=1.5):
+        poly = Polygon(box)
+        distance = poly.area * unclip_ratio / poly.length
+        offset = pyclipper.PyclipperOffset()
+        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        expanded = np.array(offset.Execute(distance))
+        return expanded
+
+    def get_mini_boxes(self, contour):
+        bounding_box = cv2.minAreaRect(contour)
+        points = sorted(list(cv2.boxPoints(bounding_box)), key=lambda x: x[0])
+
+        index_1, index_2, index_3, index_4 = 0, 1, 2, 3
+        if points[1][1] > points[0][1]:
+            index_1 = 0
+            index_4 = 1
+        else:
+            index_1 = 1
+            index_4 = 0
+        if points[3][1] > points[2][1]:
+            index_2 = 2
+            index_3 = 3
+        else:
+            index_2 = 3
+            index_3 = 2
+
+        box = [points[index_1], points[index_2], points[index_3], points[index_4]]
+        return box, min(bounding_box[1])
+
+    def box_score_fast(self, bitmap, _box):
+        h, w = bitmap.shape[:2]
+        box = _box.copy()
+        xmin = np.clip(np.floor(box[:, 0].min()).astype(np.int_), 0, w - 1)
+        xmax = np.clip(np.ceil(box[:, 0].max()).astype(np.int_), 0, w - 1)
+        ymin = np.clip(np.floor(box[:, 1].min()).astype(np.int_), 0, h - 1)
+        ymax = np.clip(np.ceil(box[:, 1].max()).astype(np.int_), 0, h - 1)
+
+        mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
+        box[:, 0] = box[:, 0] - xmin
+        box[:, 1] = box[:, 1] - ymin
+        cv2.fillPoly(mask, box.reshape(1, -1, 2).astype(np.int32), 1)
+        return cv2.mean(bitmap[ymin:ymax + 1, xmin:xmax + 1], mask)[0]
+
+
+def select_horizontal_vertical_images(data_path, flag="horizontal", mvcp="move", r=1.0):
+    file_list = sorted(os.listdir(data_path))
+    dir_name = os.path.basename(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_selected_horizontal_images".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    for f in tqdm(file_list):
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        # if imgsz[0] > imgsz[1]:
+        if flag == "horizontal" or flag == "h" or flag == "H":
+            if imgsz[0] * r <= imgsz[1]:
+                f_dst_path = save_path + "/{}".format(f)
+                if mvcp == "copy" or mvcp == "cp":
+                    shutil.copy(f_abs_path, f_dst_path)
+                elif mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_abs_path, f_dst_path)
+                elif mvcp == "delete" or mvcp == "del":
+                    os.remove(f_abs_path)
+        elif flag == "vertical" or flag == "v" or flag == "V":
+            if imgsz[0] >= imgsz[1] * r:
+                f_dst_path = save_path + "/{}".format(f)
+                if mvcp == "copy" or mvcp == "cp":
+                    shutil.copy(f_abs_path, f_dst_path)
+                elif mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_abs_path, f_dst_path)
+                elif mvcp == "delete" or mvcp == "del":
+                    os.remove(f_abs_path)
+        else:
+            print("Error!")
+            
+
+
+def draw_bbox(img, result, color=(0, 0, 255), thickness=2):
+    for point in result:
+        point = point.astype(int)
+        cv2.polylines(img, [point], True, color, thickness)
+    return img
+
+
+# def softmax(x):
+#     exps = np.exp(x - np.max(x))
+#     return exps / np.sum(exps)
+
+
+def expand_kpt(imgsz, pts, r):
+    minSide = min(imgsz[0], imgsz[1])
+    if minSide > 400:
+        minSide = minSide / 5
+    elif minSide > 300:
+        minSide = minSide / 4
+    elif minSide > 200:
+        minSide = minSide / 3
+    elif minSide > 100:
+        minSide = minSide / 2
+    else:
+        minSide = minSide
+
+    expandP = round(minSide * r)
+    expandP_half = round(minSide * r / 2)
+    expandP_quarter = round(minSide * r / 4)
+    expandP_one_sixth = round(minSide * r / 6)
+    expandP_one_eighth = round(minSide * r / 8)
+
+    for i in range(len(pts)):
+        if pts[i][0] - expandP >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP
+            else:
+                pts[i][0] = pts[i][0] + expandP
+        elif pts[i][0] - expandP_half >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_half
+            else:
+                pts[i][0] = pts[i][0] + expandP_half
+        elif pts[i][0] - expandP_quarter >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_quarter
+            else:
+                pts[i][0] = pts[i][0] + expandP_quarter
+        elif pts[i][0] - expandP_one_sixth >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_one_sixth
+            else:
+                pts[i][0] = pts[i][0] + expandP_one_sixth
+        elif pts[i][0] - expandP_one_eighth >= 0:
+            if i == 0 or i == 3:
+                pts[i][0] = pts[i][0] - expandP_one_eighth
+            else:
+                pts[i][0] = pts[i][0] + expandP_one_eighth
+        else:
+            pts[i][0] = pts[i][0]
+
+        if pts[i][1] - expandP >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP
+            else:
+                pts[i][1] = pts[i][1] + expandP
+        elif pts[i][1] - expandP_half >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_half
+            else:
+                pts[i][1] = pts[i][1] + expandP_half
+        elif pts[i][1] - expandP_quarter >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_quarter
+            else:
+                pts[i][1] = pts[i][1] + expandP_quarter
+        elif pts[i][1] - expandP_one_sixth >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_one_sixth
+            else:
+                pts[i][1] = pts[i][1] + expandP_one_sixth
+        elif pts[i][1] - expandP_one_eighth >= 0:
+            if i == 0 or i == 1:
+                pts[i][1] = pts[i][1] - expandP_one_eighth
+            else:
+                pts[i][1] = pts[i][1] + expandP_one_eighth
+        else:
+            pts[i][1] = pts[i][1]
+
+    for i in range(len(pts)):
+        pts[i][0] = int(round(pts[i][0]))
+        pts[i][1] = int(round(pts[i][1]))
+
+    return pts
+
+
+def cal_hw(b):
+    MIN_X = 1e6
+    MAX_X = -1e6
+    MIN_Y = 1e6
+    MAX_Y = -1e6
+
+    for bi in b:
+        if bi[0] <= MIN_X:
+            MIN_X = bi[0]
+        if bi[0] >= MAX_X:
+            MAX_X = bi[0]
+        if bi[1] <= MIN_Y:
+            MIN_Y = bi[1]
+        if bi[1] >= MAX_Y:
+            MAX_Y = bi[1]
+
+    h = int(round(abs(MAX_Y - MIN_Y)))
+    w = int(round(abs(MAX_X - MIN_X)))
+    return (h, w)
+
+def get_new_boxes(boxes, rhw, r=0.12):
+    boxes_orig = []
+    for bi in boxes:
+        bi_ = []
+        for bj in bi:
+            bi_orig = [bj[0] / rhw[1], bj[1] / rhw[0]]
+            bi_.append(bi_orig)
+        boxes_orig.append(bi_)
+
+    boxes_new = []
+    for bbi in boxes_orig:
+        # x1, x2 = round(min(bi[0], bi[0])), round(max(bi[0], bi[0]))
+        # y1, y2 = round(min(bi[1], bi[1])), round(max(bi[1], bi[1]))
+        # basesz = (abs(y2 - y1), abs(x2 - x1))
+        basesz = cal_hw(bbi)
+        bi_ = expand_kpt(basesz, bbi, r)
+        boxes_new.append(bi_)
+
+    return boxes_new
+
+
+def softmax(x):
+    ex = np.exp(x - np.max(x))
+    return ex / np.sum(ex)
+
+
+def median_blur(img, k=3):
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    dst = cv2.medianBlur(img, k)
+    return dst
+
+
+def clahe(img, clipLimit=40):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(8, 8))
+    dst1 = clahe.apply(gray)
+    dst = cv2.merge([dst1, dst1, dst1])
+    return dst
+
+
+def contain_chinese(string):
+    pattern = r'[\u4e00-\u9fff]'
+    return re.search(pattern, string) is not None
+
+
+def process_sliding_window_results(res):
+    # TODO
+    final_res = ""
+    for i, resi in enumerate(res):
+        if i == 0:
+            final_res += resi
+        else:
+            resi_new = resi
+            for j in range(len(resi)):
+                if len(resi) >= j + 1 and len(final_res) >= j + 1:
+                    if resi[0:j + 1] == final_res[-(j + 1):]:
+                        resi_new = resi[j + 1:]
+            final_res += resi_new
+
+    return final_res
+
+
+def get_label(img_name):
+    label = ""
+    if "=" in img_name:
+        equal_num = img_name.count("=")
+        if equal_num > 1:
+            print("equal_num > 1!")
+        else:
+            # label = img_name.split("=")[-1]
+
+            img_name_r = img_name[::-1]
+            idx_r = img_name_r.find("=")
+            idx = -(idx_r + 1)
+            label = img_name[(idx + 1):]
+
+    return label
+
+
+def get_alpha(flag="digits_19"):
+    global alpha
+
+    if flag == "digits_15":
+        # alpha = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        # alpha = ' ' + '0123456789.-:' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        alpha = ' ' + '0123456789.' + 'AbC'
+    elif flag == "digits_19":
+        alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC'
+    elif flag == "digits_20":
+        alpha = ' ' + '0123456789' + '.:/\\-' + 'ABbC'
+    elif flag == "digits_26":
+        alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC' + '℃' + 'MPa' + '㎡m³'
+    elif flag == "Chinese1":
+        CH_SIM_CHARS = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        CH_SIM_CHARS += ',;~!@#$%^&*()_+-={}:"<>?-=[]/|\\' + "'"
+        CH_SIM_CHARS += '、。┅《》「」【】¥®πи‰℃№Ⅱ←↑→↓①②③④▪☆❤'
+        print(len(CH_SIM_CHARS))
+
+        ch_sim_chars = open("words/ch_sim_char.txt", "r", encoding="utf-8")
+        lines = ch_sim_chars.readlines()
+        for l in lines:
+            CH_SIM_CHARS += l.strip()
+        alpha = CH_SIM_CHARS  # len = 6738  7568
+    elif flag == "Chinese_6867":
+        CH_SIM_CHARS = ' '
+        ch_sim_chars = open("words/chinese_simple_with_special_chars.txt", "r", encoding="utf-8")
+        lines = ch_sim_chars.readlines()
+        for l in lines:
+            CH_SIM_CHARS += l.strip()
+        alpha = CH_SIM_CHARS  # len = 6867
+    elif flag == "ppocr_6625":
+        CH_SIM_CHARS = ' '
+        ch_sim_chars = open("words/ppocr_keys_v1.txt", "r", encoding="utf-8")
+        lines = ch_sim_chars.readlines()
+        for l in lines:
+            CH_SIM_CHARS += l.strip()
+        alpha = CH_SIM_CHARS
+    else:
+        raise NotImplementedError
+
+    return alpha
+
+
+def resize_norm_padding_img(img, imgsz, max_wh_ratio):
+    # max_wh_ratio: 320 / 48
+    imgC, imgH, imgW = imgsz
+    assert imgC == img.shape[2]
+    imgW = int((imgH * max_wh_ratio))
+    h, w = img.shape[:2]
+    ratio = w / float(h)
+    if math.ceil(imgH * ratio) > imgW:
+        resized_w = imgW
+    else:
+        resized_w = int(math.ceil(imgH * ratio))
+    resized_image = cv2.resize(img, (resized_w, imgH))
+    resized_image = resized_image.astype('float32')
+    resized_image = resized_image.transpose((2, 0, 1)) / 255
+    resized_image -= 0.5
+    resized_image /= 0.5
+    padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
+    padding_im[:, :, 0:resized_w] = resized_image
+    return padding_im
+
+
+def putText_Chinese(img_pil, p, string, color=(255, 0, 255)):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
+    # img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img_pil)
+    font = ImageFont.truetype('./utils/gen_fake/Fonts/chinese_2/仿宋_GB2312.ttf', 20)
+    draw.text(p, string, font=font, fill=color)
+    # img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+    return img_pil
+
+
+def draw_e2e_res(image, boxes, txts, font_path="utils/gen_fake/Fonts/chinese_2/楷体_GB2312.ttf"):
+    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
+
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(np.uint8(image))
+
+    font = ImageFont.truetype(font_path, 15, encoding="utf-8")
+    h, w = image.height, image.width
+    img_left = image.copy()
+    img_right = Image.new('RGB', (w, h), (255, 255, 255))
+
+    random.seed(0)
+    draw_left = ImageDraw.Draw(img_left)
+    draw_right = ImageDraw.Draw(img_right)
+    for idx, (box, txt) in enumerate(zip(boxes, txts)):
+        box = np.array(box)
+        box = [tuple(x) for x in box]
+        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        draw_left.polygon(box, fill=color)
+        draw_right.polygon(box, outline=color)
+        draw_right.text([box[0][0], box[0][1]], txt, fill=(0, 0, 0), font=font)
+    img_left = Image.blend(image, img_left, 0.5)
+    img_show = Image.new('RGB', (w * 2, h), (255, 255, 255))
+    img_show.paste(img_left, (0, 0, w, h))
+    img_show.paste(img_right, (w, 0, w * 2, h))
+
+    return np.array(img_show)[:, :, ::-1]
+
+
+class GKFOCR(object):
+    """
+    input support: 1.image path
+    2024.09.14
+    """
+
+    def __init__(self, cfg_path: str = "configs/cfg_gkfocr.yaml", debug: bool = False):
+        with open(cfg_path, errors='ignore') as f:
+            cfg = yaml.safe_load(f)
+
+        self.cfg = cfg
+        self.m_FLAG_DeBug = debug
+        self.alpha = get_alpha(flag="Chinese_6867")  # digits Chinese
+
+        self.det_model_path = self.cfg["det"]["model_path"]
+        self.rec_model_path = self.cfg["rec"]["model_path"]
+        self.det_input_shape = eval(self.cfg["det"]["input_shape"])
+        self.rec_input_shape = eval(self.cfg["rec"]["input_shape"])
+        self.det_mean = eval(self.cfg["det"]["mean"])
+        self.det_std = eval(self.cfg["det"]["std"])
+        self.rec_mean = eval(self.cfg["rec"]["mean"])
+        self.rec_std = eval(self.cfg["rec"]["std"])
+
+        self.det_ort_session = self.init_model(self.det_model_path)
+        print("Load det model: {}\tSuccessful".format(self.det_model_path))
+        self.rec_ort_session = self.init_model(self.rec_model_path)
+        print("Load rec model: {}\tSuccessful".format(self.rec_model_path))
+
+        self.det_thresh = float(self.cfg["det"]["thresh"])
+        self.det_box_thresh = float(self.cfg["det"]["box_thresh"])
+        self.det_max_candidates = float(self.cfg["det"]["max_candidates"])
+        self.det_unclip_ratio = float(self.cfg["det"]["unclip_ratio"])
+
+        self.rec_make_border_flag = bool(self.cfg["rec"]["make_border_flag"])
+        self.rec_batch_first = bool(self.cfg["rec"]["batch_first"])
+        self.rec_ppocr_flag = bool(self.cfg["rec"]["ppocr_flag"])
+        self.rec_c = int(self.cfg["rec"]["c"])
+        self.rec_r1 = float(self.cfg["rec"]["r1"])
+        self.rec_r2 = float(self.cfg["rec"]["r2"])
+        self.rec_sliding_window_flag = bool(self.cfg["rec"]["sliding_window_flag"])
+        self.rec_color = eval(self.cfg["rec"]["color"])
+        self.rec_gap_r = eval(self.cfg["rec"]["gap_r"])
+        self.rec_medianblur_flag = bool(self.cfg["rec"]["medianblur_flag"])
+        self.rec_k = int(self.cfg["rec"]["k"])
+        self.rec_clahe_flag = bool(self.cfg["rec"]["clahe_flag"])
+        self.rec_clipLimit = int(self.cfg["rec"]["clipLimit"])
+        self.rec_score_thr = float(self.cfg["rec"]["score_thr"])
+
+    def init_model(self, model_path: str):
+        so = ort.SessionOptions()
+        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        ort_session = ort.InferenceSession(model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        return ort_session
+
+    def inference(self, data):
+        if isinstance(data, str):
+            if os.path.isfile(data):
+                img = cv2.imread(data)
+                img_cp = img.copy()
+                mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
+                txts = self.rec_inference_v2(img_cp, boxs_new)
+                out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
+                return out_img
+            elif os.path.isdir(data):
+                dirname = os.path.basename(data)
+                save_path = os.path.abspath(os.path.join(data, "../{}_output".format(dirname)))
+                os.makedirs(save_path, exist_ok=True)
+
+                file_list = sorted(os.listdir(data))
+                for f in tqdm(file_list):
+                    fname = os.path.splitext(f)[0]
+                    f_abs_path = data + "/{}".format(f)
+                    img = cv2.imread(f_abs_path)
+                    img_cp = img.copy()
+                    mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
+                    txts = self.rec_inference(img_cp, boxs_new, save_path, fname)
+
+                    if self.m_FLAG_DeBug:
+                        pred_mask_path = save_path + "/{}_pred_mask.jpg".format(fname)
+                        cv2.imwrite(pred_mask_path, mask * 255)
+
+                    out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
+                    cv2.imwrite("{}/{}_out_img.jpg".format(save_path, fname), out_img)
+                return None
+            else:
+                print("data should be test image file path or directory path!")
+        elif isinstance(data, np.ndarray) or isinstance(data, Image.Image):
+            if isinstance(data, np.ndarray):
+                out_img = self.inference_one_array(data)
+                return out_img
+            else:
+                out_img = self.inference_one_array(np.asarray(data))
+                return out_img
+        else:
+            print("data should be: 1.test image file path. 2. test image directory path. 3. test image np.ndarray or PIL.Image.Image!")
+
+    def inference_one_array(self, img):
+        img_cp = img.copy()
+        mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
+        txts = self.rec_inference_v2(img_cp, boxs_new)
+        out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
+        return out_img
+
+    def det_inference(self, img):
+        imgsz_orig = img.shape[:2]
+        rhw = (self.det_input_shape[0] / imgsz_orig[0], self.det_input_shape[1] / imgsz_orig[1])
+
+        img, img_resize = self.det_preprocess(img)
+        outputs = self.det_ort_session.run(None, {'input': img})
+        mask, boxes, scores = self.det_postprocess(outputs)
+
+        draw_img = draw_bbox(img_resize, boxes)
+        draw_img_resize = cv2.resize(draw_img, imgsz_orig[::-1])
+        boxs_new = get_new_boxes(boxes, rhw, r=0.12)
+
+        return mask, boxes, scores, draw_img_resize, boxs_new
+    
+    def det_preprocess(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, self.det_input_shape)
+        img_resize = img.copy()
+        img = (img / 255. - np.array(self.det_mean)) / np.array(self.det_std)
+        img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0).astype(np.float32)
+        return img, img_resize
+    
+    def det_postprocess(self, outputs, is_output_polygon=False):
+        b, c, h, w = outputs[0].shape
+        mask = outputs[0][0, 0, ...]
+        batch = {'shape': [(h, w)]}
+
+        box_list, score_list = SegDetectorRepresenter(thresh=self.det_thresh, box_thresh=self.det_box_thresh, max_candidates=self.det_max_candidates, unclip_ratio=self.det_unclip_ratio)(batch, outputs[0], is_output_polygon)
+        box_list, score_list = box_list[0], score_list[0]
+
+        if len(box_list) > 0:
+            if is_output_polygon:
+                idx = [x.sum() > 0 for x in box_list]
+                box_list = [box_list[i] for i, v in enumerate(idx) if v]
+                score_list = [score_list[i] for i, v in enumerate(idx) if v]
+            else:
+                idx = box_list.reshape(box_list.shape[0], -1).sum(axis=1) > 0  # 去掉全为0的框
+                box_list, score_list = box_list[idx], score_list[idx]
+        else:
+            box_list, score_list = [], []
+
+        return mask, box_list, score_list
+
+    def rec_inference(self, img, boxes, save_path, fname):
+        txts = []
+        mask_vis = np.zeros(shape=img.shape, dtype=np.uint8)
+        mask_vis_pil = Image.fromarray(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB))
+        for b in boxes:
+            try:
+                dstsz = cal_hw(b)
+                warpped = perspective_transform(b, dstsz, img)
+
+                makeBorderRes = makeBorder_inference(warpped, new_shape=self.rec_input_shape, sliding_window=self.rec_sliding_window_flag, gap_r=self.rec_gap_r)
+                pred, score = self.rec_inference_one(makeBorderRes)
+                txts.append(pred)
+
+                if self.m_FLAG_DeBug:
+                    print("pred: {}\tscore: {}".format(pred, score))
+                    cv2.imwrite("{}/{}_cropped_img={}.jpg".format(save_path, fname, pred), warpped)
+
+                p0 = tuple(map(int, b[0]))
+                mask_vis_pil = putText_Chinese(mask_vis_pil, p0, pred, color=(255, 0, 255))
+
+            except Exception as Error:
+                print(Error)
+
+        if self.m_FLAG_DeBug:
+            mask_vis = cv2.cvtColor(np.array(mask_vis_pil), cv2.COLOR_RGB2BGR)
+            cv2.imwrite("{}/{}_vis_results.jpg".format(save_path, fname), mask_vis)
+
+        return txts
+    
+    def rec_inference_v2(self, img, boxes):
+        txts = []
+        mask_vis = np.zeros(shape=img.shape, dtype=np.uint8)
+        mask_vis_pil = Image.fromarray(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB))
+        for b in boxes:
+            try:
+                dstsz = cal_hw(b)
+                warpped = perspective_transform(b, dstsz, img)
+
+                makeBorderRes = makeBorder_inference(warpped, new_shape=self.rec_input_shape, sliding_window=self.rec_sliding_window_flag, gap_r=self.rec_gap_r)
+                pred, score = self.rec_inference_one(makeBorderRes)
+                txts.append(pred)
+
+                p0 = tuple(map(int, b[0]))
+                mask_vis_pil = putText_Chinese(mask_vis_pil, p0, pred, color=(255, 0, 255))
+
+            except Exception as Error:
+                print(Error)
+
+        return txts
+    
+    def rec_inference_one(self, img):
+        img = self.rec_preprocess(img)
+        ort_outs = self.rec_ort_session.run(["output"], {self.rec_ort_session.get_inputs()[0].name: img})
+        pred, scores_mean = self.rec_postprocess(ort_outs[0])
+        return pred, scores_mean
+
+    def rec_preprocess(self, img):
+        """
+        """
+        if self.rec_medianblur_flag:
+            img = median_blur(img, k=self.rec_k)
+        if self.rec_clahe_flag:
+            img = clahe(img, clipLimit=self.rec_clipLimit)
+
+        imgsz = (self.rec_c, self.rec_input_shape[0], self.rec_input_shape[1])
+
+        if self.rec_ppocr_flag:
+            max_wh_ratio = self.rec_input_shape[1] / self.rec_input_shape[0]
+            img = resize_norm_padding_img(img, imgsz=imgsz, max_wh_ratio=max_wh_ratio)
+            img = img[np.newaxis, :].astype(np.float32)
+        else:
+            imgsz_ = img.shape[:2]
+            if imgsz_ != self.rec_input_shape:
+                img = cv2.resize(img, self.rec_input_shape[::-1])
+            img = (img / 255. - np.array(self.rec_mean)) / np.array(self.rec_std)
+            img = img.transpose(2, 0, 1)
+            img = img[np.newaxis, :].astype(np.float32)
+
+        return img
+    
+    def rec_postprocess(self, pred):
+        res = []
+        scores = []
+
+        if self.rec_batch_first:
+            for i in range(pred.shape[1]):
+                argmax_i = np.argmax(pred[0][i])
+                res.append(argmax_i)
+
+                sc_ = softmax(pred[0][i])
+                sc = sc_[1:]
+                max_ = max(sc)
+                if max_ >= self.rec_score_thr:
+                    scores.append(max_)
+        else:
+            for i in range(pred.shape[0]):
+                argmax_i = np.argmax(pred[i][0])
+                res.append(argmax_i)
+
+                sc_ = softmax(pred[i][0])
+                sc = sc_[1:]
+                max_ = max(sc)
+                if max_ >= self.rec_score_thr:
+                    scores.append(max_)
+
+        scores_mean = np.mean(scores)
+
+        pred_ = [self.alpha[class_id] for class_id in res]
+        pred_ = [k for k, g in itertools.groupby(list(pred_))]
+        pred = ''.join(pred_).replace(' ', '')
+
+        return pred, scores_mean
+
+
+def main_gkfocr():
+    data = "data/doc/imgs"
+    # data = "data/doc/imgs/11.jpg"
+    ocr = GKFOCR(cfg_path="configs/cfg_gkfocr.yaml", debug=False)
+    out_img = ocr.inference(data)
+    if out_img is not None:
+        cv2.imwrite("data/doc/test_out_img.jpg", out_img)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def convertBboxXML2TXT(img_name, data_path, classes):
+#     import xml.etree.ElementTree as ET
+
+#     in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
+#     out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
+
+#     tree = ET.parse(in_file)
+#     root = tree.getroot()
+#     size = root.find('size')
+#     w = int(size.find('width').text)
+#     h = int(size.find('height').text)
+
+#     class_names = []
+#     for obj in root.iter('object'):
+#         difficult = obj.find('difficult').text
+#         cls = obj.find('name').text
+#         if cls not in class_names:
+#             class_names.append(cls)
+#         if cls not in classes or int(difficult) == 1:
+#             continue
+#         cls_id = classes.index(cls)
+#         xmlbox = obj.find('bndbox')
+#         b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
+#         bb = bbox_voc_to_yolo((h, w), b)
+#         out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+
+#     return class_names
 
 
 # ========================================================================================================================================================================
@@ -2158,258 +4970,6 @@ class ImageProcess():
         return warped
 
 
-# ==============================================================================================================================
-# ==============================================================================================================================
-
-def get_color(specific_color_flag=True):
-    global color
-    color1 = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-
-    if specific_color_flag:
-        color2, color3, color4 = (0, 0, 0), (114, 114, 114), (255, 255, 255)
-        color_rdm = np.random.rand()
-        if color_rdm <= 0.85:
-            color = color1
-        elif color_rdm > 0.85 and color_rdm <= 0.90:
-            color = color2
-        elif color_rdm > 0.90 and color_rdm <= 0.95:
-            color = color3
-        else:
-            color = color4
-    else:
-        color = color1
-
-    return color
-
-
-def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific_color_flag=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    color = get_color(specific_color_flag=specific_color_flag)
-
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-    else:
-        rdmh = np.random.random()
-        rmdw = np.random.random()
-        top = int(round(ph * rdmh))
-        bottom = ph - top
-        left = int(round(pw * rmdw))
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, specific_color_flag=True):
-    cropped_imgs = []
-    imgsz = img.shape[:2]
-
-    if gap[0] == 0 and gap[1] > 0:
-        cropsz = (imgsz[0], cropsz[1])
-        for i in range(0, imgsz[1], gap[1]):
-            if i + cropsz[1] > imgsz[1]:
-                cp_img = img[0:imgsz[0], i:imgsz[1]]
-                if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                cp_img = img[0:imgsz[0], i:i + cropsz[1]]
-                cropped_imgs.append(cp_img)
-    elif gap[0] > 0 and gap[1] == 0:
-        cropsz = (cropsz[0], imgsz[1])
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                cp_img = img[j:imgsz[0], 0:imgsz[1]]
-                if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                cp_img = img[j:j + cropsz[0], 0:imgsz[1]]
-                cropped_imgs.append(cp_img)
-    elif gap[0] == 0 and gap[1] == 0:
-        print("Error! gap[0] == 0 and gap[1] == 0!")
-    else:
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        cp_img = img[j:imgsz[0], i:imgsz[1]]
-                        if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        cp_img = img[j:imgsz[0], i:i + cropsz[1]]
-                        cropped_imgs.append(cp_img)
-                break
-
-            else:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        cp_img = img[j:j + cropsz[0], i:imgsz[1]]
-                        if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        cp_img = img[j:j + cropsz[0], i:i + cropsz[1]]
-                        cropped_imgs.append(cp_img)
-
-    return cropped_imgs
-
-
-def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=False, specific_color_flag=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    color = get_color(specific_color_flag=specific_color_flag)
-
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-    else:
-        rdmh = np.random.random()
-        rmdw = np.random.random()
-        top = int(round(ph * rdmh))
-        bottom = ph - top
-        left = int(round(pw * rmdw))
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def do_makeBorderv6(data_path):
-    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/makeBorder_Res"
-    os.makedirs(save_path, exist_ok=True)
-
-    file_list = sorted(os.listdir(data_path))
-    for f in tqdm(file_list):
-        try:
-            f_abs_path = data_path + "/{}".format(f)
-            f_name = os.path.splitext(f)[0]
-            img = cv2.imread(f_abs_path)
-            #img_cp = img.copy()
-            makeBorderRes = makeBorder_v6(img, new_shape=(64, 256), r1=0, r2=0.25, sliding_window=False, specific_color_flag=True, gap_r=(0, 11 / 12), last_img_makeBorder=True)
-            if isinstance(makeBorderRes, list):
-                pass
-            else:
-                f_dst_path = save_path + "/{}".format(f)
-                cv2.imwrite(f_dst_path, makeBorderRes)
-        except Exception as Error:
-            errinfo = "ImageProcess: LINE:{}, Error:{}".format(Error.__traceback__.tb_lineno, Error)
-            print(errinfo)
-
-
-
-# ==============================================================================================================================
-# ==============================================================================================================================
-
-
-
-
-
-
-
 class ResizeImages(object):
     def resize_images(self, img_path, size=(128, 128), n=8):
         img_list = os.listdir(img_path)
@@ -2540,1360 +5100,67 @@ class ResizeImages(object):
             t.join()
 
 
-def extract_one_gif_frames(gif_path):
-    img_name = os.path.splitext(os.path.basename(gif_path))[0]
-    save_path = os.path.abspath(os.path.join(gif_path, "../..")) + "/{}_gif_frames".format(img_name.split("/")[-1])
-    os.makedirs(save_path, exist_ok=True)
 
-    gif_img = Image.open(gif_path)
-    try:
-        gif_img.save("{}/{}_{}.png".format(save_path, img_name, gif_img.tell()))
-        while True:
-            gif_img.seek(gif_img.tell() + 1)
-            gif_img.save("{}/{}_{}.png".format(save_path, img_name, gif_img.tell()))
-    except Exception as Error:
-        print(Error)
-
-
-def extract_one_video_frames(video_path, gap=5):
-    video_name = os.path.splitext(os.path.basename(video_path))[0]
-    save_path = os.path.abspath(os.path.join(video_path, "../..")) + "/{}_video_frames".format(video_name.split("/")[-1])
-    os.makedirs(save_path, exist_ok=True)
-
-    cap = cv2.VideoCapture(video_path)
-    i = 0
-    while True:
-        ret, frame = cap.read()
-        if ret:
-            if i % gap == 0:
-                cv2.imwrite("{}/{}_{:07d}.jpg".format(save_path, video_name, i), frame)
-
-            i += 1
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        else:
-            break
-    cap.release()
-
-
-def extract_videos_frames(base_path, gap=5, save_path=""):
-    video_list = sorted(os.listdir(base_path))
-
-    if save_path:
-        os.makedirs(save_path, exist_ok=True)
-    else:
-        save_path = os.path.abspath(os.path.join(base_path, "../..")) + "/{}_video_frames".format(base_path.split("/")[-1])
-        os.makedirs(save_path, exist_ok=True)
-
-    for v in tqdm(video_list):
-        try:
-            video_abs_path = base_path + "/{}".format(v)
-            video_name = os.path.splitext(v)[0]
-            v_save_path = save_path + "/{}".format(video_name)
-            if not os.path.exists(v_save_path): os.makedirs(v_save_path)
-
-            cap = cv2.VideoCapture(video_abs_path)
-            i = 0
-            while True:
-
-                ret, frame = cap.read()
-                if ret:
-                    if i % gap == 0:
-                        cv2.imwrite("{}/{}_{:07d}.jpg".format(v_save_path, video_name, i), frame)
-
-                    i += 1
-
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        break
-                else:
-                    break
-            cap.release()
-        except Exception as Error:
-            print(Error)
-
-
-def scale_uint16(img, size):
-    img1 = img // 256
-    img2 = img % 256
-    img1 = cv2.resize(img1.astype('uint8'), size, interpolation=cv2.INTER_NEAREST)
-    img2 = cv2.resize(img2.astype('uint8'), size, interpolation=cv2.INTER_NEAREST)
-    img3 = img1.astype('uint16') * 256 + img2.astype('uint16')
-    return img3
-
-
-def cal_mean_std(imageDir, size=(64, 64)):
-    img_h, img_w = size[0], size[1]  # 根据自己数据集适当调整，影响不大
-    means, stdevs, vars_ = [], [], []
-    img_list = []
-
-    if os.path.exists(imageDir + "/Thumbs.db"):
-        os.remove(imageDir + "/Thumbs.db")
-
-    imgs_path_list = os.listdir(imageDir)
-
-    len_ = len(imgs_path_list)
-    i = 0
-    for item in tqdm(imgs_path_list):
-        img = cv2.imread(os.path.join(imageDir, item))
-        img = cv2.resize(img, (img_w, img_h))
-        img = img[:, :, :, np.newaxis]
-        img_list.append(img)
-        i += 1
-
-    imgs = np.concatenate(img_list, axis=3)
-    imgs = imgs.astype(np.float32) / 255.
-
-    for i in range(3):
-        pixels = imgs[:, :, i, :].ravel()  # 拉成一行
-        means.append(np.mean(pixels))
-        stdevs.append(np.std(pixels))
-        vars_.append(np.var(pixels))
-
-    return means, stdevs, vars_
-
-
-def cal_mean_std_dirs(imageDir, size=(64, 64)):
-    img_h, img_w = size[0], size[1]  # 根据自己数据集适当调整，影响不大
-    means, stdevs, vars_ = [], [], []
-    img_list = []
-
-    if os.path.exists(imageDir + "/Thumbs.db"):
-        os.remove(imageDir + "/Thumbs.db")
-
-    i = 0
-    dir_list = os.listdir(imageDir)
-    for d in dir_list:
-        imgs_path_list = os.listdir(imageDir + "/{}".format(d))
-        for item in tqdm(imgs_path_list):
-            img = cv2.imread(os.path.join(imageDir + "/{}".format(d), item))
-            img = cv2.resize(img, (img_w, img_h))
-            img = img[:, :, :, np.newaxis]
-            img_list.append(img)
-            i += 1
-
-    imgs = np.concatenate(img_list, axis=3)
-    imgs = imgs.astype(np.float32) / 255.
-
-    for i in range(3):
-        pixels = imgs[:, :, i, :].ravel()  # 拉成一行
-        means.append(np.mean(pixels))
-        stdevs.append(np.std(pixels))
-        vars_.append(np.var(pixels))
-
-    return means, stdevs, vars_
-
-
-def convert_to_jpg_format(data_path):
-    img_list = sorted(os.listdir(data_path))
-
-    for img in img_list:
-        img_name = os.path.splitext(img)[0]
-        img_abs_path = data_path + "/{}".format(img)
-
-        if img.endswith(".jpeg") or img.endswith(".png") or img.endswith(".bmp") or img.endswith(".JPG") or img.endswith(".JPEG") or img.endswith(".PNG") or img.endswith(".BMP"):
-            cv2img = cv2.imread(img_abs_path)
-            cv2.imwrite("{}/{}.jpg".format(data_path, img_name), cv2img)
-            os.remove(img_abs_path)
-            print("remove --> {} | write --> {}.jpg".format(img_abs_path, img_name))
-        elif img.endswith(".jpg"):
-            continue
-        elif img.endswith(".gif") or img.endswith(".GIF") or img.endswith(".webp"):
-            os.remove(img_abs_path)
-            print("remove --> {}".format(img_abs_path))
-        else:
-            print(img_abs_path)
-
-
-def convert_to_png_format(data_path):
-    img_list = sorted(os.listdir(data_path))
-
-    for img in img_list:
-        img_abs_path = data_path + "/{}".format(img)
-        try:
-            img_name = os.path.splitext(img)[0]
-            if img.endswith(".jpeg") or img.endswith(".jpg") or img.endswith(".bmp") or img.endswith(".JPEG") or img.endswith(".JPG") or img.endswith(".BMP"):
-                # img_abs_path = data_path + "/{}".format(img)
-                cv2img = cv2.imread(img_abs_path)
-                cv2.imwrite("{}/{}.png".format(data_path, img_name), cv2img)
-                os.remove(img_abs_path)
-                print("write --> {}.png  |  remove --> {}".format(img_name, img))
-
-            elif img.endswith(".png"):
-                continue
-            else:
-                print(img)
-        except Exception as Error:
-            os.remove(img_abs_path)
-            print("os.remove: {}".format(img_abs_path))
-
-
-def HORIZON_quant_model_cal_mean_std(torchvision_mean, torchvision_std, print_flag=True):
-    """
-    ll = [0.5079259, 0.43544242, 0.40075096]
-    for i in ll:
-        print(i * 255)
-
-    ll2 = [0.27482128, 0.26032233, 0.2618361]
-    for i in ll2:
-        print(1 / (i * 255))
-    :param torchvision_mean:
-    :param torchvision_std:
-    :return:
-    """
-    HORIZON_quant_mean = []
-    HORIZON_quant_std = []
-
-    for i in torchvision_mean:
-        HORIZON_quant_mean.append(i * 255)
-
-    for i in torchvision_std:
-        HORIZON_quant_std.append(1 / (i * 255))
-
-    if print_flag:
-        print("HORIZON_quant_mean: {} HORIZON_quant_std: {}".format(HORIZON_quant_mean, HORIZON_quant_std))
-
-    return HORIZON_quant_mean, HORIZON_quant_std
-
-
-def cal_green_sensitivity(hsv_img, mask_img):
-    """
-    My patent calculation
-    :param hsv_img:
-    :param mask_img:
-    :return:
-    """
-
-    assert hsv_img.shape[:2] == mask_img.shape, "hsv_img.shape != mask_img.shape"
-    mask = np.where((mask_img[:, :] > 127))
-
-    h_, s_, v_ = [], [], []
-    for x, y in zip(mask[1], mask[0]):
-        try:
-            h_.append(hsv_img[y, x, 0])
-            s_.append(hsv_img[y, x, 1])
-            v_.append(hsv_img[y, x, 2])
-        except Exception as Error:
-            print(Error)
-
-    h_mean = np.mean(h_)
-    s_mean = np.mean(s_)
-    v_mean = np.mean(v_)
-
-    h_green1, h_green2 = [], []
-    for hi in h_:
-        if hi >= 35 and hi <= 90:
-            h_green1.append(hi)
-        if hi > 45 and hi < 70:
-            h_green2.append(hi)
-    sigma1, sigma2 = 0.3, 0.7
-    phi = len(h_green1) / len(mask[0]) * sigma1 + len(h_green2) / len(mask[0]) * sigma2
-    sen = 1 / 3 * np.pi * s_mean ** 1.2 * v_mean ** 0.6 * phi
-
-    return sen
-
-
-def exit_light_patent_algorithm_test(img_path):
-    cv2img = cv2.imread(img_path)
-    g_img = cv2.split(cv2img)[1]
-    hsvimg = cv2.cvtColor(cv2img, cv2.COLOR_BGR2HSV)
-
-    ret, thresh = cv2.threshold(g_img, 127, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
-
-    # hsvimg = cv2.resize(hsvimg, (96, 64))
-    # thresh = cv2.resize(thresh, (96, 64))
-
-    t1 = time.time()
-    sensitivity = cal_green_sensitivity(hsvimg, thresh)
-    t2 = time.time()
-    print(t2 - t1)
-    print(sensitivity)
-
-    if sensitivity > 1000:
-        res = "ON"
-        print(res)
-    else:
-        res = "OFF"
-        print(res)
-
-
-def black_area_change_pixel(img_path):
-    save_path = img_path.replace(img_path.split("/")[-1], "{}_change_10".format(img_path.split("/")[-1]))
-    os.makedirs(save_path, exist_ok=True)
-
-    img_list = os.listdir(img_path)
-
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        cv2img_cp = cv2img.copy()
-
-        # black_area = np.where((cv2img[:, :, 0] < 5) & (cv2img[:, :, 1] < 5) & (cv2img[:, :, 2] < 5))
-        black_area = np.where((cv2img[:, :, 0] < 10) & (cv2img[:, :, 1] < 10) & (cv2img[:, :, 2] < 10))
-        # black_area = np.where((cv2img[:, :, 0] < 20) & (cv2img[:, :, 1] < 20) & (cv2img[:, :, 2] < 20))
-        # black_area = np.where((cv2img[:, :, 0] < 30) & (cv2img[:, :, 1] < 30) & (cv2img[:, :, 2] < 30))
-
-        # bg_cv2img = bg_cv2img.copy()
-        for x_b, y_b in zip(black_area[1], black_area[0]):
+def crop_red_bbx_area(data_path, expand_p=5):
+    file_list = get_file_list(data_path)
+    save_path = make_save_path(data_path, dir_name_add_str="crop_red_bbx")
+    # expand_p = 10
+
+    for f in tqdm(file_list):
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        cv2img = cv2.imread(f_abs_path)
+        results = find_red_bbx(cv2img, expand_p=expand_p)
+        for ri, r in enumerate(results):
             try:
-                cv2img_cp[y_b, x_b] = (255, 0, 255)
+                f_ri_dst_path = save_path + "/{}_{}_{}_cropped.jpg".format(fname, expand_p, ri)
+                cropped = cv2img[r[2]:r[3], r[0]:r[1]]
+                cv2.imwrite(f_ri_dst_path, cropped)
             except Exception as Error:
                 print(Error)
 
-        cv2.imwrite("{}/{}".format(save_path, img), cv2img_cp)
 
-
-def perspective_transform_test(img_path):
-    cv2img = cv2.imread(img_path)
-    h, w = cv2img.shape[:2]
-
-    p1 = np.array([[8, 26], [137, 44], [16, 162], [147, 209]], dtype=np.float32)
-    p2 = np.array([[0, 0], [w, 0], [0, h], [w, h]], dtype=np.float32)
-
-    M = cv2.getPerspectiveTransform(p1, p2)
-    warped = cv2.warpPerspective(cv2img, M, (w, h))
-    cv2.imwrite("{}".format(img_path.replace(".jpg", "_warpPerspective.jpg")), warped)
-
-
-def click_event(event, x, y, flags, param):
-    # xy = []
-    if event == cv2.EVENT_LBUTTONDOWN:
-        print(x, y)
-        # xy.append((x, y))
-        cv2.circle(cv2img, (x, y), 1, (255, 0, 255), -1)
-        cv2.putText(cv2img, "({}, {})".format(x, y), (x, y), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 1)
-        cv2.imshow("cv2img", cv2img)
-    # print(xy)
-
-
-def do_perspective_transform(img_path):
-    cv2img = cv2.imread(img_path)
-    h, w = cv2img.shape[:2]
-
-    # TODO return mouseClick xy to p1
-
-    p1 = np.array([[8, 26], [137, 44], [16, 162], [147, 209]], dtype=np.float32)
-    p2 = np.array([[0, 0], [w, 0], [0, h], [w, h]], dtype=np.float32)
-
-    M = cv2.getPerspectiveTransform(p1, p2)
-    warped = cv2.warpPerspective(cv2img, M, (w, h))
-    cv2.imwrite("{}".format(img_path.replace(".jpg", "_warpPerspective.jpg")), warped)
-
-
-def mv_or_rm_black_images(img_path, flag="mv", pixel_sum=100000):
-    img_list = sorted(os.listdir(img_path))
-
-    if flag == "mv":
-        dir_name = os.path.basename(img_path)
-        save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved_black_images_{}".format(dir_name, pixel_sum)
-        os.makedirs(save_path, exist_ok=True)
-
-    for img in img_list:
-        if os.path.isdir(img): continue
-        img_abs_path = img_path + "/{}".format(img)
-        try:
-
-            cv2img = cv2.imread(img_abs_path)
-            cv2img = cv2.resize(cv2img, (128, 128))
-            h, w = cv2img.shape[:2]
-            sum_ = np.sum(cv2img[:, :, :])
-            if sum_ < pixel_sum:
-                if flag == "mv":
-                    shutil.move(img_abs_path, save_path)
-                elif flag == "rm":
-                    os.remove(img_abs_path)
-
-            # if w > 120 and h > 200:
-            #     shutil.move(img_abs_path, save_path)
-
-        except Exception as Error:
-            if flag == "mv":
-                shutil.move(img_abs_path, save_path)
-            elif flag == "rm":
-                os.remove(img_abs_path)
-            print(Error)
-
-
-def check_image(img_path):
-    """
-    remove file: Corrupt JPEG data: premature end of file / data segment.
-    :param img_path:
-    :return:
-    """
-
-    try:
-        img = Image.open(img_path).load()
-        img.verify()
-        return True
-    except:
-        # os.remove(img_path)
-        print("PIL check_image: Error! {}".format(img_path))
-        return False
-
-
-def remove_corrupt_images_pil(img_path, move_or_delete="delete"):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-
-    if move_or_delete == "move":
-        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
-        os.makedirs(move_path, exist_ok=True)
-
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        if move_or_delete == "move":
-            img_dst_path = move_path + "/{}".format(img)
-        # cv2img = cv2.imread(img_abs_path)
-        try:
-            res = check_image(img_abs_path)
-            if not res:
-                if move_or_delete == "move":
-                    shutil.move(img_abs_path, img_dst_path)
-                    print("shutil.move {} --> {}".format(img_abs_path, img_dst_path))
-                elif move_or_delete == "delete":
-                    os.remove(img_abs_path)
-                    print("Removed --> {}".format(img_abs_path))
-
-        except Exception as Error:
-            print(Error)
-            os.remove(img_abs_path)
-            print("Removed --> {}".format(img_abs_path))
-
-
-def remove_corrupt_images_pil_v2(img_path, move_or_delete="delete"):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-
-    if move_or_delete == "move":
-        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
-        os.makedirs(move_path, exist_ok=True)
-
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        if move_or_delete == "move":
-            img_dst_path = move_path + "/{}".format(img)
-        try:
-            img = Image.open(img_abs_path)
-            img = np.asarray(img)
-        except Exception as Error:
-            print(Error)
-            if move_or_delete == "move":
-                shutil.move(img_abs_path, img_dst_path)
-                print("shutil.move: {} --> {}".format(img_abs_path, img_dst_path))
-            elif move_or_delete == "delete":
-                os.remove(img_abs_path)
-                print("Removed: --> {}".format(img_abs_path))
-
-
-def badImgFast(fn, imgType=None):
-    if os.path.getsize(fn) < 512:
-        return True
-    valid = False
-    with open(fn, "rb") as f:
-        f.seek(-2, 2)
-        buf = f.read()
-        valid = buf.endswith(b'\xff\xd9') or buf.endswith(b'\xae\x82') or buf.endswith(b'\x00\x3B') or buf.endswith(b'\x60\x82')  # 检测jpg图片完整性， 检测png图片完整性
-        buf.endswith(b'\x00\x00')
-    # return valid or (imghdr.what(nm) =="webp")
-    return valid
-
-
-def remove_corrupt_images_pil_v2_main_thread(img_path, move_or_delete, img_list_i):
-    dir_name = os.path.basename(img_path)
-    if move_or_delete == "move":
-        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
-        os.makedirs(move_path, exist_ok=True)
-
-    for img in tqdm(img_list_i):
-        suffix = os.path.splitext(img)[1][1:]
-        img_abs_path = img_path + "/{}".format(img)
-        if move_or_delete == "move":
-            img_dst_path = move_path + "/{}".format(img)
-        try:
-            res = imghdr.what(img_abs_path)
-
-            flag = False
-            if suffix.lower()[:2] == res.lower()[:2]:
-                flag = True
-
-            if res == None or not flag:
-                if move_or_delete == "move":
-                    shutil.move(img_abs_path, img_dst_path)
-                    print("shutil.move: {} --> {}".format(img_abs_path, img_dst_path))
-                elif move_or_delete == "delete":
-                    os.remove(img_abs_path)
-                    print("Removed: --> {}".format(img_abs_path))
-        except Exception as Error:
-            print(Error)
-
-
-def remove_corrupt_images_pil_v2_main(img_path, move_or_delete="delete"):
-    img_list = sorted(os.listdir(img_path))
-
-    len_ = len(img_list)
-    img_lists = []
-    split_n = 8
-    for j in range(split_n):
-        img_lists.append(img_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        img_list_i = img_lists[i]
-        t = threading.Thread(target=remove_corrupt_images_pil_v2_main_thread, args=(img_path, move_or_delete, img_list_i,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-def remove_corrupt_images_cv2_v2_main_thread(img_path, move_or_delete, img_list_i):
-    dir_name = os.path.basename(img_path)
-    if move_or_delete == "move":
-        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_moved".format(dir_name)
-        os.makedirs(move_path, exist_ok=True)
-
-    for img in tqdm(img_list_i):
-        suffix = os.path.splitext(img)[1][1:]
-        img_abs_path = img_path + "/{}".format(img)
-        if move_or_delete == "move":
-            img_dst_path = move_path + "/{}".format(img)
-        try:
-            # res = imghdr.what(img_abs_path)
-
-            res = cv2.imread(img_abs_path)
-            if res is None:
-                if move_or_delete == "move":
-                    shutil.move(img_abs_path, img_dst_path)
-                    print("shutil.move: {} --> {}".format(img_abs_path, img_dst_path))
-                elif move_or_delete == "delete":
-                    os.remove(img_abs_path)
-                    print("Removed: --> {}".format(img_abs_path))
-        except Exception as Error:
-            print(Error)
-
-
-def remove_corrupt_images_cv2_v2_main(img_path, move_or_delete="delete"):
-    img_list = sorted(os.listdir(img_path))
-
-    len_ = len(img_list)
-    img_lists = []
-    split_n = 8
-    for j in range(split_n):
-        img_lists.append(img_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        img_list_i = img_lists[i]
-        t = threading.Thread(target=remove_corrupt_images_cv2_v2_main_thread, args=(img_path, move_or_delete, img_list_i,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-def remove_corrupt_images_opencv(img_path):
-    img_list = sorted(os.listdir(img_path))
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        try:
-            # cv2img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-            cv2img = cv2.imread(img_abs_path)
-
-            if cv2img is None:
-                os.remove(img_abs_path)
-                print("[img is None]: Removed --> {}".format(img_abs_path))
-                continue
-
-            cv2img_ = np.asarray(cv2img)
-
-        except Exception as Error:
-            print(Error)
-            os.remove(img_abs_path)
-            print("Removed --> {}".format(img_abs_path))
-
-
-def ssim_move_or_remove_same_images(img_path, imgsz=(64, 64), move_or_remove="move"):
-    from skimage.metrics import structural_similarity
-
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-
-    if move_or_remove == "move":
-        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_same_images_moved".format(dir_name)
-        os.makedirs(move_path, exist_ok=True)
-
-    for i in range(len(img_list)):
-        try:
-            img_path_i = img_path + "/{}".format(img_list[i])
-            img_i = cv2.imread(img_path_i)
-            imgisz = img_i.shape[:2]
-            if imgisz[0] < 10 or imgisz[1] < 10: continue
-            if img_i is None: continue
-            img_i = cv2.resize(img_i, imgsz)
-
-            for j in range(i + 1, len(img_list)):
-                img_path_j = img_path + "/{}".format(img_list[j])
-                img_j = cv2.imread(img_path_j)
-                imgjsz = img_j.shape[:2]
-                if imgjsz[0] < 10 or imgjsz[1] < 10: continue
-                if img_j is None: continue
-                img_j = cv2.resize(img_j, imgsz)
-
-                ssim = structural_similarity(img_i, img_j, multichannel=True)
-                print("N: {} i: {}, j: {}, ssim: {}".format(len(img_list), i, j, ssim))
-
-                if ssim > 0.95:
-                    if move_or_remove == "remove" or move_or_remove == "delete":
-                        os.remove(img_path_j)
-                        print("{}, {} 两张图片相似度很高, ssim: {}  |  Removed: {}".format(img_list[i], img_list[j], ssim, img_path_j))
-                    elif move_or_remove == "move":
-                        shutil.move(img_path_j, move_path + "/{}".format(img_list[j]))
-                        print("{}, {} 两张图片相似度很高, ssim: {}   |  {} --> {}/{}.".format(img_list[i], img_list[j], ssim, img_path_j, move_path, img_list[j]))
-                    else:
-                        print("'move_or_remove' should be one of [remove, delete, move]!")
-
-            print(" ----------- {} ----------- ".format(i))
-
-        except Exception as Error:
-            print(Error, Error.__traceback__.tb_lineno)
-
-
-def ssim_move_or_remove_base(img_path, imgsz, img_list, ii, img_i, img_list_i, move_or_remove, move_path):
-    from skimage.metrics import structural_similarity
-
-    for j in range(len(img_list_i)):
-        img_path_j = img_path + "/{}".format(img_list_i[j])
-        img_j = cv2.imread(img_path_j)
-        imgsz = img_j.shape[:2]
-        if imgsz[0] < 7 or imgsz[1] < 7: continue
-        if img_j is None: continue
-        img_j = cv2.resize(img_j, imgsz)
-
-        ssim = structural_similarity(img_i, img_j, multichannel=True)
-        print("N: {} i: {}, j: {}, ssim: {}".format(len(img_list), ii, j, ssim))
-
-        if ssim > 0.95:
-            if move_or_remove == "remove" or move_or_remove == "delete":
-                os.remove(img_path_j)
-                print("{}, {} 两张图片相似度很高, ssim: {}  |  Removed: {}".format(img_list[ii], img_list_i[j], ssim, img_path_j))
-            elif move_or_remove == "move":
-                shutil.move(img_path_j, move_path + "/{}".format(img_list_i[j]))
-                print("{}, {} 两张图片相似度很高, ssim: {}   |  {} --> {}/{}.".format(img_list[ii], img_list_i[j], ssim, img_path_j, move_path, img_list_i[j]))
-            else:
-                print("'move_or_remove' should be one of [remove, delete, move]!")
-
-    print(" ----------- {} ----------- ".format(ii))
-
-
-def ssim_move_or_remove_same_images_multithread(img_path, imgsz=(64, 64), move_or_remove="move"):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-
-    if move_or_remove == "move":
-        move_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_same_images_moved".format(dir_name)
-        os.makedirs(move_path, exist_ok=True)
-
-    for ii in range(len(img_list)):
-        try:
-            img_path_i = img_path + "/{}".format(img_list[ii])
-            img_i = cv2.imread(img_path_i)
-            if img_i is None: continue
-            img_i = cv2.resize(img_i, imgsz)
-
-            img_list_left = img_list[ii + 1:]
-
-            len_ = len(img_list_left)
-            img_lists_left = []
-            split_n = 8
-            for j in range(split_n):
-                img_lists_left.append(img_list_left[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-            t_list = []
-            for i in range(split_n):
-                img_list_i = img_lists_left[i]
-                t = threading.Thread(target=ssim_move_or_remove_base, args=(img_path, imgsz, img_list, ii, img_i, img_list_i, move_or_remove, move_path,))
-                t_list.append(t)
-
-            for t in t_list:
-                t.start()
-            for t in t_list:
-                t.join()
-
-        except Exception as Error:
-            print(Error)
-
-
-def remove_small_area(img_path):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_removed_small_area".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    for img in img_list:
-        try:
-            img_abs_path = img_path + "/{}".format(img)
-            cv2img = cv2.imread(img_abs_path)
-            cv2img_gray = cv2.cvtColor(cv2img, cv2.COLOR_BGR2GRAY)
-
-            ret, thresh = cv2.threshold(cv2img_gray.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
-            cnts, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            for c in cnts:
-                cx, cy, cw, ch = cv2.boundingRect(c)
-                if cw * ch < 5000:
-                    cv2img[cy:cy + ch, cx:cx + cw] = (0, 0, 0)
-                    print("{}: {}_{}_{}_{}".format(img, cx, cy, cw, ch))
-
-            cv2.imwrite("{}/{}".format(save_path, img), cv2img)
-
-        except Exception as Error:
-            print(Error)
-
-
-def mv_or_remove_small_images(img_path, rmsz=48, mode=0):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_small".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    for img in tqdm(img_list):
-        if os.path.isdir(img): continue
-        try:
-            img_abs_path = img_path + "/{}".format(img)
-            img_dst_path = save_path + "/{}".format(img)
-            cv2img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-
-            h, w = cv2img.shape[:2]
-            if mode == 0:
-                if (h < rmsz and w < rmsz) or (h > 8 * w or w > 5 * h):
-                    shutil.move(img_abs_path, img_dst_path)
-            elif mode == 1:
-                if h < rmsz or w < rmsz:
-                    shutil.move(img_abs_path, img_dst_path)
-            else:
-                if (h < rmsz or w < rmsz) or (h > 3 * w or w > 5 * h):
-                    shutil.move(img_abs_path, img_dst_path)
-
-        except Exception as Error:
-            print(Error)
-
-
-def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=False, scaleFill=False, scaleup=True, stride=32):
-    # Resize and pad image while meeting stride-multiple constraints
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape)
-
-    # Scale ratio (new / old)
-    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-    if not scaleup:  # only scale down, do not scale up (for better val mAP)
-        r = min(r, 1.0)
-
-    # Compute padding
-    ratio = r, r  # width, height ratios
-    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
-    if auto:  # minimum rectangle
-        dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
-    elif scaleFill:  # stretch
-        dw, dh = 0.0, 0.0
-        new_unpad = (new_shape[1], new_shape[0])
-        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
-
-    dw /= 2  # divide padding into 2 sides
-    dh /= 2
-
-    if shape[::-1] != new_unpad:  # resize
-        im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
-    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-    return im, ratio, (dw, dh)
-
-
-def yolo_transform(img, final_shape=(64, 64)):
-    img_src, ratio, (dw, dh) = letterbox(img, new_shape=final_shape)
-    img = cv2.cvtColor(img_src, cv2.COLOR_BGR2RGB)
-    img = np.transpose(img, (2, 1, 0))  # HWC -> CHW
-    return img, img_src
-
-
-def resize_image_keep_ratio(img_path):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_resize_keep_ratio".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-
-        img_, img_src = yolo_transform(cv2img, final_shape=(128, 128))
-        cv2.imwrite("{}/{}".format(save_path, img), img_src)
-
-
-def select_images_according_other_images():
-    src_img_path = "/home/zengyifan/wujiahu/data/003.Cigar_Detection/others/optimize_cls_model/MPII_select_images/crop_images_/1"
-    src_img_list = os.listdir(src_img_path)
-
-    data_path = "/home/zengyifan/wujiahu/data/003.Cigar_Detection/others/optimize_cls_model/MPII_select_images/crop_images"
-    data_path_1 = data_path + "/1"
-    os.makedirs(data_path_1, exist_ok=True)
-
-    for img in src_img_list:
-        img_abs_path = data_path + "/{}".format(img)
-        img_dst_path = data_path_1 + "/{}".format(img)
-
-        shutil.move(img_abs_path, img_dst_path)
-
-
-def select_images_according_txt_list(data_path, print_flag=True):
-    txt_path = data_path + "/labels_new"
-    img_path = data_path + "/images"
-    txt_list = sorted(os.listdir(txt_path))
-
-    save_path = data_path + "/images_new"
-    os.makedirs(save_path, exist_ok=True)
-
-    for t in txt_list:
-        f_name = t.replace(".txt", ".jpg")
-        img_abs_path = img_path + "/{}".format(f_name)
-        img_dst_path = save_path + "/{}".format(f_name)
-        shutil.copy(img_abs_path, img_dst_path)
-        if print_flag:
-            print("{} --> {}".format(img_abs_path, img_dst_path))
-
-
-def select_images_according_txt_file(txt_file, img_path, save_path=None, cp_mv_del="copy"):
-    img_dir_name = os.path.basename(img_path)
-
-    with open(txt_file, "r", encoding="utf-8") as fo:
-        lines = fo.readlines()
-
-    if save_path is None:
-        save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_selected_according_txt_file".format(img_dir_name)
-        os.makedirs(save_path, exist_ok=True)
+def judge_if_gray_img(cv2img, dstsz=(64, 64), mean_thr=1):
+    cv2img = cv2.resize(cv2img, dstsz)
+    imgsz = cv2img.shape[:2]
+    psum = []
+    for hi in range(imgsz[0]):
+        for wi in range(imgsz[1]):
+            pgap = (abs(cv2img[hi, wi, 0] - cv2img[hi, wi, 1]) + abs(cv2img[hi, wi, 1] - cv2img[hi, wi, 2]) + abs(cv2img[hi, wi, 0] - cv2img[hi, wi, 2])) / 3
+            psum.append(pgap)
+
+    pmean = np.mean(psum)
+
+    if pmean < mean_thr:
+        return "Gray"
     else:
-        os.makedirs(save_path, exist_ok=True)
+        return "Color"
 
-    for line in lines:
-        line = line.strip()
-        # absolute path
-        if "/" or "\\" in line:
-            img_name = os.path.basename(line)
-            img_src_path = img_path + "/{}".format(img_name)
-            img_dst_path = save_path + "/{}".format(img_name)
 
-            if cp_mv_del == "cp" or cp_mv_del == "copy":
-                shutil.copy(img_src_path, img_dst_path)
-            elif cp_mv_del == "mv" or cp_mv_del == "move":
-                shutil.move(img_src_path, img_dst_path)
-            elif cp_mv_del == "del" or cp_mv_del == "delete" or cp_mv_del == "rm" or cp_mv_del == "remove":
-                os.remove(img_src_path)
+def makeSunLightEffect(img, r=(50, 200), light_strength=300):
+    imgsz = img.shape[:2]
+    center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
+    effectR = np.random.randint(r[0], r[1])
+    lightStrength = np.random.randint(light_strength // 4, light_strength)
+
+    dst = np.zeros(shape=img.shape, dtype=np.uint8)
+
+    for i in range(imgsz[0]):
+        for j in range(imgsz[1]):
+            dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
+            B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
+            if dis < effectR * effectR:
+                result = int(lightStrength * (1.0 - np.sqrt(dis) / effectR))
+                B += result
+                G += result
+                R += result
+
+                B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
+                dst[i, j] = np.uint8((B, G, R))
             else:
-                print("Error 'cp_mv_del' parameter!")
-        # relative path
-        else:
-            # img_name = os.path.basename(line)
-            img_src_path = img_path + "/{}".format(line)
-            img_dst_path = save_path + "/{}".format(line)
+                dst[i, j] = np.uint8((B, G, R))
 
-            if cp_mv_del == "cp" or cp_mv_del == "copy":
-                shutil.copy(img_src_path, img_dst_path)
-            elif cp_mv_del == "mv" or cp_mv_del == "move":
-                shutil.move(img_src_path, img_dst_path)
-            elif cp_mv_del == "del" or cp_mv_del == "delete" or cp_mv_del == "rm" or cp_mv_del == "remove":
-                os.remove(img_src_path)
-            else:
-                print("Error 'cp_mv_del' parameter!")
-
-
-def select_images_according_yolo_label(data_path="", save_path=""):
-    dir_name = os.path.basename(data_path)
-    if save_path:
-        save_path_images = save_path + "/images"
-        save_path_labels = save_path + "/labels"
-        os.makedirs(save_path_images, exist_ok=True)
-        os.makedirs(save_path_labels, exist_ok=True)
-    else:
-        save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_selected_images_and_labels_according_yolo_label".format(dir_name)
-        save_path_images = save_path + "/images"
-        save_path_labels = save_path + "/labels"
-        os.makedirs(save_path_images, exist_ok=True)
-        os.makedirs(save_path_labels, exist_ok=True)
-
-    img_path = data_path + "/images"
-    lbl_path = data_path + "/labels"
-    lbl_list = sorted(os.listdir(lbl_path))
-
-    for lbl in lbl_list:
-        lbl_abs_path = lbl_path + "/{}".format(lbl)
-        lbl_name = os.path.splitext(lbl)[0]
-        img_abs_path = img_path + "/{}.jpg".format(lbl_name)
-
-        lbl_sum = 0
-        with open(lbl_abs_path, "r", encoding="utf-8") as fo:
-            lines = fo.readlines()
-
-            for l in lines:
-                l = l.strip().split(" ")
-                cls = int(l[0])
-                if cls == 1:
-                    lbl_sum += 1
-
-        if lbl_sum >= 1:
-            img_dst_path = save_path_images + "/{}.jpg".format(lbl_name)
-            lbl_dst_path = save_path_labels + "/{}".format(lbl)
-
-            shutil.copy(img_abs_path, img_dst_path)
-            shutil.copy(lbl_abs_path, lbl_dst_path)
-
-
-def apply_hog(img):
-    from skimage import feature, exposure
-
-    fd, hog_img = feature.hog(img, orientations=9, pixels_per_cell=(16, 16), cells_per_block=(2, 2), visualize=True)
-    hog_img_rescaled = exposure.rescale_intensity(hog_img, in_range=(0, 10))
-    return hog_img_rescaled
-
-
-def MinFilterGray(src, r=7):
-    '''最小值滤波，r是滤波器半径'''
-    # 使用opencv的erode函数更高效
-
-    return cv2.erode(src, np.ones((2 * r + 1, 2 * r + 1)))
-
-
-def guidedfilter(I, p, r, eps):
-    ''''引导滤波，直接参考网上的matlab代码'''
-    height, width = I.shape
-    m_I = cv2.boxFilter(I, -1, (r, r))
-    m_p = cv2.boxFilter(p, -1, (r, r))
-    m_Ip = cv2.boxFilter(I * p, -1, (r, r))
-    cov_Ip = m_Ip - m_I * m_p
-
-    m_II = cv2.boxFilter(I * I, -1, (r, r))
-    var_I = m_II - m_I * m_I
-
-    a = cov_Ip / (var_I + eps)
-    b = m_p - a * m_I
-
-    m_a = cv2.boxFilter(a, -1, (r, r))
-    m_b = cv2.boxFilter(b, -1, (r, r))
-    return m_a * I + m_b
-
-
-def getV1(m, r, eps, w, maxV1):
-    # 输入rgb图像，值范围[0,1]
-    '''计算大气遮罩图像V1和光照值A, V1 = 1-t/A'''
-    V1 = np.min(m, 2)  # 得到暗通道图像
-    V1 = guidedfilter(V1, MinFilterGray(V1, 7), r, eps)  # 使用引导滤波优化
-    bins = 2000
-    ht = np.histogram(V1, bins)  # 计算大气光照A
-    d = np.cumsum(ht[0]) / float(V1.size)
-    for lmax in range(bins - 1, 0, -1):
-        if d[lmax] <= 0.999:
-            break
-    A = np.mean(m, 2)[V1 >= ht[1][lmax]].max()
-    V1 = np.minimum(V1 * w, maxV1)  # 对值范围进行限制
-
-    return V1, A
-
-
-def deHaze(m, r=81, eps=0.001, w=0.95, maxV1=0.80, bGamma=False):
-    Y = np.zeros(m.shape)
-    V1, A = getV1(m, r, eps, w, maxV1)  # 得到遮罩图像和大气光照
-    for k in range(3):
-        Y[:, :, k] = (m[:, :, k] - V1) / (1 - V1 / A)  # 颜色校正
-    Y = np.clip(Y, 0, 1)
-    if bGamma:
-        Y = Y ** (np.log(0.5) / np.log(Y.mean()))  # gamma校正,默认不进行该操作
-    return Y
-
-
-def dehaze_test():
-    m = deHaze(cv2.imread('/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/20221111152824_8b46d8_75_0028505.jpg') / 255.0) * 255
-    cv2.imwrite('/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/20221111152824_8b46d8_75_0028505_defog.jpg', m)
-
-
-def cal_saliency_map_FT(src):
-    lab = cv2.cvtColor(src, cv2.COLOR_BGR2LAB)
-    # gaussian_blur = cv2.GaussianBlur(src, (17, 17), 0)
-    blur = cv2.medianBlur(src, 7)
-
-    mean_lab = np.mean(lab, axis=(0, 1))
-    saliency_map = (blur - mean_lab) * (blur - mean_lab)
-    saliency_map = (saliency_map - np.amin(saliency_map)) / (np.amax(saliency_map) - np.amin(saliency_map))
-
-    return saliency_map
-
-
-def get_saliency_ft(img_path):
-    from skimage.util import img_as_float
-
-    # Saliency map calculation based on:
-
-    img = skimage.io.imread(img_path)
-
-    img_rgb = img_as_float(img)
-
-    img_lab = skimage.color.rgb2lab(img_rgb)
-    avgl, avga, avgb = np.mean(img_lab, axis=(0, 1))
-
-    mean_val = np.mean(img_lab, axis=(0, 1))
-    kernel_h = (1.0 / 16.0) * np.array([[1, 4, 6, 4, 1]])
-    # kernel_h = (1.0/4.0) * np.array([[1,2,1]])
-    kernel_w = kernel_h.transpose()
-
-    blurred_l = scipy.signal.convolve2d(img_lab[:, :, 0], kernel_h, mode='same')
-    blurred_a = scipy.signal.convolve2d(img_lab[:, :, 1], kernel_h, mode='same')
-    blurred_b = scipy.signal.convolve2d(img_lab[:, :, 2], kernel_h, mode='same')
-
-    blurred_l2 = scipy.signal.convolve2d(blurred_l, kernel_w, mode='same')
-    blurred_a2 = scipy.signal.convolve2d(blurred_a, kernel_w, mode='same')
-    blurred_b2 = scipy.signal.convolve2d(blurred_b, kernel_w, mode='same')
-
-    im_blurred = np.dstack([blurred_l2, blurred_a2, blurred_b2])
-
-    # sal = np.linalg.norm(mean_val - im_blurred,axis = 2)
-    sal = np.square(blurred_l2 - avgl) + np.square(blurred_a2 - avga) + np.square(blurred_b2 - avgb)
-    sal_max = np.max(sal)
-    sal_min = np.min(sal)
-    range = sal_max - sal_min
-    if range == 0:
-        range = 1
-    sal = 255 * ((sal - sal_min) / range)
-
-    sal = sal.astype(int)
-    return sal
-
-
-def binarise_saliency_map(saliency_map):
-    adaptive_threshold = 2.0 * saliency_map.mean()
-    return (saliency_map > adaptive_threshold)
-
-
-def saliency_map_ft_test():
-    from pywt import dwt, idwt, dwt2, idwt2
-
-    # img = cv2.imread("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133.jpg")
-    # saliency_map = cal_saliency_map_FT(img)
-    # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133_saliency_map_ft.jpg", saliency_map * 255)
-    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/smoke_PS/data"
-
-    bg_path = os.path.abspath(os.path.join(data_path, "../..")) + "/bg"
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/output"
-    os.makedirs(save_path, exist_ok=True)
-
-    img_list = sorted(os.listdir(data_path))
-    for imgi in img_list:
-        img_name = os.path.splitext(imgi)[0]
-        img_abs_path = data_path + "/{}".format(imgi)
-        bg_abs_path = bg_path + "/{}".format(imgi)
-        img = cv2.imread(img_abs_path)
-        H, W = img.shape[:2]
-        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        img_cp = img.copy()
-        bg_img = cv2.imread(bg_abs_path)
-        bg_b, bg_g, bg_r = cv2.split(bg_img)
-        bg_img_gray = cv2.cvtColor(bg_img, cv2.COLOR_BGR2GRAY)
-        # bg_img_cp = bg_img.copy()
-        saliency_map2 = get_saliency_ft(img_abs_path)
-        saliency_map2_merge = cv2.merge([saliency_map2, saliency_map2, saliency_map2])
-        saliency_map = cal_saliency_map_FT(img) * 255
-        b, g, r = cv2.split(saliency_map)
-        ret, b_bin = cv2.threshold(np.uint8(b), 70, 255, cv2.THRESH_BINARY)
-        cv2.imwrite("{}/{}_saliency_map2.jpg".format(save_path, img_name), saliency_map2)
-        cv2.imwrite("{}/{}_saliency_map2_merge.jpg".format(save_path, img_name), saliency_map2_merge)
-        cv2.imwrite("{}/{}_saliency_map.jpg".format(save_path, img_name), saliency_map)
-        cv2.imwrite("{}/{}_saliency_map_b.jpg".format(save_path, img_name), b)
-        cv2.imwrite("{}/{}_saliency_map_g.jpg".format(save_path, img_name), g)
-        cv2.imwrite("{}/{}_saliency_map_r.jpg".format(save_path, img_name), r)
-        cv2.imwrite("{}/{}_saliency_map_b_bin.jpg".format(save_path, img_name), b_bin)
-
-        b_bin_merge = cv2.merge([b_bin, b_bin, b_bin])
-
-        cnts, hierarchy = cv2.findContours(b_bin.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        max_cnts = max(cnts, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(max_cnts)
-        cv2.rectangle(b_bin, (x, y), (x + w, y + h), (255, 0, 255), 5)
-        cv2.rectangle(img_cp, (x, y), (x + w, y + h), (255, 0, 255), 5)
-        cv2.imwrite("{}/{}_saliency_map_b_bin_rect.jpg".format(save_path, img_name), b_bin)
-        # cv2.imwrite("{}/{}_saliency_map_img_rect.jpg".format(data_path, img_name), img_cp)
-
-        bg_roi = bg_img_gray[y:y + h, x:x + w]
-        bgcA, (bgcH, bgcV, bgcD) = dwt2(bg_roi, "haar")
-        # bgcAH = np.hstack((bgcA, bgcH))
-        # bgcVD = np.hstack((bgcV, bgcD))
-        # bgcAHVD = np.vstack((bgcAH, bgcVD))
-        # bg_cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
-        bg_energy_gray = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
-        print("E_bg_gray: ", bg_energy_gray)
-
-        bg_roi = bg_b[y:y + h, x:x + w]
-        bgcA, (bgcH, bgcV, bgcD) = dwt2(bg_roi, "haar")
-        # bgcAH = np.hstack((bgcA, bgcH))
-        # bgcVD = np.hstack((bgcV, bgcD))
-        # bgcAHVD = np.vstack((bgcAH, bgcVD))
-        # bg_cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
-        bg_energy = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
-        print("E_bg_b: ", bg_energy)
-
-        b_roi = img_gray[y:y + h, x:x + w]
-        cA, (cH, cV, cD) = dwt2(b_roi, "haar")
-        cAH = np.hstack((cA, cH))
-        cVD = np.hstack((cV, cD))
-        cAHVD = np.vstack((cAH, cVD))
-        cv2img_resz = cv2.resize(cAHVD, (W, H))
-        cv2img_resz_merge = cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz])
-        energy_gray = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
-        print("E_gray: ", energy_gray)
-
-        b_roi = b[y:y + h, x:x + w]
-        cA, (cH, cV, cD) = dwt2(b_roi, "haar")
-        cAH = np.hstack((cA, cH))
-        cVD = np.hstack((cV, cD))
-        cAHVD = np.vstack((cAH, cVD))
-        cv2img_resz = cv2.resize(cAHVD, (W, H))
-        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
-        print("E_b: ", energy)
-
-        E_ratio_gray = energy_gray / bg_energy_gray
-        E_ratio_b = energy / bg_energy
-        print("E_ratio_gray: {}".format(E_ratio_gray))
-        print("E_ratio_b: {}".format(E_ratio_b))
-
-        img_roi = img[y:y + h, x:x + w]
-        # img_roi_b, img_roi_g, img_roi_r = cv2.split(img_roi)
-        B_, G_, R_ = np.mean(img_roi[:, :, 0]), np.mean(img_roi[:, :, 1]), np.mean(img_roi[:, :, 2])
-        print("B_, G_, R_: ", B_, G_, R_)
-
-        cv2.putText(img_cp, "E_bg: {:.2f}".format(bg_energy), (20, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
-        cv2.putText(img_cp, "E: {:.2f}".format(energy), (20, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
-        cv2.putText(img_cp, "E_ratio: {:.2f}".format(E_ratio_b), (20, 150), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
-        cv2.putText(img_cp, "B_, G_, R_: {:.2f} {:.2f} {:.2f}".format(B_, G_, R_), (20, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
-
-        cv2.imwrite("{}/{}_saliency_map_img_cp.jpg".format(save_path, img_name), img_cp)
-        out_img = np.hstack((img, saliency_map, b_bin_merge, cv2img_resz_merge, img_cp))
-        cv2.imwrite("{}/{}_saliency_map_stacked.jpg".format(save_path, img_name), out_img)
-
-
-def thresh_img(img, threshold_min_thr=10, adaptiveThreshold=True):
-    if adaptiveThreshold:
-        thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 5, 5)
-        return None, thresh
-    else:
-        ret, thresh = cv2.threshold(img, threshold_min_thr, 255, cv2.THRESH_BINARY)
-        return ret, thresh
-
-
-def wt_test():
-    from pywt import dwt, idwt, dwt2, idwt2
-
-    img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/cmp_data2/smoke"
-    img_list = os.listdir(img_path)
-
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/output/cmp_data2/smoke"
-    os.makedirs(save_path, exist_ok=True)
-
-    Es = []
-
-    for img in img_list:
-        img_name = os.path.splitext(img)[0]
-        img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path, 0)
-        cA, (cH, cV, cD) = dwt2(cv2img, "haar")
-
-        cAH = np.hstack((cA, cH))
-        cVD = np.hstack((cV, cD))
-        cAHVD = np.vstack((cAH, cVD))
-        cv2.imwrite("{}/{}_dwt2.jpg".format(save_path, img_name), cAHVD)
-
-        cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
-        img_cha = cv2.subtract(np.uint8(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz])), np.uint8(cv2.merge([cA, cA, cA])))
-        # img_cha = cv2.subtract(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz]), cv2.merge([cA, cA, cA]))
-        # img_cha = cv2.subtract(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz]), cv2.merge([cA, cA, cA]))
-        print(img_cha.sum())
-        cv2.imwrite("{}/{}_img_cha.jpg".format(save_path, img_name), img_cha)
-
-        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / cv2img.size
-        print("E: ", energy)
-
-        Es.append(energy)
-
-    print("E mean: ", np.mean(Es))
-
-
-def hog_test():
-    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data"
-    img_list = sorted(os.listdir(data_path))
-    for img in img_list:
-        img_name = os.path.splitext(img)[0]
-        img_abs_path = data_path + "/{}".format(img)
-        img = cv2.imread(img_abs_path, 0)
-        hog_res = apply_hog(img)
-        cv2.imwrite("{}/{}_hog.jpg".format(data_path, img_name), hog_res * 255)
-
-
-def image_process_fire_smoke_experiment():
-    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/train/train_fire_smoke/20230517_yolov5_experiment/train_5000"
-    dir_name = os.path.basename(data_path)
-    img_path = data_path + "/images"
-    lbl_path = data_path + "/labels"
-    img_list = sorted(os.listdir(img_path))
-    # gammas = [0.4, 0.8, 1.2, 1.8]
-    gammas = [0.8, 1.2]
-
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_gamma_correction_output_0.8_1.2".format(dir_name)
-    img_save_path = save_path + "/images"
-    lbl_save_path = save_path + "/labels"
-    os.makedirs(img_save_path, exist_ok=True)
-    os.makedirs(lbl_save_path, exist_ok=True)
-
-    for img in img_list:
-        img_name = os.path.splitext(img)[0]
-        img_abs_path = img_path + "/{}".format(img)
-        lbl_abs_path = lbl_path + "/{}.txt".format(img_name)
-        img = cv2.imread(img_abs_path)
-        for gamma in gammas:
-            gamma_correction_res = gamma_correction(img, gamma=gamma)
-            if len(gamma_correction_res.shape) == 2:
-                gamma_correction_res_ = cv2.cvtColor(gamma_correction_res, cv2.COLOR_GRAY2BGR)
-                cv2.imwrite("{}/{}_gamma_{}_correction_res.jpg".format(img_save_path, img_name, gamma), gamma_correction_res_)
-                shutil.copy(lbl_abs_path, lbl_save_path + "/{}_gamma_{}_correction_res.txt".format(img_name, gamma))
-            else:
-                cv2.imwrite("{}/{}_gamma_{}_correction_res.jpg".format(img_save_path, img_name, gamma), gamma_correction_res)
-                shutil.copy(lbl_abs_path, lbl_save_path + "/{}_gamma_{}_correction_res.txt".format(img_name, gamma))
-
-
-def image_process_fire_smoke_experiment2():
-    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/train/train_fire_smoke/20230517_yolov5_experiment/train_5000"
-    dir_name = os.path.basename(data_path)
-    img_path = data_path + "/images"
-    lbl_path = data_path + "/labels"
-    img_list = sorted(os.listdir(img_path))
-
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_gamma_correction_output_auto".format(dir_name)
-    img_save_path = save_path + "/images"
-    lbl_save_path = save_path + "/labels"
-    os.makedirs(img_save_path, exist_ok=True)
-    os.makedirs(lbl_save_path, exist_ok=True)
-
-    for img in img_list:
-        img_name = os.path.splitext(img)[0]
-        img_abs_path = img_path + "/{}".format(img)
-        lbl_abs_path = lbl_path + "/{}.txt".format(img_name)
-        img = cv2.imread(img_abs_path)
-        for i in range(2, 3):
-            gamma_correction_res, gamma = gamma_correction_auto(img, method=i)
-            if len(gamma_correction_res.shape) == 2:
-                gamma_correction_res_ = cv2.cvtColor(gamma_correction_res, cv2.COLOR_GRAY2BGR)
-                cv2.imwrite("{}/{}_gamma_{}_correction_res_method_{}.jpg".format(img_save_path, img_name, gamma, i), gamma_correction_res_)
-                shutil.copy(lbl_abs_path, lbl_save_path + "/{}_gamma_{}_correction_res_method_{}.txt".format(img_name, gamma, i))
-            else:
-                cv2.imwrite("{}/{}_gamma_{}_correction_res_method_{}.jpg".format(img_save_path, img_name, gamma, i), gamma_correction_res)
-                shutil.copy(lbl_abs_path, lbl_save_path + "/{}_gamma_{}_correction_res_method_{}.txt".format(img_name, gamma, i))
-
-
-def convert_to_gray_image(data_path):
-    img_list = sorted(os.listdir(data_path))
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/images_gray"
-    os.makedirs(save_path, exist_ok=True)
-
-    for i in img_list:
-        img_abs_path = data_path + "/{}".format(i)
-        img = cv2.imread(img_abs_path, 0)
-        cv2.imwrite("{}/{}".format(save_path, i), img)
-
-
-def crop_one_image(img_path, crop_area):
-    cv2img = cv2.imread(img_path)
-    par_path = os.path.abspath(os.path.join(img_path, "../.."))
-    img_name = os.path.splitext(os.path.basename(img_path))[0]
-    cropped = cv2img[crop_area[0]:crop_area[1], crop_area[2]:crop_area[3]]
-    cv2.imwrite("{}/{}_cropped.jpg".format(par_path, img_name), cropped)
-
-
-def create_pure_images(save_path, size=(1080, 1920), max_pixel_value=20, save_num=1000, p=0.8):
-    os.makedirs(save_path, exist_ok=True)
-    colors = [[0, 0, 0],
-              [10, 0, 0],
-              [0, 10, 0],
-              [0, 0, 10],
-              [10, 10, 0],
-              [10, 0, 10],
-              [0, 10, 10],
-              [10, 10, 10],
-              [10, 15, 0],
-              [10, 0, 15],
-              [15, 10, 0],
-              [2, 3, 5],
-              [5, 2, 2],
-              [5, 6, 2],
-              [5, 7, 2],
-              [5, 2, 8],
-              [5, 54, 2],
-              [5, 5, 2],
-              ]
-
-    colors2 = []
-    for i in range(save_num):
-        r = np.random.random()
-        if r < p:
-            c0 = np.random.choice(range(max_pixel_value))
-            c1 = np.random.choice(range(max_pixel_value))
-            c = [np.random.choice([c0, c1]), np.random.choice([c0, c1]), np.random.choice([c0, c1])]
-        else:
-            c = list(np.random.choice(range(max_pixel_value), size=3))
-        if c not in colors2:
-            colors2.append(c)
-
-    if len(colors2) > 1000 and len(colors2) < 5000:
-        colors2 = colors2 * 5
-    elif len(colors2) <= 1000:
-        colors2 = colors2 * 10
-    elif len(colors2) >= 5000:
-        colors2 = colors2 * 2
-
-    for i in range(len(colors2)):
-        img_init = np.ones(shape=[size[0], size[1], 3])
-        img_b = img_init[:, :, 0] * colors2[i][0]
-        img_g = img_init[:, :, 1] * colors2[i][1]
-        img_r = img_init[:, :, 2] * colors2[i][2]
-        img = cv2.merge([img_b, img_g, img_r])
-        cv2.imwrite("{}/{}.jpg".format(save_path, i), img)
-
-
-def classify_images_via_bgr_values(img_path):
-    img_list = sorted(os.listdir(img_path))
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/cls_res"
-    save_path_0 = save_path + "/0"
-    save_path_1 = save_path + "/1"
-    os.makedirs(save_path_0, exist_ok=True)
-    os.makedirs(save_path_1, exist_ok=True)
-
-    for i in img_list:
-        img_abs_path = img_path + "/{}".format(i)
-        cv2img = cv2.imread(img_abs_path)
-        imgsz = cv2img.shape[:2]
-        b, g, r = cv2.split(cv2img)
-        b_ = np.mean(np.asarray(b).reshape(1, -1))
-        g_ = np.mean(np.asarray(g).reshape(1, -1))
-        r_ = np.mean(np.asarray(r).reshape(1, -1))
-
-        print("b_, g_, r_: ", b_, g_, r_)
-
-        bg_mean = np.mean([b_, g_])
-
-        if abs(r_ - bg_mean) < 30:
-            img_dst_path = save_path_0 + "/{}".format(i)
-            shutil.move(img_abs_path, img_dst_path)
-        else:
-            img_dst_path = save_path_1 + "/{}".format(i)
-            shutil.move(img_abs_path, img_dst_path)
+    return dst
 
 
 def rotate_img_any_angle(img_path):
@@ -3912,329 +5179,6 @@ def rotate_img_any_angle(img_path):
                 pilimg.rotate(ang, expand=True).save("{}/{}_{}.jpg".format(save_path, img_name, ang))
             except Exception as Error:
                 print(Error, Error.__traceback__.tb_lineno)
-
-
-def ssim_move_images(base_img_path, imgs_path, imgsz=(32, 32), ssim_thr=0.5):
-    from skimage.metrics import structural_similarity
-
-    img_list = sorted(os.listdir(imgs_path))
-    base_img = cv2.imread(base_img_path)
-    img_i = cv2.resize(base_img, imgsz)
-    for j in tqdm(img_list):
-        img_path_j = imgs_path + "/{}".format(j)
-        img_j = cv2.imread(img_path_j)
-        if img_j is None: continue
-        img_j = cv2.resize(img_j, imgsz)
-
-        ssim = structural_similarity(img_i, img_j, multichannel=True)
-        print("ssim:", ssim)
-
-        if ssim > ssim_thr:
-            img_dst_path = "/home/zengyifan/wujiahu/data/004.Knife_Det/others/Robot_Test/Videos/C_Plus_Plus_det_output/20230711_video_frames_merged/crop_images/1/1.1" + "/{}".format(j)
-            shutil.move(img_path_j, img_dst_path)
-            print("{} -->\n{}".format(img_path_j, img_dst_path))
-
-
-def canny_demo(image):
-    t = 80
-    canny_output = cv2.Canny(image, t, t * 2)
-
-    return canny_output
-
-
-def GetRed(img):
-    """
-    提取图中的红色部分
-    """
-    # 转化为hsv空间
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    # print(hsv.shape)
-    # 颜色在HSV空间下的上下限
-    low_hsv = np.array([0, 180, 80])
-    high_hsv = np.array([10, 255, 255])
-
-    # 使用opencv的inRange函数提取颜色
-    mask = cv2.inRange(hsv, lowerb=low_hsv, upperb=high_hsv)
-    Red = cv2.bitwise_and(img, img, mask=mask)
-    return Red
-
-
-def find_red_bbx_v2(img_path, cls):
-    dir_name = os.path.basename(img_path)
-    lbl_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_labels".format(dir_name)
-    os.makedirs(lbl_path, exist_ok=True)
-
-    img_list = sorted(os.listdir(img_path))
-    for img in tqdm(img_list):
-        img_name = os.path.splitext(img)[0]
-        img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        imgsz = cv2img.shape[:2]
-
-        with open(lbl_path + "/{}.txt".format(img_name), "w", encoding="utf-8") as fw:
-            src = GetRed(cv2img)
-            binary = canny_demo(src)
-            k = np.ones((3, 3), dtype=np.uint8)
-            binary = cv2.morphologyEx(binary, cv2.MORPH_DILATE, k)
-
-            contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for c in range(len(contours)):
-                area = cv2.contourArea(contours[c])
-                arclen = cv2.arcLength(contours[c], True)
-                if area < 20 or arclen < 100:
-                    continue
-                rect = cv2.minAreaRect(contours[c])
-                cx, cy = rect[0]
-
-                box = cv2.boxPoints(rect)
-                box = np.int0(box)
-                listX = [box[0][0], box[1][0], box[2][0], box[3][0]]
-                listY = [box[0][1], box[1][1], box[2][1], box[3][1]]
-                x1 = min(listX)
-                y1 = min(listY)
-                x2 = max(listX)
-                y2 = max(listY)
-                # print(x1, y1, x2, y2)
-                width = np.int32(x2 - x1)
-                height = np.int32(y2 - y1)
-
-                roi = cv2img[y1 + 5: y2 - 5, x1 + 5:x2 - 5]
-                # print(width, height)
-                # print(x1,y1,x2,y2)
-                if width < 80 or height < 80:
-                    continue
-
-                # cv2.imshow("roi", roi)
-                # cv2.waitKey(0)
-                if len(roi):
-                    # cv2.imwrite("{}/{}_{}.jpg".format(lbl_path, img_name, c), roi)
-                    # bbx_voc = [x1, x2, y1, y2]
-                    # bbx_yolo = convert_bbx_VOC_to_yolo(imgsz, bbx_voc)
-                    bbx_voc = [x1, y1, y1, y2]
-                    bbx_yolo = convertBboxVOC2YOLO(imgsz, bbx_voc)
-                    txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbx_yolo]) + "\n"
-                    fw.write(txt_content)
-
-
-def find_red_bbx(cv2img, expand_p=2):
-    src = GetRed(cv2img)
-    binary = canny_demo(src)
-    k = np.ones((3, 3), dtype=np.uint8)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_DILATE, k)
-
-    results = []
-    contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for c in range(len(contours)):
-        area = cv2.contourArea(contours[c])
-        arclen = cv2.arcLength(contours[c], True)
-        if area < 20 or arclen < 100:
-            continue
-        rect = cv2.minAreaRect(contours[c])
-        cx, cy = rect[0]
-
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
-        listX = [box[0][0], box[1][0], box[2][0], box[3][0]]
-        listY = [box[0][1], box[1][1], box[2][1], box[3][1]]
-        x1 = min(listX)
-        y1 = min(listY)
-        x2 = max(listX)
-        y2 = max(listY)
-        # print(x1, y1, x2, y2)
-        width = np.int32(x2 - x1)
-        height = np.int32(y2 - y1)
-
-        roi = cv2img[y1 + expand_p: y2 - expand_p, x1 + expand_p:x2 - expand_p]
-        # print
-        # print(x1,y1,x2,y2)
-        if width < 80 or height < 80:
-            continue
-
-        # cv2.imshow("roi", roi)
-        # cv2.waitKey(0)
-        if len(roi):
-            # cv2.imwrite("{}/{}_{}.jpg".format(lbl_path, img_name, c), roi)
-            bbx_voc = [int(round(x1)) + expand_p, int(round(x2)) - expand_p, int(round(y1)) + expand_p, int(round(y2)) - expand_p]
-            results.append(bbx_voc)
-
-    return results
-
-
-def detect_shape(c):
-    """
-    approxPolyDP()函数是opencv中对指定的点集进行多边形逼近的函数
-    :param c:
-    :return: 返回形状和折点的坐标
-    """
-    peri = cv2.arcLength(c, True)
-    approx = cv2.approxPolyDP(c, 0.04 * peri, True)
-
-    if len(approx) == 3:
-        shape = "triangle"
-        return shape, approx
-
-    elif len(approx) == 4:
-        (x, y, w, h) = cv2.boundingRect(approx)
-        ar = w / float(h)
-        shape = "square" if ar >= 0.95 and ar <= 1.05 else "rectangle"
-        return shape, approx
-
-    elif len(approx) == 5:
-        shape = "pentagon"
-        return shape, approx
-
-    elif len(approx) == 6:
-        shape = "hexagon"
-        return shape, approx
-
-    elif len(approx) == 8:
-        shape = "octagon"
-        return shape, approx
-
-    elif len(approx) == 10:
-        shape = "star"
-        return shape, approx
-
-    else:
-        shape = "circle"
-        return shape, approx
-
-
-def seg_crop_object(cv2img, bgimg, maskimg):
-    # imgsz = cv2img.shape
-    outimg = np.zeros(cv2img.shape)
-    # outimg2 = bgimg.copy()
-    # roi = np.where(maskimg[:, :, 0] != 0 & maskimg[:, :, 1] != 0 & maskimg[:, :, 2] != 0)
-    roi = np.where(maskimg[:, :, 0] != 0)
-    outimg[roi] = cv2img[roi]
-    # outimg2[roi] = (0, 0, 0)
-
-    conts, hierarchy = cv2.findContours(maskimg[:, :, 0].astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    maxc = max(conts, key=cv2.contourArea)
-    bbox = cv2.boundingRect(maxc)
-    outimg_crop = outimg[bbox[1]:(bbox[1] + bbox[3]), bbox[0]:(bbox[0] + bbox[2])]
-    # outimg2_crop = outimg2[bbox[1]:(bbox[1] + bbox[3]), bbox[0]:(bbox[0] + bbox[2])]
-    # merged = outimg_crop + outimg2_crop
-
-    # relative_roi = []
-    # for ri in range(len(roi[0])):
-    #     y_new, x_new = y - bbox[1], x - bbox[0]
-    #     relative_roi.append([y_new, x_new])
-
-    # relative_roi = np.asarray(relative_roi)
-
-    relative_roi = (roi[0] - bbox[1], roi[1] - bbox[0])
-
-    return outimg_crop, bbox, relative_roi
-
-
-def vstack_two_images(data_path="/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/0-9_white"):
-    # save_path = os.path.abspath(os.path.join(data_path, "..")) + "/llj_0-9_vstack_output"
-    # os.makedirs(save_path, exist_ok=True)
-    #
-    # for i in range(10):
-    #     imgi_path = data_path + "/{}.png".format(i)
-    #     imgi1_path = data_path + "/{}.png".format(i + 1)
-    #     imgi = cv2.imread(imgi_path)
-    #     imgi1 = cv2.imread(imgi1_path)
-    #
-    #     vstack = np.vstack((imgi, imgi1))
-    #     vstacksz = vstack.shape
-    #
-    #     # while (True):
-    #     #     rdm = np.random.random()
-    #     #     if rdm < 0.25:
-    #     #         break
-    #     # out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
-    #     # cv2.imwrite("{}/{}.jpg".format(save_path, i), out)
-    #
-    #     rdm = np.random.random()
-    #     out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
-    #     if rdm < 0.25:
-    #         cv2.imwrite("{}/{}.jpg".format(save_path, i), out)
-    #     # else:
-    #     #     cv2.imwrite("{}/{}.jpg".format(save_path, i + 1), out)
-
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/llj_0-9_vstack_output"
-    os.makedirs(save_path, exist_ok=True)
-
-    for i in range(10):
-        imgi_path = data_path + "/{}N.png".format(i)
-        imgi1_path = data_path + "/{}N.png".format(i + 1)
-        imgi = cv2.imread(imgi_path)
-        imgi1 = cv2.imread(imgi1_path)
-
-        vstack = np.vstack((imgi, imgi1))
-        vstacksz = vstack.shape
-
-        # while (True):
-        #     rdm = np.random.random()
-        #     if rdm < 0.25:
-        #         break
-        # out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
-        # cv2.imwrite("{}/{}.jpg".format(save_path, i), out)
-
-        rdm = np.random.random()
-        out = vstack[int(round(rdm * vstacksz[0])):int(round((1 - rdm) * vstacksz[0])), 0:vstacksz[1]]
-        if rdm < 0.25:
-            cv2.imwrite("{}/{}_{}.jpg".format(save_path, i, str(rdm).replace(".", "")), out)
-        # else:
-        #     cv2.imwrite("{}/{}_{}.jpg".format(save_path, i + 1, str(rdm).replace(".", "")), out)
-
-
-def cut_images(data_path):
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/0-9_output_ud"
-    os.makedirs(save_path, exist_ok=True)
-
-    for i in range(10):
-        imgi_path = data_path + "/{}N.png".format(i)
-        imgi = cv2.imread(imgi_path)
-        imgisz = imgi.shape
-        for j in range(1, 10):
-            outi_u = imgi[int(round(j * 0.1 * imgisz[0])):imgisz[0], 0:imgisz[1]]
-            outi_d = imgi[0:int(round((1 - j * 0.1) * imgisz[0])), 0:imgisz[1]]
-            cv2.imwrite("{}/{}_{}_u.png".format(save_path, i, j), outi_u)
-            cv2.imwrite("{}/{}_{}_d.png".format(save_path, i, j), outi_d)
-
-
-def stack_images(data_path):
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/0-9_output_ud_stack"
-    os.makedirs(save_path, exist_ok=True)
-
-    for i in range(10):
-        for j in range(1, 10):
-            imgi_j_u_path = data_path + "/{}_{}_u.png".format(i, j)
-            if i == 9:
-                imgi1_j_d_path = data_path + "/{}_{}_d.png".format(0, 10 - j)
-            else:
-                imgi1_j_d_path = data_path + "/{}_{}_d.png".format(i + 1, 10 - j)
-            imgi_j_u = cv2.imread(imgi_j_u_path)
-            imgi1_j_d = cv2.imread(imgi1_j_d_path)
-            # imgi_j_u_sz = imgi_j_u.shape
-
-            stack = np.vstack((imgi_j_u, imgi1_j_d))
-            if j <= 5:
-                cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, i), stack)
-            else:
-                if i == 9:
-                    cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, 0), stack)
-                else:
-                    cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, i + 1), stack)
-
-
-def crop_images(data_path):
-    dir_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_cropped".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    data_list = sorted(os.listdir(data_path))
-    for f in tqdm(data_list):
-        f_abs_path = data_path + "/{}".format(f)
-        cv2img = cv2.imread(f_abs_path)
-        imgsz = cv2img.shape[:2]
-        # cropped = cv2img[212:imgsz[0], :]
-        cropped = cv2img[0:165, :]
-        cv2.imwrite("{}/{}".format(save_path, f), cropped)
 
 
 class BlurAug(object):
@@ -4671,80 +5615,7 @@ def do_aug_multithreading(data_path, split_n=8):
         t.join()
 
 
-def sliding_window_crop(img, cropsz=(96, 256), gap=(0, 128)):
-    cropped_imgs = []
-    imgsz = img.shape[:2]
 
-    if gap[0] == 0 and gap[1] > 0:
-        cropsz = (imgsz[0], cropsz[1])
-        for i in range(0, imgsz[1], gap[1]):
-            if i + cropsz[1] >= imgsz[1]:
-                i_last = imgsz[1] - cropsz[1]
-
-                cp_img = img[0:imgsz[0], i_last:i_last + cropsz[1], :]
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                if i + cropsz[1] > imgsz[1]:
-                    break
-                cp_img = img[0:imgsz[0], i:i + cropsz[1], :]
-                cropped_imgs.append(cp_img)
-    elif gap[0] > 0 and gap[1] == 0:
-        cropsz = (cropsz[0], imgsz[1])
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] >= imgsz[0]:
-                j_last = imgsz[0] - cropsz[0]
-
-                cp_img = img[j_last:j_last + cropsz[0], 0:imgsz[1], :]
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                if j + cropsz[0] > imgsz[0]:
-                    break
-                cp_img = img[j:j + cropsz[0], 0:imgsz[1], :]
-                cropped_imgs.append(cp_img)
-    elif gap[0] == 0 and gap[1] == 0:
-        print("Error! gap[0] == 0 and gap[1] == 0!")
-    else:
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] >= imgsz[0]:
-                j_last = imgsz[0] - cropsz[0]
-
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] >= imgsz[1]:
-                        i_last = imgsz[1] - cropsz[1]
-
-                        cp_img = img[j_last:j_last + cropsz[0], i_last:i_last + cropsz[1], :]
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        if i + cropsz[1] > imgsz[1]:
-                            break
-                        cp_img = img[j_last:j_last + cropsz[0], i:i + cropsz[1], :]
-                        cropped_imgs.append(cp_img)
-                break
-
-            else:
-                for i in range(0, imgsz[1], gap[1]):
-                    if j + cropsz[0] > imgsz[0] or i + cropsz[1] > imgsz[1]:
-                        break
-                    cp_img = img[j:j + cropsz[0], i:i + cropsz[1], :]
-                    cropped_imgs.append(cp_img)
-
-    return cropped_imgs
-
-
-def sliding_window_crop_test2():
-    img_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/Others/sliding_window_test/images/bg_natural_images_0000000.jpg"
-    cv2img = cv2.imread(img_path)
-    imgsz = cv2img.shape[:2]
-
-    cropped_imgs = sliding_window_crop(cv2img, cropsz=(96, 256), gap=(48, 128))
-    for idx, ci in enumerate(cropped_imgs):
-        cv2.imwrite("/home/zengyifan/wujiahu/data/010.Digital_Rec/others/Others/sliding_window_test/images_sliding_window_crop/{}.jpg".format(idx), ci)
-
-
-def sliding_window_crop_test():
     ratio = 0.7  # 像素占比
 
     # img_path = "/home/zengyifan/wujiahu/data/000.Bg/bg_natural_images_21781/images/bg_natural_images_0000000.jpg"
@@ -4808,372 +5679,6 @@ def sliding_window_crop_test():
                     cv2.imwrite(os.path.join(save_path, base_name.replace('.jpg', f'_{num}.jpg')), cp_img)
 
                     num += 1
-
-
-def crop_red_bbx_area(data_path, expand_p=5):
-    file_list = get_file_list(data_path)
-    save_path = make_save_path(data_path, dir_name_add_str="crop_red_bbx")
-    # expand_p = 10
-
-    for f in tqdm(file_list):
-        fname = os.path.splitext(f)[0]
-        f_abs_path = data_path + "/{}".format(f)
-        cv2img = cv2.imread(f_abs_path)
-        results = find_red_bbx(cv2img, expand_p=expand_p)
-        for ri, r in enumerate(results):
-            try:
-                f_ri_dst_path = save_path + "/{}_{}_{}_cropped.jpg".format(fname, expand_p, ri)
-                cropped = cv2img[r[2]:r[3], r[0]:r[1]]
-                cv2.imwrite(f_ri_dst_path, cropped)
-            except Exception as Error:
-                print(Error)
-
-
-def gray_img_or_not(cv2img, dstsz=(64, 64), mean_thr=5):
-    cv2img = cv2.resize(cv2img, dstsz)
-    imgsz = cv2img.shape[:2]
-    psum = []
-    for hi in range(imgsz[0]):
-        for wi in range(imgsz[1]):
-            pgap = (abs(cv2img[hi, wi, 0] - cv2img[hi, wi, 1]) + abs(cv2img[hi, wi, 1] - cv2img[hi, wi, 2]) + abs(cv2img[hi, wi, 0] - cv2img[hi, wi, 2])) / 3
-            psum.append(pgap)
-
-    pmean = np.mean(psum)
-
-    if pmean < mean_thr:
-        return "Gray"
-    else:
-        return "Color"
-
-
-def classify_color_and_gray_images(data_path):
-    file_list = get_file_list(data_path)
-    save_path0 = make_save_path(data_path, "output/0")
-    save_path1 = make_save_path(data_path, "output/1")
-
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        cv2img = cv2.imread(f_abs_path)
-        gray_or_color = gray_img_or_not(cv2img, dstsz=(64, 64), mean_thr=5)
-
-        if gray_or_color.upper() == "GRAY":
-            f_dst_path = save_path0 + "/{}".format(f)
-            shutil.move(f_abs_path, f_dst_path)
-        else:
-            f_dst_path = save_path1 + "/{}".format(f)
-            shutil.move(f_abs_path, f_dst_path)
-
-
-def makeSunLightEffect(img, r=(50, 200), light_strength=300):
-    imgsz = img.shape[:2]
-    center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
-    effectR = np.random.randint(r[0], r[1])
-    lightStrength = np.random.randint(light_strength // 4, light_strength)
-
-    dst = np.zeros(shape=img.shape, dtype=np.uint8)
-
-    for i in range(imgsz[0]):
-        for j in range(imgsz[1]):
-            dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
-            B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
-            if dis < effectR * effectR:
-                result = int(lightStrength * (1.0 - np.sqrt(dis) / effectR))
-                B += result
-                G += result
-                R += result
-
-                B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
-                dst[i, j] = np.uint8((B, G, R))
-            else:
-                dst[i, j] = np.uint8((B, G, R))
-
-    return dst
-
-
-def get_color(specific_color_flag=True):
-    global color
-    color1 = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-
-    if specific_color_flag:
-        color2, color3, color4 = (0, 0, 0), (114, 114, 114), (255, 255, 255)
-        color_rdm = np.random.rand()
-        if color_rdm <= 0.85:
-            color = color1
-        elif color_rdm > 0.85 and color_rdm <= 0.90:
-            color = color2
-        elif color_rdm > 0.90 and color_rdm <= 0.95:
-            color = color3
-        else:
-            color = color4
-    else:
-        color = color1
-
-    return color
-
-
-def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific_color_flag=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    color = get_color(specific_color_flag=specific_color_flag)
-
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-    else:
-        rdmh = np.random.random()
-        rmdw = np.random.random()
-        top = int(round(ph * rdmh))
-        bottom = ph - top
-        left = int(round(pw * rmdw))
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, r2=0.25, specific_color_flag=True):
-    cropped_imgs = []
-    imgsz = img.shape[:2]
-
-    if gap[0] == 0 and gap[1] > 0:
-        cropsz = (imgsz[0], cropsz[1])
-        for i in range(0, imgsz[1], gap[1]):
-            if i + cropsz[1] > imgsz[1]:
-                cp_img = img[0:imgsz[0], i:imgsz[1]]
-                if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                cp_img = img[0:imgsz[0], i:i + cropsz[1]]
-                cropped_imgs.append(cp_img)
-    elif gap[0] > 0 and gap[1] == 0:
-        cropsz = (cropsz[0], imgsz[1])
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                cp_img = img[j:imgsz[0], 0:imgsz[1]]
-                if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                cp_img = img[j:j + cropsz[0], 0:imgsz[1]]
-                cropped_imgs.append(cp_img)
-    elif gap[0] == 0 and gap[1] == 0:
-        print("Error! gap[0] == 0 and gap[1] == 0!")
-    else:
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        cp_img = img[j:imgsz[0], i:imgsz[1]]
-                        if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        cp_img = img[j:imgsz[0], i:i + cropsz[1]]
-                        cropped_imgs.append(cp_img)
-                break
-
-            else:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        cp_img = img[j:j + cropsz[0], i:imgsz[1]]
-                        if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        cp_img = img[j:j + cropsz[0], i:i + cropsz[1]]
-                        cropped_imgs.append(cp_img)
-
-    return cropped_imgs
-
-
-def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=False, specific_color_flag=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    color = get_color(specific_color_flag=specific_color_flag)
-
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-    else:
-        rdmh = np.random.random()
-        rmdw = np.random.random()
-        top = int(round(ph * rdmh))
-        bottom = ph - top
-        left = int(round(pw * rmdw))
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def sample_asym(magnitude, size=None):
-    return np.random.beta(1, 4, size) * magnitude
-
-
-def sample_sym(magnitude, size=None):
-    return (np.random.beta(4, 4, size=size) - 0.5) * 2 * magnitude
-
-
-def sample_uniform(low, high, size=None):
-    return np.random.uniform(low, high, size=size)
-
-
-def get_interpolation(type='random'):
-    if type == 'random':
-        choice = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA]
-        interpolation = choice[random.randint(0, len(choice) - 1)]
-    elif type == 'nearest':
-        interpolation = cv2.INTER_NEAREST
-    elif type == 'linear':
-        interpolation = cv2.INTER_LINEAR
-    elif type == 'cubic':
-        interpolation = cv2.INTER_CUBIC
-    elif type == 'area':
-        interpolation = cv2.INTER_AREA
-    else:
-        raise TypeError('Interpolation types only nearest, linear, cubic, area are supported!')
-    return interpolation
-
-
-def blend_mask(image, mask, alpha=0.5, cmap='jet', color='b', color_alpha=1.0):
-    # normalize mask
-    mask = (mask - mask.min()) / (mask.max() - mask.min() + np.finfo(float).eps)
-    if mask.shape != image.shape:
-        mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
-    # get color map
-    color_map = plt.get_cmap(cmap)
-    mask = color_map(mask)[:, :, :3]
-    # convert float to uint8
-    mask = (mask * 255).astype(dtype=np.uint8)
-
-    # set the basic color
-    basic_color = np.array(colors.to_rgb(color)) * 255
-    basic_color = np.tile(basic_color, [image.shape[0], image.shape[1], 1])
-    basic_color = basic_color.astype(dtype=np.uint8)
-    # blend with basic color
-    blended_img = cv2.addWeighted(image, color_alpha, basic_color, 1 - color_alpha, 0)
-    # blend with mask
-    blended_img = cv2.addWeighted(blended_img, alpha, mask, 1 - alpha, 0)
-
-    return blended_img
-
-
-def onehot(label, depth, device=None):
-    """
-    Args:
-        label: shape (n1, n2, ..., )
-        depth: a scalar
-
-    Returns:
-        onehot: (n1, n2, ..., depth)
-    """
-    if not isinstance(label, torch.Tensor):
-        label = torch.tensor(label, device=device)
-    onehot = torch.zeros(label.size() + torch.Size([depth]), device=device)
-    onehot = onehot.scatter_(-1, label.unsqueeze(-1), 1)
-
-    return onehot
 
 
 class CVRandomRotation(object):
@@ -5484,605 +5989,6 @@ class CVColorJitter(object):
             return self.transforms(img)
         else:
             return img
-
-
-def apply_CLAHE(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(3, (4, 4))
-    dst = clahe.apply(gray)
-
-    return dst
-
-
-def bmp2jpg(bmp_abs_path):
-    base_name = os.path.basename(bmp_abs_path)
-    save_name = base_name.replace(".bmp", ".jpg")
-    cv2_img = cv2.imread(bmp_abs_path)
-
-    return cv2_img, save_name
-
-
-def dcm2jpg(dcm_path):
-    ds = pydicom.read_file(dcm_path)  # 读取.dcm文件
-    img = ds.pixel_array  # 提取图像信息
-    # scipy.misc.imsave(out_path, img)
-    return img
-
-
-def calc_brightness(img):
-    # 把图片转换为单通道的灰度图
-    img = cv2.resize(img, (16, 16))
-    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # 获取形状以及长宽
-    img_shape = gray_img.shape
-    height, width = img_shape[0], img_shape[1]
-    size = gray_img.size
-    # 灰度图的直方图
-    hist = cv2.calcHist([gray_img], [0], None, [256], [0, 256])
-    # 计算灰度图像素点偏离均值(128)程序
-    a = 0
-    ma = 0
-    reduce_matrix = np.full((height, width), 128)
-    shift_value = gray_img - reduce_matrix
-    shift_sum = sum(map(sum, shift_value))
-    da = shift_sum / size
-    # 计算偏离128的平均偏差
-    for i in range(256):
-        ma += (abs(i - 128 - da) * hist[i])
-    m = abs(ma / size)
-
-    # 亮度系数
-    if m == 0:
-        print("ZeroDivisionError!")
-        return 100, -100
-    else:
-        k = abs(da) / m
-        return k[0], da
-
-
-def cal_mean_std(imageDir):
-
-    img_h, img_w = 64, 64  # 根据自己数据集适当调整，影响不大
-    means, stdevs = [], []
-    img_list = []
-
-    if os.path.exists(imageDir + "\\Thumbs.db"):
-        os.remove(imageDir + "\\Thumbs.db")
-    imgs_path_list = os.listdir(imageDir)
-
-    len_ = len(imgs_path_list)
-    i = 0
-    for item in imgs_path_list:
-        img = cv2.imread(os.path.join(imageDir, item))
-        img = cv2.resize(img, (img_w, img_h))
-        img = img[:, :, :, np.newaxis]
-        img_list.append(img)
-        i += 1
-        print(i, '/', len_)
-
-    imgs = np.concatenate(img_list, axis=3)
-    imgs = imgs.astype(np.float32) / 255.
-
-    for i in range(3):
-        pixels = imgs[:, :, i, :].ravel()  # 拉成一行
-        means.append(np.mean(pixels))
-        stdevs.append(np.std(pixels))
-
-    # BGR --> RGB ， CV读取的需要转换，PIL读取的不用转换
-    means = means.reverse()
-    stdevs = stdevs.reverse()
-
-    return means, stdevs
-
-
-def detect_shape(c):
-    """
-    approxPolyDP()函数是opencv中对指定的点集进行多边形逼近的函数
-    :param c:
-    :return: 返回形状和折点的坐标
-    """
-    peri = cv2.arcLength(c, True)
-    approx = cv2.approxPolyDP(c, 0.04 * peri, True)
-
-    if len(approx) == 3:
-        shape = "triangle"
-        return shape, approx
-
-    elif len(approx) == 4:
-        (x, y, w, h) = cv2.boundingRect(approx)
-        ar = w / float(h)
-        shape = "square" if ar >= 0.95 and ar <= 1.05 else "rectangle"
-        return shape, approx
-
-    elif len(approx) == 5:
-        shape = "pentagon"
-        return shape, approx
-
-    elif len(approx) == 6:
-        shape = "hexagon"
-        return shape, approx
-
-    elif len(approx) == 8:
-        shape = "octagon"
-        return shape, approx
-
-    elif len(approx) == 10:
-        shape = "star"
-        return shape, approx
-
-    else:
-        shape = "circle"
-        return shape, approx
-
-
-def cv2ImgAddText(img, text, left, top, font_path="simsun.ttc", textColor=(0, 255, 0), textSize=20):
-    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
-
-    if (isinstance(img, np.ndarray)):  # 判断是否OpenCV图片类型
-        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    # 创建一个可以在给定图像上绘图的对象
-    draw = ImageDraw.Draw(img)
-    fontStyle = ImageFont.truetype(font_path, textSize, encoding="utf-8")
-    draw.text((left, top), text, textColor, font=fontStyle)
-
-    return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
-
-
-def random_color():
-    b = random.randint(0, 255)
-    g = random.randint(0, 255)
-    r = random.randint(0, 255)
-
-    return (b, g, r)
-
-
-def cal_SVD_var(img):
-    img_r, img_g, img_b = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-    u_r, sigma_r, v_r = np.linalg.svd(img_r)
-    u_g, sigma_g, v_g = np.linalg.svd(img_r)
-    u_b, sigma_b, v_b = np.linalg.svd(img_r)
-    # r
-    len_sigma_r = len(sigma_r)
-    len_sigma_r_50 = int(round(.5 * len_sigma_r))
-    len_sigma_r_20 = int(round(.2 * len_sigma_r))
-    var_r_50 = np.var(sigma_r[:len_sigma_r_50])
-    var_r_last_20 = np.var(sigma_r[-len_sigma_r_20:])
-    # g
-    len_sigma_g = len(sigma_g)
-    len_sigma_g_50 = int(round(.5 * len_sigma_g))
-    len_sigma_g_20 = int(round(.2 * len_sigma_g))
-    var_g_50 = np.var(sigma_r[:len_sigma_g_50])
-    var_g_last_20 = np.var(sigma_r[-len_sigma_g_20:])
-    # b
-    len_sigma_b = len(sigma_b)
-    len_sigma_b_50 = int(round(.5 * len_sigma_b))
-    len_sigma_b_20 = int(round(.2 * len_sigma_b))
-    var_b_50 = np.var(sigma_r[:len_sigma_b_50])
-    var_b_last_20 = np.var(sigma_r[-len_sigma_b_20:])
-
-    var_50 = np.mean([var_r_50, var_g_50, var_b_50])
-    var_last_20 = np.mean([var_r_last_20, var_g_last_20, var_b_last_20])
-
-    return var_50, var_last_20
-
-
-def find_specific_color(img):
-    """
-    https://stackoverflow.com/questions/42592234/python-opencv-morphologyex-remove-specific-color
-    Parameters
-    ----------
-    img
-
-    Returns
-    -------
-
-    """
-    # lower = np.array([10, 10, 120])  # -- Lower range --
-    # upper = np.array([60, 60, 245])  # -- Upper range --
-    lower = np.array([0, 0, 100])  # -- Lower range --
-    upper = np.array([80, 80, 255])  # -- Upper range --
-    mask = cv2.inRange(img, lower, upper)
-    # mask = 255 - mask
-    res = cv2.bitwise_and(img, img, mask=mask)  # -- Contains pixels having the gray color--
-
-    return res
-
-
-def remove_specific_color(image):
-    H, W, _ = image.shape
-    newimg = image.copy()
-
-    for i in range(H):
-        for j in range(W):
-            if image[:, :, 0][i, j] < 200 and image[:, :, 1][i, j] < 200 and image[:, :, 2][i, j] > 200:
-            # if abs(image[:, :, 0][i, j] - image[:, :, 1][i, j]) < 20 and abs(image[:, :, 2][i, j] - image[:, :, 0][i, j]) > 50:
-                newimg[:, :, 0][i, j] = 0
-                newimg[:, :, 1][i, j] = 0
-                newimg[:, :, 2][i, j] = 0
-
-    return newimg
-
-
-def remove_specific_color_v2(cv2img):
-    hsv = cv2.cvtColor(cv2img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv)
-    thresh1 = cv2.threshold(s, 92, 255, cv2.THRESH_BINARY)[1]
-    thresh2 = cv2.threshold(v, 10, 255, cv2.THRESH_BINARY)[1]
-    thresh2 = 255 - thresh2
-    mask = cv2.add(thresh1, thresh2)
-
-    H, W, _ = cv2img.shape
-    newimg = cv2img.copy()
-
-    for i in range(H):
-        for j in range(W):
-            if mask[i, j] != 0:
-                newimg[i, j] = cv2img[i - 12, j - 12]
-
-    return newimg
-
-
-def resize_images(imgPath, savePath, size_=(256, 32)):
-    imgList = sorted(os.listdir(imgPath))
-    for i in range(len(imgList)):
-        imgAbsPath = imgPath + "\\" + imgList[i]
-        img_name = os.path.basename(imgAbsPath).split(".")[0]
-        ends = os.path.splitext(imgList[i])[1]
-        cv2_img = cv2.imread(imgAbsPath)
-        resized_img = cv2.resize(cv2_img, size_)
-        cv2.imwrite(savePath + "\\{}{}".format(img_name, ends), resized_img)
-
-    print("Resized!")
-
-
-def retrieve_image_from_video(video_path, frame_save_path):
-    video_name = os.path.basename(video_path).split(".")[0]
-
-    if not os.path.exists(frame_save_path):
-        os.makedirs(frame_save_path)
-
-    cap = cv2.VideoCapture(video_path)
-    count = 0
-    while(True):
-        success, frame = cap.read()
-        if success:
-            cv2.imwrite(frame_save_path + "/{}_{}.jpg".format(video_name, count), frame)
-        elif not success:
-            break
-        count += 1
-        print("Processing...")
-
-
-def perspective_transform(image, rect):
-    """
-    透视变换
-    """
-    tl, tr, br, bl = rect
-    # tl, tr, br, bl = np.array([tl[0] - 20, tl[1] - 20]), np.array([tr[0] + 20, tr[1] - 20]), np.array([br[0] + 20, br[1] + 20]), np.array([bl[0] - 20, bl[1] + 20])
-    # rect_new = np.array([tl[0] - 20, tl[1] - 20]), np.array([tr[0] + 20, tr[1] - 20]), np.array([br[0] + 20, br[1] + 20]), np.array([bl[0] - 20, bl[1] + 20])
-    # 计算宽度
-    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
-    maxWidth = max(int(widthA), int(widthB))
-    # 计算高度
-    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-    maxHeight = max(int(heightA), int(heightB))
-    # 定义变换后新图像的尺寸
-    dst = np.array([[0, 0], [maxWidth-1, 0], [maxWidth-1, maxHeight-1],
-                   [0, maxHeight-1]], dtype='float32')
-    # 变换矩阵
-    M = cv2.getPerspectiveTransform(rect, dst)
-    # 透视变换
-    warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
-    return warped
-
-
-def makeBorderH(image, H, W, W_need=128, H_need=32):
-    """
-    Horizental
-    :param image:
-    :param H:
-    :param W:
-    :param W_need:
-    :param H_need:
-    :return:
-    """
-    top_size, bottom_size, left_size, right_size = 0, 0, 0, 0
-    if W < W_need:
-        lr_pixel_need = W_need - W
-        left_size = lr_pixel_need // 2
-        right_size = lr_pixel_need - left_size
-    if H < H_need:
-        tb_pixel_need = H_need - H
-        top_size = tb_pixel_need // 2
-        bottom_size = tb_pixel_need - top_size
-
-    if top_size != 0 or bottom_size != 0 or left_size != 0 or right_size != 0:
-        replicate = cv2.copyMakeBorder(image, top_size, bottom_size, left_size, right_size, borderType=cv2.BORDER_REPLICATE)
-        replicateResized = cv2.resize(replicate, (W_need, H_need))
-        return replicateResized
-    else:
-        resized = cv2.resize(image, (W_need, H_need))
-        return resized
-
-
-def makeBorderV(image, H, W, W_need=32, H_need=128):
-    """
-    Vertical
-    :param image:
-    :param H:
-    :param W:
-    :param W_need:
-    :param H_need:
-    :return:
-    """
-    top_size, bottom_size, left_size, right_size = 0, 0, 0, 0
-    if W < W_need:
-        lr_pixel_need = W_need - W
-        left_size = lr_pixel_need // 2
-        right_size = lr_pixel_need - left_size
-    if H < H_need:
-        tb_pixel_need = H_need - H
-        top_size = tb_pixel_need // 2
-        bottom_size = tb_pixel_need - top_size
-
-    if top_size != 0 or bottom_size != 0 or left_size != 0 or right_size != 0:
-        replicate = cv2.copyMakeBorder(image, top_size, bottom_size, left_size, right_size, borderType=cv2.BORDER_REPLICATE)
-        replicateResized = cv2.resize(replicate, (W_need, H_need))
-        return replicateResized
-    else:
-        resized = cv2.resize(image, (W_need, H_need))
-        return resized
-
-
-def get_peak_points(heatmaps):
-    """
-
-    :param heatmaps: numpy array (N,4,256,256)
-    :return:numpy array (N,4,2) #
-    """
-    N,C,H,W = heatmaps.shape   # N= batch size C=4 hotmaps
-    all_peak_points = []
-    for i in range(N):
-        peak_points = []
-        for j in range(C):
-            yy,xx = np.where(heatmaps[i, j] == heatmaps[i, j].max())
-            y = yy[0]
-            x = xx[0]
-            peak_points.append([x, y])
-        all_peak_points.append(peak_points)
-    all_peak_points = np.array(all_peak_points)
-    return all_peak_points
-
-
-# ========================================= Color Identification =========================================
-def RGB2HEX(color):
-    return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
-
-
-def get_image(image_path):
-    image = cv2.imread(image_path)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return image
-
-
-def get_colors(image, n_colors, show_chart, size):
-    from sklearn.cluster import KMeans
-    from collections import Counter
-
-    modified_image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
-    modified_image = modified_image.reshape(modified_image.shape[0] * modified_image.shape[1], 3)
-
-    clf = KMeans(n_clusters=n_colors)
-    labels = clf.fit_predict(modified_image)
-
-    counts = Counter(labels)
-    counts = dict(sorted(counts.items()))
-
-    center_colors = clf.cluster_centers_
-    ordered_colors = [center_colors[i] for i in counts.keys()]
-    hex_colors = [RGB2HEX(ordered_colors[i]) for i in counts.keys()]
-    rgb_colors = [ordered_colors[i] for i in counts.keys()]
-
-    if show_chart:
-        plt.figure(figsize=(8, 6))
-        plt.pie(counts.values(), labels=hex_colors, colors=hex_colors)
-        plt.show()
-
-    return rgb_colors
-
-
-def match_image_by_color(image, color, threshold=60, n_colors=10, size=(128, 32)):
-    from skimage.color import rgb2lab, deltaE_cie76
-
-    image_colors = get_colors(image, n_colors, False, size)
-    selected_color = rgb2lab(np.uint8(np.asarray([[color]])))
-
-    selected_image = False
-    for i in range(n_colors):
-        curr_color = rgb2lab(np.uint8(np.asarray([[image_colors[i]]])))
-        diff = deltaE_cie76(selected_color, curr_color)
-        if diff < threshold:
-            selected_image = True
-
-    return selected_image
-
-
-def show_selected_images(images, color, threshold, colors_to_match):
-    index = 1
-    for i in range(len(images)):
-        selected = match_image_by_color(images[i], color, threshold, colors_to_match)
-        if selected:
-            # image_ = cv2.resize(images[i], (1920, 1080))
-            # cv2.imshow("image_{}".format(i), image_)
-            # cv2.waitKey(0)
-            plt.subplot(1, 5, index)
-            plt.imshow(images[i])
-            index += 1
-
-
-def colors_dict():
-    COLORS = {
-        # 'RED_128': [128, 0, 0],
-        'GREEN_128': [0, 128, 0],
-        # 'BLUE_128': [0, 0, 128],
-        # 'RED_255': [255, 0, 0],
-        'GREEN_255': [0, 255, 0],
-        # 'BLUE_255': [0, 0, 255],
-        # 'YELLOW_128': [128, 128, 0],
-        'CYAN_128': [0, 128, 128],
-        # 'MAGENTA_128': [128, 0, 128],
-        # 'YELLOW_255': [255, 255, 0],
-        'CYAN_255': [0, 255, 255],
-        # 'MAGENTA_255': [255, 0, 255],
-        'BLACK': [0, 0, 0],
-        # 'GRAY': [128, 128, 128],
-        'WHITE': [255, 255, 255]
-    }
-
-    return COLORS
-
-
-def identify_colors(img, COLORS, THRESHOLD=60, N_COLORS=5, SIZE=(32, 16)):
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    RES = {}
-    for k in COLORS:
-        selected = match_image_by_color(img, COLORS[k], THRESHOLD, N_COLORS, SIZE)
-        RES[k] = selected
-
-    return RES
-
-
-def color_identify(data_path):
-    """
-    An example.
-    :param data_path:
-    :return:
-    """
-    off_path = os.path.abspath(os.path.join(data_path, "../..")) + "/cropped_on_or_off/off"
-    on_path = os.path.abspath(os.path.join(data_path, "../..")) + "/cropped_on_or_off/on"
-    unsure_path = os.path.abspath(os.path.join(data_path, "../..")) + "/cropped_on_or_off/unsure"
-    os.makedirs(off_path, exist_ok=True)
-    os.makedirs(on_path, exist_ok=True)
-    os.makedirs(unsure_path, exist_ok=True)
-
-    COLORS = colors_dict()
-
-    img_list = os.listdir(data_path)
-    for img in img_list:
-        img_abs_path = data_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        RES = identify_colors(cv2img, COLORS, THRESHOLD=60, N_COLORS=5, SIZE=(32, 16))
-        if RES["WHITE"] and not RES["GREEN_128"] and not RES["GREEN_255"]:
-            img_dst_path = off_path + "/{}".format(img)
-            shutil.copy(img_abs_path, img_dst_path)
-            print("{}: {} --> {}".format("OFF", img_abs_path, img_dst_path))
-        elif RES["GREEN_128"] and RES["GREEN_255"] and not RES["WHITE"]:
-            img_dst_path = on_path + "/{}".format(img)
-            shutil.copy(img_abs_path, img_dst_path)
-            print("{}: {} --> {}".format("ON", img_abs_path, img_dst_path))
-        else:
-            img_dst_path = unsure_path + "/{}".format(img)
-            shutil.copy(img_abs_path, img_dst_path)
-            print("{}: {} --> {}".format("ON", img_abs_path, img_dst_path))
-
-
-def rotate_image_90(img_path):
-    dir_name = os.path.basename(img_path)
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_rotated".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    img_list = sorted(os.listdir(img_path))
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        img90 = np.rot90(cv2img, 1)
-        cv2.imwrite("{}/{}".format(save_path, img), img90)
-
-
-def seg_object_from_mask(base_path):
-    img_path = base_path + "/images"
-    mask_path = base_path + "/masks"
-
-    save_path = base_path + "/output"
-    os.makedirs(save_path, exist_ok=True)
-
-    img_list = sorted(os.listdir(img_path))
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        mask_abs_path = mask_path + "/{}".format(img.replace(".jpg", ".png"))
-
-        cv2img = cv2.imread(img_abs_path)
-        maskimg = cv2.imread(mask_abs_path)
-        zeros = np.zeros(shape=cv2img.shape)
-
-        object_area = np.where((maskimg[:, :, 0] != 0) & (maskimg[:, :, 1] != 0) & (maskimg[:, :, 2] != 0))
-        x, y = object_area[1], object_area[0]
-        for i in range(len(x)):
-            zeros[y[i], x[i], :] = cv2img[y[i], x[i], :]
-
-        cv2.imwrite("{}/{}".format(save_path, img), zeros)
-
-
-def select_h_or_v_images(src_path1, src_path2):
-    img_list1 = os.listdir(src_path1)
-    img_list2 = os.listdir(src_path2)
-
-    save_path1_h = src_path1 + "/h"
-    save_path1_v = src_path1 + "/v"
-    save_path2_h = src_path2 + "/h"
-    save_path2_v = src_path2 + "/v"
-    os.makedirs(save_path1_h, exist_ok=True)
-    os.makedirs(save_path1_v, exist_ok=True)
-    os.makedirs(save_path2_h, exist_ok=True)
-    os.makedirs(save_path2_v, exist_ok=True)
-
-    for i in img_list1:
-        img_abs_path = src_path1 + "/{}".format(i)
-        cv2img = cv2.imread(img_abs_path)
-        h, w = cv2img.shape[:2]
-        if w >= h:
-            shutil.move(img_abs_path, save_path1_h)
-        else:
-            shutil.move(img_abs_path, save_path1_v)
-
-    for i in img_list2:
-        img_abs_path = src_path2 + "/{}".format(i)
-        cv2img = cv2.imread(img_abs_path)
-        h, w = cv2img.shape[:2]
-        if w >= h:
-            shutil.move(img_abs_path, save_path2_h)
-        else:
-            shutil.move(img_abs_path, save_path2_v)
-
-
-def cal_images_mean_h_w(img_path):
-    img_list = sorted(img_path)
-
-    hs, ws = [], []
-
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        h, w = cv2img.shape[:2]
-        hs.append(h)
-        ws.append(w)
-
-    h_mean = np.mean(hs)
-    w_mean = np.mean(ws)
-
-    print(h_mean)  # 511.35578569681155
-    print(w_mean)  # 478.03767430481935
-
-    return h_mean, w_mean
-# ========================================= Color Identification =========================================
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
-
-
-
 
 
 # ========================================================================================================================================================================
@@ -6869,7 +6775,7 @@ def seamlessclone_mixed_output(bg_img, obj_img):
             lbl_np = np.array([lbl])
             lbl_np = lbl_np[:, [0, 2, 1, 3]]
             lbl_list = list(lbl_np[0])
-            lbl_yolo_new = convertBboxVOC2YOLO((bh, bw), lbl_list)
+            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_list)
             yolo_bbxes_new.append(lbl_yolo_new)
 
         return output_mixed, yolo_bbxes_new, VOC_bbxes, thresh
@@ -6892,7 +6798,7 @@ def seamlessclone_mixed_output(bg_img, obj_img):
             # lbl_yolo_new = convert_bbx_VOC_to_yolo((bh, bw), lbl_VOC_new)
             lbl_VOC_new = [int(round(bw / 2 - ow / 2 + lbl[0])), int(round(bh / 2 - oh / 2 + lbl[2])),
                            int(round(bw / 2 - ow / 2 + lbl[0] + (lbl[1] - lbl[0]))), int(round(bh / 2 - oh / 2 + lbl[2] + (lbl[3] - lbl[2])))]
-            lbl_yolo_new = convertBboxVOC2YOLO((bh, bw), lbl_VOC_new)
+            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_VOC_new)
             yolo_bbxes_new.append(lbl_yolo_new)
 
         return output_mixed, yolo_bbxes_new, VOC_bbxes, thresh
@@ -7035,7 +6941,7 @@ def pil_paste_img(bg_img, obj_img, paste_num=1):
             lbl_np = np.array([lbl])
             lbl_np = lbl_np[:, [0, 2, 1, 3]]
             lbl_list = list(lbl_np[0])
-            lbl_yolo_new = convertBboxVOC2YOLO((bh, bw), lbl_list)
+            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_list)
             yolo_bbxes_new.append(lbl_yolo_new)
 
         return array_bg_img, yolo_bbxes_new
@@ -7062,7 +6968,7 @@ def pil_paste_img(bg_img, obj_img, paste_num=1):
             # lbl_yolo_new = convert_bbx_VOC_to_yolo((bh, bw), lbl_VOC_new)
             lbl_VOC_new = [int(round(lbl[0] + paste_poses_selected[i][0])), int(round(lbl[2] + paste_poses_selected[i][1])),
                            int(round(lbl[1] + paste_poses_selected[i][0])), int(round(lbl[3] + paste_poses_selected[i][1]))]
-            lbl_yolo_new = convertBboxVOC2YOLO((bh, bw), lbl_VOC_new)
+            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_VOC_new)
             yolo_bbxes_new.append(lbl_yolo_new)
 
         return array_bg_img, yolo_bbxes_new
@@ -7173,7 +7079,7 @@ def image_gen_yolo_bbx(res_arr, size):
             y_max = y + h
 
             # bb = convert_bbx_VOC_to_yolo((size[0], size[1]), (x_min, x_max, y_min, y_max))
-            bb = convertBboxVOC2YOLO((size[0], size[1]), (x_min, y_min, x_max, y_max))
+            bb = bbox_voc_to_yolo((size[0], size[1]), (x_min, y_min, x_max, y_max))
             bboxes.append(bb)
 
     return bboxes
@@ -7501,7 +7407,7 @@ def crop_image_according_labelbee_json(data_path, crop_ratio=(1, 1.5, 2, 2.5, 3)
                         # cv2.imwrite("{}/{}_{}_{}.jpg".format(cropped_nx_path, img_name, i, nx), cropped_img)
 
                 # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                bb = convertBboxVOC2YOLO((h, w), (x_min, y_min, x_max, y_max))
+                bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
                 txt_content = "0" + " " + " ".join([str(b) for b in bb]) + "\n"
                 fw.write(txt_content)
 
@@ -7536,7 +7442,7 @@ def crop_image_according_yolo_txt(data_path, CLS=(1, 2), crop_ratio=(1, 1.5, 2, 
                 if cls in CLS:
                     bbx_yolo = list(map(float, l_s[1:]))
                     # bbx_voc = convert_bbx_yolo_to_VOC([h, w], bbx_yolo)
-                    bbx_voc = convertBboxYOLO2VOC([h, w], bbx_yolo)
+                    bbx_voc = bbox_yolo_to_voc([h, w], bbx_yolo)
 
                     # crop_ratio_rdm = np.random.randint(20, 31)
                     # crop_ratio_ = [crop_ratio_rdm * 0.1]
@@ -8028,7 +7934,7 @@ def select_images_and_write_yolo_label_according_C_Plus_Plus_det_cls_output(img_
                             ymax = bbx[1] + bbx[3]
 
                             # yolo_bbx = convert_bbx_VOC_to_yolo(imgsz, (xmin, xmax, ymin, ymax))
-                            yolo_bbx = convertBboxVOC2YOLO(imgsz, (xmin, ymin, xmax, ymax))
+                            yolo_bbx = bbox_voc_to_yolo(imgsz, (xmin, ymin, xmax, ymax))
                             txt_content = "{}".format(lbl) + " " + " ".join([str(b) for b in yolo_bbx]) + "\n"
                             fw.write(txt_content)
 
@@ -8069,7 +7975,7 @@ def select_images_and_write_yolo_label_according_C_Plus_Plus_det_output(img_path
                             ymax = bbx[1] + bbx[3]
 
                             # yolo_bbx = convert_bbx_VOC_to_yolo(imgsz, (xmin, xmax, ymin, ymax))
-                            yolo_bbx = convertBboxVOC2YOLO(imgsz, (xmin, ymin, xmax, ymax))
+                            yolo_bbx = bbox_voc_to_yolo(imgsz, (xmin, ymin, xmax, ymax))
                             txt_content = "{}".format(lbl) + " " + " ".join([str(b) for b in yolo_bbx]) + "\n"
                             fw.write(txt_content)
 
@@ -8562,7 +8468,7 @@ class ToolHelper():
             cls = lbl_[0]
             b = list(map(float, lbl_[1:]))
             # bbx_VOC = convert_bbx_yolo_to_VOC(img_size, b)
-            bbx_VOC = convertBboxYOLO2VOC(img_size, b)
+            bbx_VOC = bbox_yolo_to_voc(img_size, b)
             bbx_VOC.append(cls)
             coords.append(bbx_VOC)
 
@@ -8629,7 +8535,7 @@ class ToolHelper():
             box_np = np.array([box])
             box_np = box_np[:, [0, 2, 1, 3]]
             box_list = list(box_np[0])
-            yolo_bbx = convertBboxVOC2YOLO(auged_img_size, box_list)
+            yolo_bbx = bbox_voc_to_yolo(auged_img_size, box_list)
             txt_content = "{}".format(label) + " " + " ".join(str(bb) for bb in yolo_bbx) + "\n"
             txt_fw.write(txt_content)
 
@@ -8708,7 +8614,7 @@ def gen_random_pos_cropped_object_aug_data_v2(cropped_imgs, random_N, scatter_bb
                         l = l.strip()
                         l_ = [float(l.split(" ")[1]), float(l.split(" ")[2]), float(l.split(" ")[3]), float(l.split(" ")[4])]
                         # bbx_VOC_format = convert_bbx_yolo_to_VOC(bg_size, l_)
-                        bbx_VOC_format = convertBboxYOLO2VOC(bg_size, l_)
+                        bbx_VOC_format = bbox_yolo_to_voc(bg_size, l_)
 
                         # if in yolov5 false positive detections bbx, is not our desired results
                         if (paste_pos_k[0] >= bbx_VOC_format[0] and paste_pos_k[0] <= bbx_VOC_format[2]) and (paste_pos_k[1] >= bbx_VOC_format[1] and paste_pos_k[1] <= bbx_VOC_format[3]):
@@ -8861,12 +8767,12 @@ def write_yolo_label_cropped_object_aug_data_v2(labels_save_path, added_res_bbx,
                 elif scale_type == 2:
                     bbx_new = scale_down_bbx_v2(bb_, scale_ratio=scale_ratio)
                 # bb = convert_bbx_VOC_to_yolo(bg_size, [bbx_new[0], bbx_new[0] + bbx_new[2], bbx_new[1], bbx_new[1] + bbx_new[3]])
-                bb = convertBboxVOC2YOLO(bg_size, [bbx_new[0], bbx_new[1], bbx_new[0] + bbx_new[2], bbx_new[1] + bbx_new[3]])
+                bb = bbox_voc_to_yolo(bg_size, [bbx_new[0], bbx_new[1], bbx_new[0] + bbx_new[2], bbx_new[1] + bbx_new[3]])
                 txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
                 fw.write(txt_content)
             else:
                 # bb = convert_bbx_VOC_to_yolo(bg_size, [bb_[0], bb_[0] + bb_[2], bb_[1], bb_[1] + bb_[3]])
-                bb = convertBboxVOC2YOLO(bg_size, [bb_[0], bb_[1], bb_[0] + bb_[2], bb_[1] + bb_[3]])
+                bb = bbox_voc_to_yolo(bg_size, [bb_[0], bb_[1], bb_[0] + bb_[2], bb_[1] + bb_[3]])
                 txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
                 fw.write(txt_content)
 
@@ -9016,7 +8922,7 @@ def get_lbl_bbx_pil_paste_cropped_object_aug_data(bg_lbl_abs_path, img_size):
         for l in lines:
             l_ = [float(l.split(" ")[1]), float(l.split(" ")[2]), float(l.split(" ")[3]), float(l.split(" ")[4])]
             # bbx_VOC_format = convert_bbx_yolo_to_VOC(l_, img_size)
-            bbx_VOC_format = convertBboxYOLO2VOC(img_size, l_)
+            bbx_VOC_format = bbox_yolo_to_voc(img_size, l_)
             bbxes.append(bbx_VOC_format)
     return bbxes
 
@@ -9028,12 +8934,12 @@ def write_yolo_label_pil_paste_cropped_object_aug_data(labels_save_path, img_nam
             if scale_flag:
                 bbx_new = scale_down_bbx(bb_, scale_ratio=scale_ratio)
                 # bb = convert_bbx_VOC_to_yolo((bbx_new[0], bbx_new[0] + bbx_new[2], bbx_new[1], bbx_new[1] + bbx_new[3]), bg_size)
-                bb = convertBboxVOC2YOLO((bbx_new[0], bbx_new[1], bbx_new[0] + bbx_new[2], bbx_new[1] + bbx_new[3]), bg_size)
+                bb = bbox_voc_to_yolo((bbx_new[0], bbx_new[1], bbx_new[0] + bbx_new[2], bbx_new[1] + bbx_new[3]), bg_size)
                 txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
                 fw.write(txt_content)
             else:
                 # bb = convert_bbx_VOC_to_yolo((bb_[0], bb_[0] + bb_[2], bb_[1], bb_[1] + bb_[3]), bg_size)
-                bb = convertBboxVOC2YOLO((bb_[0], bb_[1], bb_[0] + bb_[2], bb_[1] + bb_[3]), bg_size)
+                bb = bbox_voc_to_yolo((bb_[0], bb_[1], bb_[0] + bb_[2], bb_[1] + bb_[3]), bg_size)
                 txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
                 fw.write(txt_content)
 
@@ -9214,7 +9120,7 @@ def image_gen_bbx_add_black_bg_object_aug_data(res_arr, size):
                 y_max = y + h
 
                 # bb = convert_bbx_VOC_to_yolo(size, (x_min, x_max, y_min, y_max))
-                bb = convertBboxVOC2YOLO(size, (x_min, y_min, x_max, y_max))
+                bb = bbox_voc_to_yolo(size, (x_min, y_min, x_max, y_max))
                 bboxes.append(bb)
 
     return bboxes
@@ -9293,7 +9199,7 @@ def main_thread_add_black_bg_object_aug_data(bg_list, bg_path, seg_object_list, 
                 x_, y_, w_, h_ = cv2.boundingRect(sortedcnts[0])
                 x_min, x_max, y_min, y_max = x_, x_ + w_, y_, y_ + h_
                 # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                bb = convertBboxVOC2YOLO((h, w), (x_min, y_min, x_max, y_max))
+                bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
 
                 cv2.imwrite("{}/{}_added_{}_{}.jpg".format(save_image_path, bg_img_name, j, rename_add_str), added_res)
                 txt_save_path_added = save_txt_path + "/{}_added_{}_{}.txt".format(bg_img_name, j, rename_add_str)
@@ -9507,7 +9413,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                         for l in bg_lbl_data_lines:
                             gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
                             # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = convertBboxYOLO2VOC(bg_size, gb_yolo_bbx)
+                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
                             iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
 
                             if iou < iou_thr:
@@ -9542,7 +9448,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
 
                     final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = convertBboxVOC2YOLO(bg_size, final_VOC_bbx)
+                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
                     assert final_yolo_bbx[0] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[1] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[2] > 0, "bbx should > 0!"
@@ -9566,8 +9472,8 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     for bj in range(bi + 1, len(final_yolo_bbxes)):
                         # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
                         # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bj])
+                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
+                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
 
                         iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
                         if iou_bi_bj > 0:
@@ -9629,7 +9535,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                         for l in bg_lbl_data_lines:
                             gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
                             # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = convertBboxYOLO2VOC(bg_size, gb_yolo_bbx)
+                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
                             iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
 
                             if iou < iou_thr:
@@ -9664,7 +9570,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
 
                     final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = convertBboxVOC2YOLO(bg_size, final_VOC_bbx)
+                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
                     assert final_yolo_bbx[0] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[1] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[2] > 0, "bbx should > 0!"
@@ -9688,8 +9594,8 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     for bj in range(bi + 1, len(final_yolo_bbxes)):
                         # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
                         # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bj])
+                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
+                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
 
                         iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
                         if iou_bi_bj > 0:
@@ -9751,7 +9657,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                         for l in bg_lbl_data_lines:
                             gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
                             # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = convertBboxYOLO2VOC(bg_size, gb_yolo_bbx)
+                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
                             iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
 
                             if iou < iou_thr:
@@ -9786,7 +9692,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
 
                     final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = convertBboxVOC2YOLO(bg_size, final_VOC_bbx)
+                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
                     assert final_yolo_bbx[0] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[1] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[2] > 0, "bbx should > 0!"
@@ -9810,8 +9716,8 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     for bj in range(bi + 1, len(final_yolo_bbxes)):
                         # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
                         # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bj])
+                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
+                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
 
                         iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
                         if iou_bi_bj > 0:
@@ -9894,7 +9800,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                         for l in bg_lbl_data_lines:
                             gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
                             # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = convertBboxYOLO2VOC(bg_size, gb_yolo_bbx)
+                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
                             iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
 
                             if iou < iou_thr:
@@ -9929,7 +9835,7 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
 
                     final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = convertBboxVOC2YOLO(bg_size, final_VOC_bbx)
+                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
                     assert final_yolo_bbx[0] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[1] > 0, "bbx should > 0!"
                     assert final_yolo_bbx[2] > 0, "bbx should > 0!"
@@ -9953,8 +9859,8 @@ def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_di
                     for bj in range(bi + 1, len(final_yolo_bbxes)):
                         # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
                         # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = convertBboxYOLO2VOC(bg_size, final_yolo_bbxes[bj])
+                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
+                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
 
                         iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
                         if iou_bi_bj > 0:
@@ -9999,7 +9905,7 @@ def seamless_paste_main_v6(bg_path, bg_img_dir_name, bg_lbl_dir_name, object_pat
 # ======================================================================================================================================
 # ============================= Paste object like opencv seamless clone for det aug data multi thread v6 ===============================
 # ======================================================================================================================================
-def remove_yolo_txt_contain_specific_class(data_path, rm_cls=(1, 2,)):
+def remove_yolo_labels_specific_class(data_path, rm_cls=(1, 2,)):
     curr_labels_path = data_path + "/labels"
     save_labels_path = data_path + "/labels_new"
     os.makedirs(save_labels_path, exist_ok=True)
@@ -10035,7 +9941,7 @@ def remove_yolo_txt_contain_specific_class(data_path, rm_cls=(1, 2,)):
             print("os.remove: {}".format(txt_new_abs_path))
 
 
-def convert_Stanford_Dogs_Dataset_annotations_to_yolo_format(data_path):
+def convert_Stanford_Dogs_to_yolo_format(data_path):
     import xml.etree.ElementTree as ET
 
     img_path = data_path + "/Images"
@@ -10080,7 +9986,7 @@ def convert_Stanford_Dogs_Dataset_annotations_to_yolo_format(data_path):
                     cls_id = classes.index(cls)
                     xmlbox = obj.find('bndbox')
                     b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
-                    bb = convertBboxVOC2YOLO((h, w), b)
+                    bb = bbox_voc_to_yolo((h, w), b)
                     out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
 
                 in_file.close()
@@ -10090,7 +9996,7 @@ def convert_Stanford_Dogs_Dataset_annotations_to_yolo_format(data_path):
                 print("Error: {} {}".format(Error, f_name))
 
 
-def convert_WiderPerson_Dataset_annotations_to_yolo_format(data_path):
+def convert_WiderPerson_to_yolo_format(data_path):
     img_path = data_path + "/Images"
     lbl_path = data_path + "/Annotations"
 
@@ -10117,7 +10023,7 @@ def convert_WiderPerson_Dataset_annotations_to_yolo_format(data_path):
             VOC_bb = list(map(int, l_[2:].split(" ")))
             # VOC_bb = list(np.array([VOC_bb])[:, [0, 2, 1, 3]][0])
             # yolo_bb = convert_bbx_VOC_to_yolo(img_shape, VOC_bb)
-            yolo_bb = convertBboxVOC2YOLO(img_shape, VOC_bb)
+            yolo_bb = bbox_voc_to_yolo(img_shape, VOC_bb)
             txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in yolo_bb]) + "\n"
             new_lbl.write(txt_content)
 
@@ -10125,7 +10031,7 @@ def convert_WiderPerson_Dataset_annotations_to_yolo_format(data_path):
         new_lbl.close()
 
 
-def convert_TinyPerson_Dataset_annotations_to_yolo_format(data_path):
+def convert_TinyPerson_to_yolo_format(data_path):
     data_type = ["train", "test"]
     dense_or_not = ["", "dense"]
     for dt in data_type:
@@ -10161,7 +10067,7 @@ def convert_TinyPerson_Dataset_annotations_to_yolo_format(data_path):
                         continue
 
                     img_shape = [images[image_id]["height"], images[image_id]["width"]]
-                    yolo_bbx = convertBboxVOC2YOLO(img_shape, VOC_bbx)
+                    yolo_bbx = bbox_voc_to_yolo(img_shape, VOC_bbx)
 
                     if ignore:
                         # yolo_bbx.insert(0, int(category_id) - 1)
@@ -10179,7 +10085,7 @@ def convert_TinyPerson_Dataset_annotations_to_yolo_format(data_path):
                         fw.write(txt_content)
 
 
-def convert_AI_TOD_Dataset_to_yolo_format(data_path):
+def convert_AI_TOD_to_yolo_format(data_path):
     # train_data_path = data_path + "/train"
     # test_data_path = data_path + "/test"
     # val_data_path = data_path + "/val"
@@ -10231,7 +10137,7 @@ def convert_AI_TOD_Dataset_to_yolo_format(data_path):
                 bbx = list(map(float, l[:4]))
                 # bbx = list(np.array([bbx])[:, [0, 2, 1, 3]][0])
                 # bbx_yolo = convert_bbx_VOC_to_yolo(img_shape, bbx)
-                bbx_yolo = convertBboxVOC2YOLO(img_shape, bbx)
+                bbx_yolo = bbox_voc_to_yolo(img_shape, bbx)
 
                 txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbx_yolo]) + "\n"
                 txt_fw.write(txt_content)
@@ -10328,7 +10234,7 @@ def gen_yolo_others_label(data_path, others_class=2, fixnum=True, others_num=1, 
                 l = l.strip().split(" ")
                 bbx_yolo = list(map(float, l[1:]))
                 # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, bbx_yolo)
-                bbx_voc = convertBboxYOLO2VOC(imgsz, bbx_yolo)
+                bbx_voc = bbox_yolo_to_voc(imgsz, bbx_yolo)
                 bbxs_voc.append(bbx_voc)
 
         t1 = time.time()
@@ -10373,7 +10279,7 @@ def gen_yolo_others_label(data_path, others_class=2, fixnum=True, others_num=1, 
                     # random_bbx = list(np.array(random_bbx).reshape(1, -1)[:, [0, 2, 1, 3]][0, :])
                     # bbx_yolo_new = convert_bbx_VOC_to_yolo(imgsz, random_bbx)
                     random_bbx = list(np.array(random_bbx).reshape(1, -1)[0, :])
-                    bbx_yolo_new = convertBboxVOC2YOLO(imgsz, random_bbx)
+                    bbx_yolo_new = bbox_voc_to_yolo(imgsz, random_bbx)
                     l_new = str(others_class) + " " + " ".join([str(a) for a in bbx_yolo_new]) + "\n"
                     fw.writelines(l_new)
 
@@ -10400,7 +10306,7 @@ def vis_coco_pose_data_test():
             cls = int(l[0])
             bbx = list(map(float, l[1:5]))
             # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, bbx)
-            bbx_voc = convertBboxYOLO2VOC(imgsz, bbx)
+            bbx_voc = bbox_yolo_to_voc(imgsz, bbx)
             cv2.rectangle(cv2img, (bbx_voc[0], bbx_voc[1]), (bbx_voc[2], bbx_voc[3]), (255, 255, 0))
 
             points = np.asarray(list(map(float, l[5:]))).reshape(-1, 3)
@@ -10476,7 +10382,7 @@ def according_yolov8_pose_gen_head_bbx(data_path, cls=2):
                     continue
 
                 # bbx_yolo = convert_bbx_VOC_to_yolo(imgsz, bbx)
-                bbx_yolo = convertBboxVOC2YOLO(imgsz, bbx)
+                bbx_yolo = bbox_voc_to_yolo(imgsz, bbx)
                 bboxes.append(bbx_yolo)
 
         txt_save_path = "{}/{}.txt".format(save_path, file_name)
@@ -10508,7 +10414,7 @@ def rm_iou_larger_than_zero(data_path):
                 l = l.split(" ")
                 bbx_ = list(map(float, l[1:]))
                 # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, bbx_)
-                bbx_voc = convertBboxYOLO2VOC(imgsz, bbx_)
+                bbx_voc = bbox_yolo_to_voc(imgsz, bbx_)
                 bbxes.append(bbx_voc)
 
             if len(bbxes) > 1:
@@ -10524,81 +10430,6 @@ def rm_iou_larger_than_zero(data_path):
                             shutil.move(img_abs_path, img_dst_path)
         except Exception as Error:
             print(Error)
-
-
-def makeBorderAndChangeYoloBbx(data_path, n=3):
-    save_img_path = make_save_path(data_path, "makeBorderAndChangeYoloBbx/images")
-    save_lbl_path = make_save_path(data_path, "makeBorderAndChangeYoloBbx/labels")
-    img_path = data_path + "/images"
-    lbl_path = data_path + "/labels"
-    file_list = get_file_list(img_path)
-    for f in tqdm(file_list):
-        fname = os.path.splitext(f)[0]
-        img_abs_path = img_path + "/{}".format(f)
-        lbl_abs_path = lbl_path + "/{}.txt".format(fname)
-
-        cv2img = cv2.imread(img_abs_path)
-        imgsz = cv2img.shape[:2]
-
-        for ni in range(n):
-            makeBorderSize = np.random.randint(200, 350)
-            color = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-            res = cv2.copyMakeBorder(cv2img, makeBorderSize, makeBorderSize, makeBorderSize, makeBorderSize, borderType=cv2.BORDER_CONSTANT, value=color)
-
-            lblf = open(lbl_abs_path, "r")
-            lbl_data = lblf.readlines()
-            lblf.close()
-
-            img_dst_path = save_img_path + "/{}_{}.jpg".format(fname, ni)
-            lbl_dst_path = save_lbl_path + "/{}_{}.txt".format(fname, ni)
-            lblw = open(lbl_dst_path, "w", encoding="utf-8")
-
-            for line in lbl_data:
-                l = line.strip()
-                cls = int(l.split(" ")[0])
-                bbx = list(map(float, l.split(" ")[1:]))
-                # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, bbx)
-                bbx_voc = convertBboxYOLO2VOC(imgsz, bbx)
-                bbx_voc_new = [bbx_voc[0] + makeBorderSize, bbx_voc[1] + makeBorderSize, bbx_voc[2] + makeBorderSize, bbx_voc[3] + makeBorderSize]
-
-                imgsz_new = [imgsz[0] + 2 * makeBorderSize, imgsz[1] + 2 * makeBorderSize]
-                bbx_new = convertBboxVOC2YOLO(imgsz_new, bbx_voc_new)
-                lbl_new_i = "{}".format(cls) + " " + " ".join([str(bb) for bb in bbx_new]) + "\n"
-                lblw.write(lbl_new_i)
-
-            cv2.imwrite(img_dst_path, res)
-            lblw.close()
-
-
-def moveYoloLabelNumGreaterThanN(data_path, cls=0, N=2):
-    save_img_path = make_save_path(data_path, "makeBorderAndChangeYoloBbx/images")
-    save_lbl_path = make_save_path(data_path, "makeBorderAndChangeYoloBbx/labels")
-    img_path = data_path + "/images"
-    lbl_path = data_path + "/labels"
-    file_list = get_file_list(img_path)
-    for f in tqdm(file_list):
-        fname = os.path.splitext(f)[0]
-        img_abs_path = img_path + "/{}".format(f)
-        lbl_abs_path = lbl_path + "/{}.txt".format(fname)
-        img_dst_path = save_img_path + "/{}".format(f)
-        lbl_dst_path = save_lbl_path + "/{}.txt".format(fname)
-
-        cv2img = cv2.imread(img_abs_path)
-        imgsz = cv2img.shape[:2]
-
-        lblf = open(lbl_abs_path, "r")
-        lbl_data = lblf.readlines()
-        lblf.close()
-
-        clsn = 0
-        for l in lbl_data:
-            cls_ = int(l.strip().split(" ")[0])
-            if cls_ == cls:
-                clsn += 1
-
-        if clsn > N:
-            shutil.move(img_abs_path, img_dst_path)
-            shutil.move(lbl_abs_path, lbl_dst_path)
 
 
 def get_min_max_xy(bbx):
@@ -12396,7 +12227,7 @@ def vis_dbnet_gt(data_path):
                     cv2.circle(cv2img, (line[j], line[j + 1]), 4, (255, 0, 255), 2)
 
         cv2.imwrite("{}/{}.jpg".format(vis_path, gt_name), cv2img)
-
+        
 
 def crop_ocr_rec_img_according_labelbee_det_json(data_path):
     dir_name = os.path.basename(data_path)
@@ -12518,29 +12349,7 @@ def crop_ocr_rec_img_according_labelbee_det_json(data_path):
             except Exception as Error:
                 print(Error)
 
-            # try:
-            #     cropped_img0 = cv2img[y_min:y_max, x_min:x_max]
-            #     cropped_img1 = cv2img[y_min - np.random.randint(0, 4):y_max + np.random.randint(0, 4), x_min - np.random.randint(0, 4):x_max + np.random.randint(0, 4)]
-            #     cropped_img2 = cv2img[y_min - np.random.randint(0, 4):y_max - np.random.randint(0, 4), x_min - np.random.randint(0, 4):x_max - np.random.randint(0, 4)]
-            #     cropped_img3 = cv2img[y_min + np.random.randint(0, 4):y_max - np.random.randint(0, 4), x_min + np.random.randint(0, 4):x_max - np.random.randint(0, 4)]
-            #     cropped_img4 = cv2img[y_min + np.random.randint(0, 4):y_max + np.random.randint(0, 4), x_min + np.random.randint(0, 4):x_max + np.random.randint(0, 4)]
-            #
-            #     if "A" in label or "b" in label or "C" in label:
-            #         rdm_w = np.random.randint(55, 76)
-            #         alpha0 = cropped_img0[0:cropped_img0.shape[0], 0:rdm_w]
-            #         digital0 = cropped_img0[0:cropped_img0.shape[0], rdm_w:cropped_img0.shape[1]]
-            #         alpha0_label = label[0]
-            #         digital0_label = label[1:]
-            #         cv2.imwrite("{}/{}_{}_{}_alpha={}.jpg".format(cropped_path, img_name, i, 0, alpha0_label), alpha0)
-            #         cv2.imwrite("{}/{}_{}_{}_digital={}.jpg".format(cropped_path, img_name, i, 0, digital0_label), digital0)
-            #
-            #     cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 0, label), cropped_img0)
-            #     cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 1, label), cropped_img1)
-            #     cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 2, label), cropped_img2)
-            #     cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 3, label), cropped_img3)
-            #     cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 4, label), cropped_img4)
-            # except Exception as Error:
-            #     print(Error)
+            
 
 
 def convert_ICDAR_to_custom_format(data_path):
@@ -12766,35 +12575,6 @@ def gen_img(imgsz=(64, 128), font=None, alpha="0123456789.AbC", target_len=1):
 
 def main_010_aug_test(save_path):
     os.makedirs(save_path, exist_ok=True)
-
-    # img_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/dbnet_PS/output_warp_test/VID_20230726_155204_0000409_ps_0.jpg"
-    # cv2img = cv2.imread(img_path)
-    # imgsz = cv2img.shape[:2]
-    #
-    # mask = np.zeros(shape=cv2img.shape, dtype=np.uint8)
-    #
-    # # for i in range(99 - 13, 204 - 13):
-    # #     for j in range(347 - 95, 560 - 95):
-    # #         mask[j, i] = (255, 255, 255)
-    #
-    # # for i in range(261 - 13, 368 - 13):
-    # #     for j in range(347 - 95, 560 - 95):
-    # #         mask[j, i] = (255, 255, 255)
-    # #
-    # # for i in range(426 - 13, 534 - 13):
-    # #     for j in range(347 - 95, 560 - 95):
-    # #         mask[j, i] = (255, 255, 255)
-    # #
-    # # for i in range(587 - 13, 695 - 13):
-    # #     for j in range(347 - 95, 560 - 95):
-    # #         mask[j, i] = (255, 255, 255)
-    # #
-    # for i in range(752 - 13, 858 - 13):
-    #     for j in range(305 - 95, 615 - 95):
-    #         mask[j, i] = (255, 255, 255)
-    #
-    # cv2.imwrite("/home/zengyifan/wujiahu/data/010.Digital_Rec/others/dbnet_PS/output_warp_test/VID_20230726_155204_0000409_ps_0_mask_5.jpg", mask)
-
     # ==============================================================================================================================================
     bg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/dbnet_PS/New Folder/VID_20230726_155204_0000409_ps_0.jpg"
     fg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/llj_0-9/llj_0-9_new_THR_INV"
@@ -12913,240 +12693,9 @@ def main_010_aug_test_AbC(save_path):
 
     cv2.imwrite("{}/20230905_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
 
-    # # ==============================================================================================================================================
-    # bg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/AbC/bg/2.jpg"
-    # fg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/AbC/0-9_AbC"
-    # fg_list = sorted(os.listdir(fg_path))
-    #
-    # bg_img = cv2.imread(bg_path)
-    # bgsz = bg_img.shape[:2]
-    #
-    # rdm = random.random()
-    #
-    # label_str = ""
-    # for i in range(4):
-    #     fgi = random.sample(fg_list, 1)[0]
-    #     fgi_name = os.path.splitext(fgi)[0]
-    #     if "AN" in fgi_name:
-    #         label_str += "A"
-    #     elif "bN" in fgi_name:
-    #         label_str += "b"
-    #     elif "CN" in fgi_name:
-    #         label_str += "C"
-    #     elif "0N" in fgi_name:
-    #         label_str += "0"
-    #     elif "1N" in fgi_name:
-    #         label_str += "1"
-    #     elif "2N" in fgi_name:
-    #         label_str += "2"
-    #     elif "3N" in fgi_name:
-    #         label_str += "3"
-    #     elif "4N" in fgi_name:
-    #         label_str += "4"
-    #     elif "5N" in fgi_name:
-    #         label_str += "5"
-    #     elif "6N" in fgi_name:
-    #         label_str += "6"
-    #     elif "7N" in fgi_name:
-    #         label_str += "7"
-    #     elif "8N" in fgi_name:
-    #         label_str += "8"
-    #     elif "9N" in fgi_name:
-    #         label_str += "9"
-    #     elif "0.N" in fgi_name:
-    #         label_str += "0."
-    #     elif "1.N" in fgi_name:
-    #         label_str += "1."
-    #     elif "2.N" in fgi_name:
-    #         label_str += "2."
-    #     elif "3.N" in fgi_name:
-    #         label_str += "3."
-    #     elif "4.N" in fgi_name:
-    #         label_str += "4."
-    #     elif "5.N" in fgi_name:
-    #         label_str += "5."
-    #     elif "6.N" in fgi_name:
-    #         label_str += "6."
-    #     elif "7.N" in fgi_name:
-    #         label_str += "7."
-    #     elif "8.N" in fgi_name:
-    #         label_str += "8."
-    #     elif "9.N" in fgi_name:
-    #         label_str += "9."
-    #     else:
-    #         print("Error!")
-    #     # label_str += fgi_name
-    #
-    #     fg_abs_path = fg_path + "/{}".format(fgi)
-    #     fg_img = cv2.imread(fg_abs_path)
-    #     fg_img = cv2.resize(fg_img, (48, 70))
-    #     fgsz = fg_img.shape[:2]
-    #
-    #     mask_img = 255 * np.ones(shape=fg_img.shape, dtype=np.uint8)
-    #     out = cv2.seamlessClone(fg_img, bg_img, mask_img, (30 + 56 * i, 36), cv2.MIXED_CLONE)
-    #     bg_img = out
-    #
-    # cv2.imwrite("{}/20230905_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
-
-    # # ==============================================================================================================================================
-    # bg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/AbC/bg/3.jpg"
-    # fg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/from_lzx/gen_number_code/AbC/0-9_AbC"
-    # fg_list = sorted(os.listdir(fg_path))
-    #
-    # bg_img = cv2.imread(bg_path)
-    # bgsz = bg_img.shape[:2]
-    #
-    # rdm = random.random()
-    #
-    # label_str = ""
-    # for i in range(5):
-    #     fgi = random.sample(fg_list, 1)[0]
-    #     fgi_name = os.path.splitext(fgi)[0]
-    #     if "AN" in fgi_name:
-    #         label_str += "A"
-    #     elif "bN" in fgi_name:
-    #         label_str += "b"
-    #     elif "CN" in fgi_name:
-    #         label_str += "C"
-    #     elif "0N" in fgi_name:
-    #         label_str += "0"
-    #     elif "1N" in fgi_name:
-    #         label_str += "1"
-    #     elif "2N" in fgi_name:
-    #         label_str += "2"
-    #     elif "3N" in fgi_name:
-    #         label_str += "3"
-    #     elif "4N" in fgi_name:
-    #         label_str += "4"
-    #     elif "5N" in fgi_name:
-    #         label_str += "5"
-    #     elif "6N" in fgi_name:
-    #         label_str += "6"
-    #     elif "7N" in fgi_name:
-    #         label_str += "7"
-    #     elif "8N" in fgi_name:
-    #         label_str += "8"
-    #     elif "9N" in fgi_name:
-    #         label_str += "9"
-    #     elif "0.N" in fgi_name:
-    #         label_str += "0."
-    #     elif "1.N" in fgi_name:
-    #         label_str += "1."
-    #     elif "2.N" in fgi_name:
-    #         label_str += "2."
-    #     elif "3.N" in fgi_name:
-    #         label_str += "3."
-    #     elif "4.N" in fgi_name:
-    #         label_str += "4."
-    #     elif "5.N" in fgi_name:
-    #         label_str += "5."
-    #     elif "6.N" in fgi_name:
-    #         label_str += "6."
-    #     elif "7.N" in fgi_name:
-    #         label_str += "7."
-    #     elif "8.N" in fgi_name:
-    #         label_str += "8."
-    #     elif "9.N" in fgi_name:
-    #         label_str += "9."
-    #     else:
-    #         print("Error!")
-    #     # label_str += fgi_name
-    #
-    #     fg_abs_path = fg_path + "/{}".format(fgi)
-    #     fg_img = cv2.imread(fg_abs_path)
-    #     fg_img = cv2.resize(fg_img, (48, 70))
-    #     fgsz = fg_img.shape[:2]
-    #
-    #     mask_img = 255 * np.ones(shape=fg_img.shape, dtype=np.uint8)
-    #
-    #     if i == 0:
-    #         out = cv2.seamlessClone(fg_img, bg_img, mask_img, (30, 36), cv2.MIXED_CLONE)
-    #     else:
-    #         out = cv2.seamlessClone(fg_img, bg_img, mask_img, (68 + 30 + 56 * (i - 1), 36), cv2.MIXED_CLONE)
-    #     bg_img = out
-    #
-    # cv2.imwrite("{}/20230905_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
-
 
 def main_010_aug_test_AbC_v2(save_path):
     os.makedirs(save_path, exist_ok=True)
-
-    # # ==============================================================================================================================================
-    # bg_path = "/home/wujiahu/code/gen_fake/gen_AbC/bg/2.jpg"
-    # fg_path = "/home/wujiahu/code/gen_fake/gen_AbC/0-9_AbC_new"
-    # fg_list = sorted(os.listdir(fg_path))
-    #
-    # bg_img = cv2.imread(bg_path)
-    # bgsz = bg_img.shape[:2]
-    #
-    # # for fgi in fg_list:
-    # fgi = random.sample(fg_list, 1)[0]
-    # label_str = ""
-    # fgi_name = os.path.splitext(fgi)[0]
-    # if "AN" in fgi_name:
-    #     label_str += "A"
-    # elif "bN" in fgi_name:
-    #     label_str += "b"
-    # elif "CN" in fgi_name:
-    #     label_str += "C"
-    # elif "0N" in fgi_name:
-    #     label_str += "0"
-    # elif "1N" in fgi_name:
-    #     label_str += "1"
-    # elif "2N" in fgi_name:
-    #     label_str += "2"
-    # elif "3N" in fgi_name:
-    #     label_str += "3"
-    # elif "4N" in fgi_name:
-    #     label_str += "4"
-    # elif "5N" in fgi_name:
-    #     label_str += "5"
-    # elif "6N" in fgi_name:
-    #     label_str += "6"
-    # elif "7N" in fgi_name:
-    #     label_str += "7"
-    # elif "8N" in fgi_name:
-    #     label_str += "8"
-    # elif "9N" in fgi_name:
-    #     label_str += "9"
-    # elif "0.N" in fgi_name:
-    #     label_str += "0."
-    # elif "1.N" in fgi_name:
-    #     label_str += "1."
-    # elif "2.N" in fgi_name:
-    #     label_str += "2."
-    # elif "3.N" in fgi_name:
-    #     label_str += "3."
-    # elif "4.N" in fgi_name:
-    #     label_str += "4."
-    # elif "5.N" in fgi_name:
-    #     label_str += "5."
-    # elif "6.N" in fgi_name:
-    #     label_str += "6."
-    # elif "7.N" in fgi_name:
-    #     label_str += "7."
-    # elif "8.N" in fgi_name:
-    #     label_str += "8."
-    # elif "9.N" in fgi_name:
-    #     label_str += "9."
-    # elif "space" in fgi_name:
-    #     label_str += ""
-    # else:
-    #     print("Error!")
-    #
-    # fg_abs_path = fg_path + "/{}".format(fgi)
-    # fg_img = cv2.imread(fg_abs_path)
-    # fg_img = cv2.resize(fg_img, (54, 72))
-    # fgsz = fg_img.shape[:2]
-    #
-    # rdm = random.random()
-    #
-    # mask_img = 255 * np.ones(shape=fg_img.shape, dtype=np.uint8)
-    # out = cv2.seamlessClone(fg_img, bg_img, mask_img, (bgsz[1] // 2, bgsz[0] // 2), cv2.MIXED_CLONE)
-    # # bg_img = out
-    #
-    # cv2.imwrite("{}/20230905_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
-
     # ==============================================================================================================================================
     bg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/gen_fake/gen_AbC/bg/2.jpg"
     fg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/gen_fake/gen_AbC/0-9_AbC_new"
@@ -13224,117 +12773,9 @@ def main_010_aug_test_AbC_v2(save_path):
 
     cv2.imwrite("{}/20231008_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
 
-    # # ==============================================================================================================================================
-    # bg_path = "/home/wujiahu/code/gen_fake/gen_AbC/bg/2.jpg"
-    # fg_path = "/home/wujiahu/code/gen_fake/gen_AbC/0-9_AbC_new"
-    # fg_list = sorted(os.listdir(fg_path))
-    #
-    # bg_img = cv2.imread(bg_path)
-    # bgsz = bg_img.shape[:2]
-    #
-    # rdm = random.random()
-    #
-    # label_str = ""
-    # for i in range(5):
-    #     fgi = random.sample(fg_list, 1)[0]
-    #     fgi_name = os.path.splitext(fgi)[0]
-    #     if "AN" in fgi_name:
-    #         label_str += "A"
-    #     elif "bN" in fgi_name:
-    #         label_str += "b"
-    #     elif "CN" in fgi_name:
-    #         label_str += "C"
-    #     elif "0N" in fgi_name:
-    #         label_str += "0"
-    #     elif "1N" in fgi_name:
-    #         label_str += "1"
-    #     elif "2N" in fgi_name:
-    #         label_str += "2"
-    #     elif "3N" in fgi_name:
-    #         label_str += "3"
-    #     elif "4N" in fgi_name:
-    #         label_str += "4"
-    #     elif "5N" in fgi_name:
-    #         label_str += "5"
-    #     elif "6N" in fgi_name:
-    #         label_str += "6"
-    #     elif "7N" in fgi_name:
-    #         label_str += "7"
-    #     elif "8N" in fgi_name:
-    #         label_str += "8"
-    #     elif "9N" in fgi_name:
-    #         label_str += "9"
-    #     elif "0.N" in fgi_name:
-    #         label_str += "0."
-    #     elif "1.N" in fgi_name:
-    #         label_str += "1."
-    #     elif "2.N" in fgi_name:
-    #         label_str += "2."
-    #     elif "3.N" in fgi_name:
-    #         label_str += "3."
-    #     elif "4.N" in fgi_name:
-    #         label_str += "4."
-    #     elif "5.N" in fgi_name:
-    #         label_str += "5."
-    #     elif "6.N" in fgi_name:
-    #         label_str += "6."
-    #     elif "7.N" in fgi_name:
-    #         label_str += "7."
-    #     elif "8.N" in fgi_name:
-    #         label_str += "8."
-    #     elif "9.N" in fgi_name:
-    #         label_str += "9."
-    #     elif "space" in fgi_name:
-    #         label_str += ""
-    #     else:
-    #         print("Error!")
-    #     # label_str += fgi_name
-    #
-    #     fg_abs_path = fg_path + "/{}".format(fgi)
-    #     fg_img = cv2.imread(fg_abs_path)
-    #     fg_img = cv2.resize(fg_img, (48, 70))
-    #     fgsz = fg_img.shape[:2]
-    #
-    #     mask_img = 255 * np.ones(shape=fg_img.shape, dtype=np.uint8)
-    #
-    #     if i == 0:
-    #         out = cv2.seamlessClone(fg_img, bg_img, mask_img, (30, 36), cv2.MIXED_CLONE)
-    #     else:
-    #         out = cv2.seamlessClone(fg_img, bg_img, mask_img, (68 + 30 + 56 * (i - 1), 36), cv2.MIXED_CLONE)
-    #     bg_img = out
-    #
-    # cv2.imwrite("{}/20230905_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
-
+    
 
 def find_OCR_labels():
-    # data_path = "/home/disk/disk7/010.Digital_Rec/crnn/train/v5_20231020_cp_bk/64_256"
-    # save_path = make_save_path(data_path, "selected")
-    # dir_list = get_sub_dir_list(data_path)
-    # for d in dir_list:
-    #     file_list = get_file_list(d)
-    #     for f in tqdm(file_list):
-    #         f_abs_path = d + "/{}".format(f)
-    #         fname = os.path.splitext(f)[0]
-    #         label = fname.split("=")[1]
-    #         if label == "" or label[0] == "." or label[-1] == ".":
-    #             f_dst_path = save_path + "/{}".format(f)
-    #             shutil.move(f_abs_path, f_dst_path)
-
-    # data_path = "/home/disk/disk7/010.Digital_Rec/crnn/train/v5_20231020/gen_on_bg"
-    # save_path = make_save_path(data_path, "selected")
-    # dir_list = get_sub_dir_list(data_path)
-    # for d in dir_list:
-    #     sub_dir_list = get_sub_dir_list(d)
-    #     for sd in sub_dir_list:
-    #         file_list = get_file_list(sd)
-    #         for f in tqdm(file_list):
-    #             f_abs_path = sd + "/{}".format(f)
-    #             fname = os.path.splitext(f)[0]
-    #             label = fname.split("=")[1]
-    #             if label == "" or label[0] == "." or label[-1] == ".":
-    #                 f_dst_path = save_path + "/{}".format(f)
-    #                 shutil.move(f_abs_path, f_dst_path)
-
     data_path = "/home/wujiahu/data/000.OCR/CRNN/data/train/v1"
     save_path = make_save_path(data_path, "selected")
     dir_list = get_sub_dir_list(data_path)
@@ -13504,748 +12945,6 @@ def createDataset_v2(data_path, checkValid=True, map_size=5073741824):
     cache['num-samples'.encode()] = str(i).encode()
     writeCache(env, cache)
     print('Created dataset with %d samples' % i)
-
-
-# class ImageDataset(Dataset):
-    # "`ImageDataset` read data from LMDB database."
-
-    # def __init__(self,
-                 # path: PathOrStr,
-                 # is_training: bool = True,
-                 # img_h: int = 32,
-                 # img_w: int = 100,
-                 # max_length: int = 25,
-                 # check_length: bool = True,
-                 # case_sensitive: bool = False,
-                 # charset_path: str = 'data/charset_vn_with_space.txt',
-                 # convert_mode: str = 'RGB',
-                 # data_aug: bool = True,
-                 # deteriorate_ratio: float = 0.,
-                 # multiscales: bool = True,
-                 # one_hot_y: bool = True,
-                 # return_idx: bool = False,
-                 # return_raw: bool = False,
-                 # **kwargs):
-        # self.path, self.name = Path(path), Path(path).name
-        # assert self.path.is_dir() and self.path.exists(), f"{path} is not a valid directory."
-        # self.convert_mode, self.check_length = convert_mode, check_length
-        # self.img_h, self.img_w = img_h, img_w
-        # self.max_length, self.one_hot_y = max_length, one_hot_y
-        # self.return_idx, self.return_raw = return_idx, return_raw
-        # self.case_sensitive, self.is_training = case_sensitive, is_training
-        # self.data_aug, self.multiscales = data_aug, multiscales
-        # self.charset = CharsetMapper(charset_path, max_length=max_length + 1)
-        # self.character = self.charset.label_to_char.values()
-        # self.c = self.charset.num_classes
-
-        # self.env = lmdb.open(str(path), readonly=True, lock=False, readahead=False, meminit=False)
-        # assert self.env, f'Cannot open LMDB dataset from {path}.'
-        # with self.env.begin(write=False) as txn:
-            # self.length = int(txn.get('num-samples'.encode()))
-
-        # if self.is_training and self.data_aug:
-            # self.augment_tfs = transforms.Compose([
-                # CVGeometry(degrees=45, translate=(0.0, 0.0), scale=(0.5, 2.), shear=(45, 15), distortion=0.5, p=0.5),
-                # CVDeterioration(var=20, degrees=6, factor=4, p=0.25),
-                # CVColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1, p=0.25)
-            # ])
-        # self.totensor = transforms.ToTensor()
-
-    # def __len__(self):
-        # return self.length
-
-    # def _next_image(self, index):
-        # next_index = random.randint(0, len(self) - 1)
-        # return self.get(next_index)
-
-    # def _check_image(self, x, pixels=6):
-        # if x.size[0] <= pixels or x.size[1] <= pixels:
-            # return False
-        # else:
-            # return True
-
-    # def resize_multiscales(self, img, borderType=cv2.BORDER_CONSTANT):
-        # def _resize_ratio(img, ratio, fix_h=True):
-            # if ratio * self.img_w < self.img_h:
-                # if fix_h:
-                    # trg_h = self.img_h
-                # else:
-                    # trg_h = int(ratio * self.img_w)
-                # trg_w = self.img_w
-            # else:
-                # trg_h, trg_w = self.img_h, int(self.img_h / ratio)
-            # img = cv2.resize(img, (trg_w, trg_h))
-            # pad_h, pad_w = (self.img_h - trg_h) / 2, (self.img_w - trg_w) / 2
-            # top, bottom = math.ceil(pad_h), math.floor(pad_h)
-            # left, right = math.ceil(pad_w), math.floor(pad_w)
-            # img = cv2.copyMakeBorder(img, top, bottom, left, right, borderType)
-            # return img
-
-        # if self.is_training:
-            # if random.random() < 0.5:
-                # base, maxh, maxw = self.img_h, self.img_h, self.img_w
-                # h, w = random.randint(base, maxh), random.randint(base, maxw)
-                # return _resize_ratio(img, h / w)
-            # else:
-                # return _resize_ratio(img, img.shape[0] / img.shape[1])  # keep aspect ratio
-        # else:
-            # return _resize_ratio(img, img.shape[0] / img.shape[1])  # keep aspect ratio
-
-    # def resize(self, img):
-        # if self.multiscales:
-            # return self.resize_multiscales(img, cv2.BORDER_REPLICATE)
-        # else:
-            # return cv2.resize(img, (self.img_w, self.img_h))
-
-    # def get(self, idx):
-        # with self.env.begin(write=False) as txn:
-            # image_key, label_key = f'image-{idx + 1:09d}', f'label-{idx + 1:09d}'
-            # try:
-                # label = str(txn.get(label_key.encode()), 'utf-8').strip()  # label
-                # if not set(label).issubset(self.character):
-                    # return self._next_image(idx)
-                # label = re.sub('[^0-9a-zA-Z]+', '', label)
-                # if self.check_length and self.max_length > 0:
-                    # if len(label) > self.max_length or len(label) <= 0:
-                        # logging.info(f'Long or short text image is found: {self.name}, {idx}, {label}, {len(label)}')
-                        # return self._next_image(idx)
-                # label = label[:self.max_length]
-
-                # imgbuf = txn.get(image_key.encode())  # image
-                # buf = six.BytesIO()
-                # buf.write(imgbuf)
-                # buf.seek(0)
-                # with warnings.catch_warnings():
-                    # warnings.simplefilter("ignore", UserWarning)  # EXIF warning from TiffPlugin
-                    # image = PIL.Image.open(buf).convert(self.convert_mode)
-                # if self.is_training and not self._check_image(image):
-                    # logging.info(f'Invalid image is found: {self.name}, {idx}, {label}, {len(label)}')
-                    # return self._next_image(idx)
-            # except:
-                # import traceback
-                # traceback.print_exc()
-                # logging.info(f'Corrupted image is found: {self.name}, {idx}, {label}, {len(label)}')
-                # return self._next_image(idx)
-            # return image, label, idx
-
-    # def _process_training(self, image):
-        # if self.data_aug: image = self.augment_tfs(image)
-        # image = self.resize(np.array(image))
-        # return image
-
-    # def _process_test(self, image):
-        # return self.resize(np.array(image))  # TODO:move is_training to here
-
-    # def __getitem__(self, idx):
-        # image, text, idx_new = self.get(idx)
-        # print(image, text, idx_new, idx)
-        # if not self.is_training: assert idx == idx_new, f'idx {idx} != idx_new {idx_new} during testing.'
-
-        # if self.is_training:
-            # image = self._process_training(image)
-        # else:
-            # image = self._process_test(image)
-        # if self.return_raw: return image, text
-        # image = self.totensor(image)
-
-        # length = tensor(len(text) + 1).to(dtype=torch.long)  # one for end token
-        # label = self.charset.get_labels(text, case_sensitive=self.case_sensitive)
-        # label = tensor(label).to(dtype=torch.long)
-        # if self.one_hot_y: label = onehot(label, self.charset.num_classes)
-
-        # if self.return_idx:
-            # y = [label, length, idx_new]
-        # else:
-            # y = [label, length]
-        # return image, y
-
-
-# class TextDataset(Dataset):
-    # def __init__(self,
-                 # path: PathOrStr,
-                 # delimiter: str = '\t',
-                 # max_length: int = 25,
-                 # charset_path: str = 'data/charset_vn.txt',
-                 # case_sensitive=False,
-                 # one_hot_x=True,
-                 # one_hot_y=True,
-                 # is_training=True,
-                 # smooth_label=False,
-                 # smooth_factor=0.2,
-                 # use_sm=False,
-                 # **kwargs):
-        # self.path = Path(path)
-        # self.case_sensitive, self.use_sm = case_sensitive, use_sm
-        # self.smooth_factor, self.smooth_label = smooth_factor, smooth_label
-        # self.charset = CharsetMapper(charset_path, max_length=max_length + 1)
-        # self.one_hot_x, self.one_hot_y, self.is_training = one_hot_x, one_hot_y, is_training
-        # if self.is_training and self.use_sm: self.sm = SpellingMutation(charset=self.charset)
-
-        # dtype = {'inp': str, 'gt': str}
-        # self.df = pd.read_csv(self.path, dtype=dtype, delimiter=delimiter, na_filter=False)
-        # self.inp_col, self.gt_col = 0, 1
-
-    # def __len__(self):
-        # return len(self.df)
-
-    # def __getitem__(self, idx):
-        # text_x = self.df.iloc[idx, self.inp_col].strip()
-        # text_x = re.sub('[^0-9a-zA-Z]+', '', text_x)
-        # if not self.case_sensitive: text_x = text_x.lower()
-        # if self.is_training and self.use_sm: text_x = self.sm(text_x)
-
-        # length_x = tensor(len(text_x) + 1).to(dtype=torch.long)  # one for end token
-        # label_x = self.charset.get_labels(text_x, case_sensitive=self.case_sensitive)
-        # label_x = tensor(label_x)
-        # if self.one_hot_x:
-            # label_x = onehot(label_x, self.charset.num_classes)
-            # if self.is_training and self.smooth_label:
-                # label_x = torch.stack([self.prob_smooth_label(l) for l in label_x])
-        # x = [label_x, length_x]
-
-        # text_y = self.df.iloc[idx, self.gt_col]
-        # text_y = re.sub('[^0-9a-zA-Z]+', '', text_y)
-        # if not self.case_sensitive: text_y = text_y.lower()
-        # length_y = tensor(len(text_y) + 1).to(dtype=torch.long)  # one for end token
-        # label_y = self.charset.get_labels(text_y, case_sensitive=self.case_sensitive)
-        # label_y = tensor(label_y)
-        # if self.one_hot_y: label_y = onehot(label_y, self.charset.num_classes)
-        # y = [label_y, length_y]
-
-        # return x, y
-
-    # def prob_smooth_label(self, one_hot):
-        # one_hot = one_hot.float()
-        # delta = torch.rand([]) * self.smooth_factor
-        # num_classes = len(one_hot)
-        # noise = torch.rand(num_classes)
-        # noise = noise / noise.sum() * delta
-        # one_hot = one_hot * (1 - delta) + noise
-        # return one_hot
-
-
-# class SpellingMutation(object):
-    # def __init__(self, pn0=0.7, pn1=0.85, pn2=0.95, pt0=0.7, pt1=0.85, charset=None):
-        # """
-        # Args:
-            # pn0: the prob of not modifying characters is (pn0)
-            # pn1: the prob of modifying one characters is (pn1 - pn0)
-            # pn2: the prob of modifying two characters is (pn2 - pn1),
-                 # and three (1 - pn2)
-            # pt0: the prob of replacing operation is pt0.
-            # pt1: the prob of inserting operation is (pt1 - pt0),
-                 # and deleting operation is (1 - pt1)
-        # """
-        # super().__init__()
-        # self.pn0, self.pn1, self.pn2 = pn0, pn1, pn2
-        # self.pt0, self.pt1 = pt0, pt1
-        # self.charset = charset
-        # logging.info(f'the probs: pn0={self.pn0}, pn1={self.pn1} ' +
-                     # f'pn2={self.pn2}, pt0={self.pt0}, pt1={self.pt1}')
-
-    # def is_digit(self, text, ratio=0.5):
-        # length = max(len(text), 1)
-        # digit_num = sum([t in self.charset.digits for t in text])
-        # if digit_num / length < ratio: return False
-        # return True
-
-    # def is_unk_char(self, char):
-        # return char == self.charset.unk_char
-        # return (char not in self.charset.digits) and (char not in self.charset.alphabets)
-
-    # def get_num_to_modify(self, length):
-        # prob = random.random()
-        # if prob < self.pn0:
-            # num_to_modify = 0
-        # elif prob < self.pn1:
-            # num_to_modify = 1
-        # elif prob < self.pn2:
-            # num_to_modify = 2
-        # else:
-            # num_to_modify = 3
-
-        # if length <= 1:
-            # num_to_modify = 0
-        # elif length >= 2 and length <= 4:
-            # num_to_modify = min(num_to_modify, 1)
-        # else:
-            # num_to_modify = min(num_to_modify, length // 2)  # smaller than length // 2
-        # return num_to_modify
-
-    # def __call__(self, text, debug=False):
-        # if self.is_digit(text): return text
-        # length = len(text)
-        # num_to_modify = self.get_num_to_modify(length)
-        # if num_to_modify <= 0: return text
-
-        # chars = []
-        # index = np.arange(0, length)
-        # random.shuffle(index)
-        # index = index[: num_to_modify]
-        # if debug: self.index = index
-        # for i, t in enumerate(text):
-            # if i not in index:
-                # chars.append(t)
-            # elif self.is_unk_char(t):
-                # chars.append(t)
-            # else:
-                # prob = random.random()
-                # if prob < self.pt0:  # replace
-                    # chars.append(random.choice(self.charset.alphabets))
-                # elif prob < self.pt1:  # insert
-                    # chars.append(random.choice(self.charset.alphabets))
-                    # chars.append(t)
-                # else:  # delete
-                    # continue
-        # new_text = ''.join(chars[: self.charset.max_length - 1])
-        # return new_text if len(new_text) >= 1 else text
-
-
-# class LMDBImageDataset_v2(Dataset):
-    # "`ImageDataset` read data from LMDB database."
-
-    # def __init__(self,
-                 # path: PathOrStr,
-                 # is_training: bool = True,
-                 # img_h: int = 64,
-                 # img_w: int = 256,
-                 # max_length: int = 30,
-                 # check_length: bool = True,
-                 # case_sensitive: bool = True,
-                 # charset_path: str = 'data/charset_vn_with_space.txt',
-                 # convert_mode: str = 'RGB',
-                 # data_aug: bool = True,
-                 # deteriorate_ratio: float = 0.,
-                 # multiscales: bool = True,
-                 # one_hot_y: bool = True,
-                 # return_idx: bool = False,
-                 # return_raw: bool = False,
-                 # imgsz=(64, 256), input_len=64, mean=np.array([0.5, 0.5, 0.5]), std=np.array([0.5, 0.5, 0.5]), r1=0, r2=0.25,
-                 # rotate=True, rotate_angle=45, aug_ratio=0.90, change_brightness=True, gamma_correction=True, add_noise=True, add_sunlight_effect=True, train_Chinese_flag=True,
-                 # **kwargs):
-        # self.path, self.name = Path(path), Path(path).name
-        # assert self.path.is_dir() and self.path.exists(), f"{path} is not a valid directory."
-        # self.convert_mode, self.check_length = convert_mode, check_length
-        # self.img_h, self.img_w = img_h, img_w
-        # self.max_length, self.one_hot_y = max_length, one_hot_y
-        # self.return_idx, self.return_raw = return_idx, return_raw
-        # self.case_sensitive, self.is_training = case_sensitive, is_training
-        # self.data_aug, self.multiscales = data_aug, multiscales
-        # self.charset = CharsetMapper(charset_path, max_length=max_length + 1)
-        # self.character = self.charset.label_to_char.values()
-        # self.c = self.charset.num_classes
-
-        # ============================= Chinese ============================
-        # CH_SIM_CHARS = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-        # CH_SIM_CHARS += ',;~!@#$%^&*()_+-={}:"<>?-=[]/|\\' + "'"
-        # CH_SIM_CHARS += '、。┅《》「」【】¥®πи‰℃№Ⅱ←↑→↓①②③④▪☆❤'
-        # ch_sim_chars = open("/home/wujiahu/code/crnn.pytorch-2024.03.12/utils/gen_fake/words/ch_sim_char.txt", "r", encoding="utf-8")
-        # lines = ch_sim_chars.readlines()
-        # for l in lines:
-            # CH_SIM_CHARS += l.strip()
-        # alpha = CH_SIM_CHARS  # len = 6738
-        # args.alpha = alpha
-        # self.character = alpha
-        # ============================= Chinese ============================
-
-        # self.alpha = alpha
-        # self.preprocess = True
-        # self.eval = False
-
-        # self.im_h = imgsz[0]
-        # self.im_w = imgsz[1]
-        # self.input_len = input_len
-
-        # self.mean_ = mean
-        # self.std_ = std
-        # self.r1 = r1
-        # self.r2 = r2
-        # self.rotate = rotate
-        # self.rotate_angle = rotate_angle
-        # self.aug_ratio = aug_ratio
-        # self.change_brightness = change_brightness
-        # self.gamma_correction = gamma_correction
-        # self.add_noise = add_noise
-        # self.add_sunlight_effect = add_sunlight_effect
-
-        # self.noise_aug = NoiseAug(ratio=1.0)
-        # self.blur_aug = BlurAug(type="EASY", ratio=1.0)
-        # self.hsv_aug = HSVAug(hgain=0.2, sgain=0.7, vgain=0.5, ratio=1.0)
-
-        # self.env = lmdb.open(str(path), readonly=True, lock=False, readahead=False, meminit=False)
-        # assert self.env, f'Cannot open LMDB dataset from {path}.'
-        # with self.env.begin(write=False) as txn:
-            # self.length = int(txn.get('num-samples'.encode()))
-
-        # if self.is_training and self.data_aug:
-            # self.augment_tfs = transforms.Compose([
-                # CVGeometry(degrees=45, translate=(0.0, 0.0), scale=(0.5, 2.), shear=(45, 15), distortion=0.5, p=0.5),
-                # CVDeterioration(var=20, degrees=6, factor=4, p=0.25),
-                # CVColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1, p=0.25)
-            # ])
-        # self.totensor = transforms.ToTensor()
-
-    # def __len__(self):
-        # return self.length
-
-    # def _next_image(self, index):
-        # return self.get(index + 1)
-
-    # def _check_image(self, x, pixels=6):
-        # if x.size[0] <= pixels or x.size[1] <= pixels:
-            # return False
-        # else:
-            # return True
-
-    # def get(self, idx):
-        # with self.env.begin(write=False) as txn:
-            # image_key, label_key = f'image-{idx + 1:09d}', f'label-{idx + 1:09d}'
-            # try:
-                # label = str(txn.get(label_key.encode()), 'utf-8').strip()  # label
-                # if not set(label).issubset(self.character):
-                    # return self._next_image(idx)
-                # label = re.sub('[^0-9a-zA-Z]+', '', label)
-                # if self.check_length and self.max_length > 0:
-                    # if len(label) > self.max_length or len(label) <= 0:
-                        # logging.info(f'Long or short text image is found: {self.name}, {idx}, {label}, {len(label)}')
-                        # return self._next_image(idx)
-                # label = label[:self.max_length]
-
-                # imgbuf = txn.get(image_key.encode())  # image
-                # buf = six.BytesIO()
-                # buf.write(imgbuf)
-                # buf.seek(0)
-                # with warnings.catch_warnings():
-                    # warnings.simplefilter("ignore", UserWarning)  # EXIF warning from TiffPlugin
-                    # image = PIL.Image.open(buf).convert(self.convert_mode)
-                # if self.is_training and not self._check_image(image):
-                    # logging.info(f'Invalid image is found: {self.name}, {idx}, {label}, {len(label)}')
-                    # return self._next_image(idx)
-            # except:
-                # import traceback
-                # traceback.print_exc()
-                # logging.info(f'Corrupted image is found: {self.name}, {idx}, {label}, {len(label)}')
-                # return self._next_image(idx)
-            # return image, label, idx
-
-    # def _process_training(self, image):
-        # if self.data_aug: image = self.augment_tfs(image)
-        # image = self.resize(np.array(image))
-        # return image
-    
-    # def _process_test(self, image):
-        # return self.resize(np.array(image))  # TODO:move is_training to here
-
-    # def changeBrightness(self, img, value=30):
-        # hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        # h, s, v = cv2.split(hsv)
-        # v = cv2.add(v, value)
-        # v[v > 255] = 255
-        # v[v < 0] = 0
-        # final_hsv = cv2.merge((h, s, v))
-        # img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-        # return img
-
-    # def gammaCorrection(self, img, gamma=0.4):
-        # lookUpTable = np.empty((1, 256), np.uint8)
-        # for i in range(256):
-            # lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
-        # res = cv2.LUT(img, lookUpTable)
-        # return res
-
-    # def addNoise_v2(self, img, noise_typ):
-        # """
-        # Parameters
-        # ----------
-        # image : ndarray
-            # Input image data. Will be converted to float.
-        # mode : str
-        # One of the following strings, selecting the type of noise to add:
-
-        # 'gauss'     Gaussian-distributed additive noise.
-        # 'poisson'   Poisson-distributed noise generated from the data.
-        # 's&p'       Replaces random pixels with 0 or 1.
-        # 'speckle'   Multiplicative noise using out = image + n*image,where
-                    # n is uniform noise with specified mean & variance.
-
-        # """
-        # if noise_typ == "gaussian":
-            # """
-            # Examples
-                # --------
-                # Draw samples from the distribution:
-                
-                # >>> mu, sigma = 0, 0.1 # mean and standard deviation
-                # >>> s = np.random.normal(mu, sigma, 1000)
-                
-                # Verify the mean and the variance:
-                
-                # >>> abs(mu - np.mean(s))
-                # 0.0  # may vary
-                
-                # >>> abs(sigma - np.std(s, ddof=1))
-                # 0.1  # may vary
-                
-                # Display the histogram of the samples, along with
-                # the probability density function:
-                
-                # >>> import matplotlib.pyplot as plt
-                # >>> count, bins, ignored = plt.hist(s, 30, density=True)
-                # >>> plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
-                # ...                np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
-                # ...          linewidth=2, color='r')
-                # >>> plt.show()
-            # Parameters
-            # ----------
-            # img
-
-            # Returns
-            # -------
-
-            # """
-            # 生成高斯噪声
-            # mu, sigma = 0, 0.5 ** 0.5
-            # gaussian = np.random.normal(mu, sigma, img.shape).astype('uint8')
-            # noisy_img = cv2.add(img, gaussian)
-            # return noisy_img
-
-        # elif noise_typ == "s&p":
-            # row, col, ch = img.shape
-            # s_vs_p = 0.5
-            # amount = 0.004
-            # out = np.copy(img)
-            # Salt mode
-            # num_salt = np.ceil(amount * img.size * s_vs_p)
-            # coords = [np.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
-            # out[coords] = 1
-            # coords = [np.random.randint(0, i, int(num_salt)) for i in img.shape]
-            # for ii in range(len(coords[0])):
-                # out[coords[0][ii], coords[1][ii], coords[2][ii]] = 1
-
-            # Pepper mode
-            # num_pepper = np.ceil(amount * img.size * (1. - s_vs_p))
-            # coords = [np.random.randint(0, i - 1, int(num_pepper)) for i in image.shape]
-            # out[coords] = 0
-            # coords = [np.random.randint(0, i, int(num_pepper)) for i in img.shape]
-            # for ii in range(len(coords[0])):
-                # out[coords[0][ii], coords[1][ii], coords[2][ii]] = 0
-            # return out
-
-        # elif noise_typ == "s&p_v2":
-            # salt_prob = 0.01
-            # pepper_prob = 0.01
-            # noisy_image = np.copy(img)
-            # total_pixels = img.shape[0] * img.shape[1]  # 计算图像的总像素数
-
-            # num_salt = int(total_pixels * salt_prob)  # 通过将总像素数与指定的椒盐噪声比例相乘，得到要添加的椒盐噪声的数量。
-            # salt_coords = [np.random.randint(0, i - 1, num_salt) for i in img.shape]
-            # noisy_image[salt_coords[0], salt_coords[1]] = 255
-
-            # num_pepper = int(total_pixels * pepper_prob)
-            # pepper_coords = [np.random.randint(0, i - 1, num_pepper) for i in img.shape]
-            # noisy_image[pepper_coords[0], pepper_coords[1]] = 0
-
-            # return noisy_image
-
-        # elif noise_typ == "poisson":
-            # vals = len(np.unique(img))
-            # vals = 2 ** np.ceil(np.log2(vals))
-            # noisy = np.random.poisson(img * vals) / float(vals)
-            # return noisy
-
-        # else:
-            # raise NotImplementedError("noise_typ error: not found {}".format(noise_typ))
-
-    # def makeSunLightEffect(self, img, r=(50, 200), light_strength=150):
-        # imgsz = img.shape[:2]
-        # center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
-        # effectR = np.random.randint(r[0], r[1])
-        # lightStrength = np.random.randint(light_strength // 4, light_strength)
-
-        # dst = np.zeros(shape=img.shape, dtype=np.uint8)
-
-        # for i in range(imgsz[0]):
-            # for j in range(imgsz[1]):
-                # dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
-                # B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
-                # if dis < effectR * effectR:
-                    # result = int(lightStrength * (1.0 - np.sqrt(dis) / effectR))
-                    # B += result
-                    # G += result
-                    # R += result
-
-                    # B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
-                    # dst[i, j] = np.uint8((B, G, R))
-                # else:
-                    # dst[i, j] = np.uint8((B, G, R))
-        # return dst
-
-    # -----------------------------------------
-    # def apply_color_distortion(self, img, r=30):
-        # hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        # hsv_image[:, :, 0] = (hsv_image[:, :, 0] + r) % 180  # 在Hue通道上增加30
-        # result_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-        # return result_image
-
-    # def change_Contrast_and_Brightness(self, img, alpha=1.1, beta=30):
-        # """使用公式f(x)=α.g(x)+β"""
-        # α调节对比度，β调节亮度
-        # blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-        # dst = cv2.addWeighted(img, alpha, blank, 1 - alpha, beta)  # 图像混合加权
-        # return dst
-
-    # def apply_CLAHE(self, img, clipLimit=2.0, tileGridSize=(8, 8)):
-        # """
-        # 直方图适应均衡化
-        # 该函数包含以下参数：
-        # clipLimit: 用于控制直方图均衡化的局部对比度，值越高，越容易出现失真和噪声。建议值为2-4，若使用默认值0则表示自动计算。
-        # tileGridSize: 表示每个块的大小，推荐16x16。
-        # tileGridSize.width: 块的宽度。
-        # tileGridSize.height: 块的高度。
-        # 函数返回一个CLAHE对象，可以通过该对象调用apply函数来实现直方图均衡化。
-        # """
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-        # res = clahe.apply(img)
-        # res = cv2.merge([res, res, res])
-
-        # b, g, r = cv2.split(img)
-        # clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-        # clahe_b = clahe.apply(b)
-        # clahe_g = clahe.apply(g)
-        # clahe_r = clahe.apply(r)
-        # res = cv2.merge([clahe_b, clahe_g, clahe_r])
-
-        # return res
-
-    # def change_HSV(self, img, hgain=0.5, sgain=0.5, vgain=0.5):
-        # img = img.astype(np.uint8)
-        # r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
-        # hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
-        # dtype = img.dtype  # uint8
-
-        # x = np.arange(0, 256, dtype=np.int16)
-        # lut_hue = ((x * r[0]) % 180).astype(dtype)
-        # lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
-        # lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
-
-        # img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
-        # cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
-        # img = img.astype(np.float32)
-        # return img
-
-    # def do_aug_v2(self, img_x):
-        # aug_rdm = np.random.rand()
-
-        # if aug_rdm < 0.20:
-            # img_x_pil = Image.fromarray(np.uint8(img_x))
-            # rotate_angle = np.random.randint(-self.rotate_angle, self.rotate_angle + 1)
-            # img_x = np.asarray(img_x_pil.rotate(rotate_angle, expand=True))
-        # elif 0.20 <= aug_rdm < 0.30:
-            # brightness = np.random.randint(-20, 21)
-            # img_x = self.changeBrightness(img_x, value=brightness)
-        # elif 0.30 <= aug_rdm < 0.40:
-            # gammav = 0.1 * np.random.randint(4, 17)
-            # img_x = self.gammaCorrection(img_x, gamma=gammav)
-        # elif 0.40 <= aug_rdm < 0.50:
-            # mthd = ["gaussian", "s&p", "s&p_v2", "poisson"]
-            # img_x = self.addNoise_v2(img_x, np.random.choice(mthd, 1)[0])
-        # elif 0.50 <= aug_rdm < 0.60:
-            # hue_v = np.random.randint(0, 50)
-            # img_x = self.apply_color_distortion(img_x, r=hue_v)
-        # elif 0.60 <= aug_rdm < 0.70:
-            # img_x = self.apply_CLAHE(img_x, clipLimit=2.0, tileGridSize=(8, 8))
-        # elif 0.70 <= aug_rdm < 0.80:
-            # img_x = self.change_HSV(img_x)
-        # elif 0.80 <= aug_rdm < 0.90:
-            # img_x = self.noise_aug(img_x)
-            # img_x = self.blur_aug(img_x)
-            # img_x = self.hsv_aug(img_x)
-            # img = TransAffine(img, degrees=8, translate=0.0, scale=0.2, shear=0, perspective=0, border=(2,border_width), prob=0.95)
-            # img = TransAffine(img, degrees=3, translate=0.00025, scale=0.1, shear=3, perspective=0.0005, border=(border_height, border_width), prob=1.0)
-
-            # angle_v = np.random.randint(1, 8)
-            # translate_v = 0.001 * np.random.randint(0, 30)
-            # scale_v = 0.01 * np.random.randint(0, 15)
-            # shear_v = 0.1 * np.random.randint(0, 15)
-            # perspective_v = 0.00001 * np.random.randint(0, 30)
-
-            # img_x = TransAffine(img_x, degrees=angle_v, translate=translate_v, scale=scale_v, shear=shear_v, perspective=perspective_v, border=(0, 0), prob=1.0)
-            # img_x = img_x.astype(np.uint8)
-
-        # else:
-            # img_x = self.makeSunLightEffect(img_x, r=(50, 200), light_strength=150)
-
-        # return img_x
-
-    # def __getitem__(self, idx):
-        # image, label, idx_new = self.get(idx)
-
-        # print(image, text, idx_new, idx)
-        # if not self.is_training: assert idx == idx_new, f'idx {idx} != idx_new {idx_new} during testing.'
-        
-        # if self.is_training:
-            # image = self._process_training(image)
-        # else:
-            # image = self._process_test(image)
-        # if self.return_raw: return image, text
-        # image = self.totensor(image)
-        
-        # length = tensor(len(text) + 1).to(dtype=torch.long)  # one for end token
-        # label = self.charset.get_labels(text, case_sensitive=self.case_sensitive)
-        # label = tensor(label).to(dtype=torch.long)
-        # if self.one_hot_y: label = onehot(label, self.charset.num_classes)
-        
-        # if self.return_idx:
-            # y = [label, length, idx_new]
-        # else:
-            # y = [label, length]
-        # return image, y
-
-        # target_len = len(label)
-        # try:
-        # indices = np.array([self.alpha.index(c) for c in label])
-        # except Exception as Error:
-            # print(Error)
-            # print(x_path)
-        # target = np.zeros(shape=(self.input_len,), dtype=np.int64)
-        # target[:target_len] = indices
-
-        # rdm = np.random.rand()
-
-        # img_x = np.asarray(image, dtype=np.uint8)
-
-        # if self.preprocess:
-            # img_x = cv2.imread(x_path)
-            # img_x = cv2.imdecode(np.fromfile(x_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-
-            # if not self.eval:
-                # img_x = self.do_aug(img_x)
-                # img_x = self.do_aug_v2(img_x)
-                # if rdm > 0.5:
-                    # img_x = self.do_aug_v2(img_x)
-            # img_x = makeBorder_v5(img_x, new_shape=(self.im_h, self.im_w), r1=self.r1, r2=self.r2, sliding_window=False)
-            # img_x = cv2.cvtColor(img_x, cv2.COLOR_BGR2GRAY)
-            # img_x = (img_x / 255. - self.mean_) / self.std_
-        # else:
-            # img_x = cv2.imread(x_path)
-            # img_x = cv2.imdecode(np.fromfile(x_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-            # if not self.eval:
-                # img_x = self.do_aug(img_x)
-                # img_x = self.do_aug_v2(img_x)
-                # if rdm > 0.5:
-                    # img_x = self.do_aug_v2(img_x)
-            # img_x = makeBorder_v5(img_x, new_shape=(self.im_h, self.im_w), r1=self.r1, r2=self.r2, sliding_window=False)
-            # img_x = cv2.cvtColor(img_x, cv2.COLOR_BGR2GRAY)
-
-        # img_x = img_x.transpose(2, 0, 1)
-        # img_x = img_x.copy()
-        # img_x = torch.from_numpy(img_x).type(torch.FloatTensor)
-
-        # if self.eval:
-            # return img_x, target, self.input_len, target_len, label
-        # else:
-            # return img_x, target, self.input_len, target_len
 
 
 def convertBaiduChineseOCRDatasetToCustomDatasetFormat(data_path):
@@ -14591,1167 +13290,6 @@ def random_paste_four_corner_aug_cls_data(positive_img_path, negative_img_path):
             print(Error, )
 # ========================================================================================================================================================================
 # ========================================================================================================================================================================
-
-
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
-# PCL
-def mat2pcl(img, K):
-    f_x = K[0, 0]
-    f_y = K[1, 1]
-    s = K[0, 1]
-    p_x = K[0, 2]
-    p_y = K[1, 2]
-
-    y_values, x_values = np.where(img > 300)
-    z_values = img[y_values, x_values]
-
-    Y_values = (y_values - p_y) * z_values / f_y
-    X_values = (x_values - p_x - (y_values - p_y) * s / f_y) * z_values / f_x
-
-    points_3d = np.array([X_values, Y_values, z_values]).T
-
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points_3d)
-
-    return pcd
-
-
-def main_pcl():
-    fs = cv2.FileStorage(r"data/HXZY/matrix.yml", cv2.FileStorage_READ)
-    K = fs.getNode("M").mat()
-    fs.release()
-
-    image_path = r"data/HXZY/2111043208/1-1067.data"
-    h_image = cv2.imread(image_path, 2)
-
-    # h_image = (h_image/65535)*900+200
-
-    pcd = mat2pcl(h_image, K)
-    o3d.io.write_point_cloud(image_path.replace(".data", ".ply"), pcd)
-
-    return 0
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
-
-
-def select_horizontal_images(data_path, flag="move"):
-    file_list = sorted(os.listdir(data_path))
-    dir_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_selected_horizontal_images".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        img = cv2.imread(f_abs_path)
-        imgsz = img.shape[:2]
-        if imgsz[0] > imgsz[1]:
-            f_dst_path = save_path + "/{}".format(f)
-            if flag == "copy" or flag == "cp":
-                shutil.copy(f_abs_path, f_dst_path)
-            elif flag == "move" or flag == "mv":
-                shutil.move(f_abs_path, f_dst_path)
-            elif flag == "delete" or flag == "del":
-                os.remove(f_abs_path)
-
-
-# ==============================================================================================================================
-# ==============================================================================================================================
-
-def get_color(specific_color_flag=True):
-    global color
-    color1 = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-
-    if specific_color_flag:
-        color2, color3, color4 = (0, 0, 0), (114, 114, 114), (255, 255, 255)
-        color_rdm = np.random.rand()
-        # if color_rdm <= 0.85:
-        #     color = color1
-        # elif color_rdm > 0.85 and color_rdm <= 0.90:
-        #     color = color2
-        # elif color_rdm > 0.90 and color_rdm <= 0.95:
-        #     color = color3
-        # else:
-        #     color = color4
-
-        if color_rdm <= 0.50:
-            color = color2
-        elif color_rdm > 0.50 and color_rdm <= 0.75:
-            color = color3
-        else:
-            color = color4
-
-        # color = color3
-    else:
-        color = color1
-
-    return color
-
-
-def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific_color_flag=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    color = get_color(specific_color_flag=specific_color_flag)
-
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-    else:
-        rdmh = np.random.random()
-        rmdw = np.random.random()
-        top = int(round(ph * rdmh))
-        bottom = ph - top
-        left = int(round(pw * rmdw))
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, specific_color_flag=True):
-    cropped_imgs = []
-    imgsz = img.shape[:2]
-
-    if gap[0] == 0 and gap[1] > 0:
-        cropsz = (imgsz[0], cropsz[1])
-        for i in range(0, imgsz[1], gap[1]):
-            if i + cropsz[1] > imgsz[1]:
-                cp_img = img[0:imgsz[0], i:imgsz[1]]
-                if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                cp_img = img[0:imgsz[0], i:i + cropsz[1]]
-                cropped_imgs.append(cp_img)
-    elif gap[0] > 0 and gap[1] == 0:
-        cropsz = (cropsz[0], imgsz[1])
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                cp_img = img[j:imgsz[0], 0:imgsz[1]]
-                if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                cropped_imgs.append(cp_img)
-                break
-            else:
-                cp_img = img[j:j + cropsz[0], 0:imgsz[1]]
-                cropped_imgs.append(cp_img)
-    elif gap[0] == 0 and gap[1] == 0:
-        print("Error! gap[0] == 0 and gap[1] == 0!")
-    else:
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        cp_img = img[j:imgsz[0], i:imgsz[1]]
-                        if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        cp_img = img[j:imgsz[0], i:i + cropsz[1]]
-                        cropped_imgs.append(cp_img)
-                break
-            else:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        cp_img = img[j:j + cropsz[0], i:imgsz[1]]
-                        if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific_color_flag=specific_color_flag)
-                        cropped_imgs.append(cp_img)
-                        break
-                    else:
-                        cp_img = img[j:j + cropsz[0], i:i + cropsz[1]]
-                        cropped_imgs.append(cp_img)
-
-    return cropped_imgs
-
-
-def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=False, specific_color_flag=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    color = get_color(specific_color_flag=specific_color_flag)
-
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-    else:
-        rdmh = np.random.random()
-        rmdw = np.random.random()
-        top = int(round(ph * rdmh))
-        bottom = ph - top
-        left = int(round(pw * rmdw))
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def makeBorder_inference(im, new_shape=(64, 256), r1=0, r2=0.25, sliding_window=False, color=(0, 0, 0), gap_r=(0, 7 / 8), last_img_makeBorder=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    top = ph // 2
-    bottom = ph - top
-    left = 0
-    right = pw - left
-
-    if shape != new_unpad_size:
-        im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-    if im.shape[1] <= new_shape[1]:
-        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-    elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-        im = cv2.resize(im, new_shape[::-1])
-    else:  # TODO sliding window: 2023.09.27 Done
-        if sliding_window:
-            final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
-            return final_imgs
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-# ==============================================================================================================================
-# ==============================================================================================================================
-
-class SegDetectorRepresenter():
-    def __init__(self, thresh=0.3, box_thresh=0.7, max_candidates=1000, unclip_ratio=1.5):
-        self.min_size = 3
-        self.thresh = thresh
-        self.box_thresh = box_thresh
-        self.max_candidates = max_candidates
-        self.unclip_ratio = unclip_ratio
-
-    def __call__(self, batch, pred, is_output_polygon=False):
-        '''
-        batch: (image, polygons, ignore_tags
-        batch: a dict produced by dataloaders.
-            image: tensor of shape (N, C, H, W).
-            polygons: tensor of shape (N, K, 4, 2), the polygons of objective regions.
-            ignore_tags: tensor of shape (N, K), indicates whether a region is ignorable or not.
-            shape: the original shape of images.
-            filename: the original filenames of images.
-        pred:
-            binary: text region segmentation map, with shape (N, H, W)
-            thresh: [if exists] thresh hold prediction with shape (N, H, W)
-            thresh_binary: [if exists] binarized with threshhold, (N, H, W)
-        '''
-        pred = pred[:, 0, :, :]
-        segmentation = self.binarize(pred)
-        boxes_batch = []
-        scores_batch = []
-        # for batch_index in range(pred.size(0)):  # train
-        for batch_index in range(pred.shape[0]):  # inference
-            height, width = batch['shape'][batch_index]
-            if is_output_polygon:
-                boxes, scores = self.polygons_from_bitmap(pred[batch_index], segmentation[batch_index], width, height)
-            else:
-                boxes, scores = self.boxes_from_bitmap(pred[batch_index], segmentation[batch_index], width, height)
-            boxes_batch.append(boxes)
-            scores_batch.append(scores)
-        return boxes_batch, scores_batch
-    
-    def binarize(self, pred):
-        return pred > self.thresh
-
-    def polygons_from_bitmap(self, pred, _bitmap, dest_width, dest_height, onnx_flag=True):
-        '''
-        _bitmap: single map with shape (H, W),
-            whose values are binarized as {0, 1}
-        '''
-
-        assert len(_bitmap.shape) == 2
-        # bitmap = _bitmap.cpu().numpy()  # The first channel
-        # pred = pred.cpu().detach().numpy()
-
-        # inference
-        if onnx_flag:
-            bitmap = _bitmap  # The first channel
-            pred = pred
-        else:
-            bitmap = _bitmap.cpu().numpy()  # The first channel
-            pred = pred.cpu().detach().numpy()
-
-        # ## train
-        # bitmap = _bitmap.cpu().numpy()  # The first channel
-        # pred = pred.cpu().detach().numpy()
-
-
-        height, width = bitmap.shape
-        boxes = []
-        scores = []
-
-        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-        for contour in contours[:self.max_candidates]:
-            epsilon = 0.005 * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, epsilon, True)
-            points = approx.reshape((-1, 2))
-            if points.shape[0] < 4:
-                continue
-            # _, sside = self.get_mini_boxes(contour)
-            # if sside < self.min_size:
-            #     continue
-            score = self.box_score_fast(pred, contour.squeeze(1))
-            if self.box_thresh > score:
-                continue
-
-            if points.shape[0] > 2:
-                box = self.unclip(points, unclip_ratio=self.unclip_ratio)
-                if len(box) > 1:
-                    continue
-            else:
-                continue
-            box = box.reshape(-1, 2)
-            _, sside = self.get_mini_boxes(box.reshape((-1, 1, 2)))
-            if sside < self.min_size + 2:
-                continue
-
-            if not isinstance(dest_width, int):
-                dest_width = dest_width.item()
-                dest_height = dest_height.item()
-
-            box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
-            box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
-            boxes.append(box)
-            scores.append(score)
-        return boxes, scores
-
-    def boxes_from_bitmap(self, pred, _bitmap, dest_width, dest_height, onnx_flag=True):
-        '''
-        _bitmap: single map with shape (H, W),
-            whose values are binarized as {0, 1}
-        '''
-
-        assert len(_bitmap.shape) == 2
-
-        # # inference
-        if onnx_flag:
-            bitmap = _bitmap  # The first channel
-            pred = pred
-        else:
-            bitmap = _bitmap.cpu().numpy()  # The first channel
-            pred = pred.cpu().detach().numpy()
-
-        # # ## train
-        # bitmap = _bitmap.cpu().numpy()  # The first channel
-        # pred = pred.cpu().detach().numpy()
-
-        height, width = bitmap.shape
-        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        num_contours = min(len(contours), self.max_candidates)
-        boxes = np.zeros((num_contours, 4, 2), dtype=np.int16)
-        scores = np.zeros((num_contours,), dtype=np.float32)
-
-        for index in range(num_contours):
-            contour = contours[index].squeeze(1)
-            points, sside = self.get_mini_boxes(contour)
-            if sside < self.min_size:
-                continue
-            points = np.array(points)
-            score = self.box_score_fast(pred, contour)
-            if self.box_thresh > score:
-                continue
-            # print('===points:', points)
-            box = self.unclip(points, unclip_ratio=self.unclip_ratio).reshape(-1, 1, 2)
-            box, sside = self.get_mini_boxes(box)
-            if sside < self.min_size + 2:
-                continue
-            box = np.array(box)
-            if not isinstance(dest_width, int):
-                dest_width = dest_width.item()
-                dest_height = dest_height.item()
-
-            box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
-            box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
-            boxes[index, :, :] = box.astype(np.int16)
-            scores[index] = score
-        return boxes, scores
-    
-    def unclip(self, box, unclip_ratio=1.5):
-        poly = Polygon(box)
-        distance = poly.area * unclip_ratio / poly.length
-        offset = pyclipper.PyclipperOffset()
-        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        expanded = np.array(offset.Execute(distance))
-        return expanded
-
-    def get_mini_boxes(self, contour):
-        bounding_box = cv2.minAreaRect(contour)
-        points = sorted(list(cv2.boxPoints(bounding_box)), key=lambda x: x[0])
-
-        index_1, index_2, index_3, index_4 = 0, 1, 2, 3
-        if points[1][1] > points[0][1]:
-            index_1 = 0
-            index_4 = 1
-        else:
-            index_1 = 1
-            index_4 = 0
-        if points[3][1] > points[2][1]:
-            index_2 = 2
-            index_3 = 3
-        else:
-            index_2 = 3
-            index_3 = 2
-
-        box = [points[index_1], points[index_2], points[index_3], points[index_4]]
-        return box, min(bounding_box[1])
-
-    def box_score_fast(self, bitmap, _box):
-        h, w = bitmap.shape[:2]
-        box = _box.copy()
-        xmin = np.clip(np.floor(box[:, 0].min()).astype(np.int_), 0, w - 1)
-        xmax = np.clip(np.ceil(box[:, 0].max()).astype(np.int_), 0, w - 1)
-        ymin = np.clip(np.floor(box[:, 1].min()).astype(np.int_), 0, h - 1)
-        ymax = np.clip(np.ceil(box[:, 1].max()).astype(np.int_), 0, h - 1)
-
-        mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
-        box[:, 0] = box[:, 0] - xmin
-        box[:, 1] = box[:, 1] - ymin
-        cv2.fillPoly(mask, box.reshape(1, -1, 2).astype(np.int32), 1)
-        return cv2.mean(bitmap[ymin:ymax + 1, xmin:xmax + 1], mask)[0]
-
-
-def select_horizontal_images(data_path, flag="move"):
-    file_list = sorted(os.listdir(data_path))
-    dir_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_selected_horizontal_images".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        img = cv2.imread(f_abs_path)
-        imgsz = img.shape[:2]
-        # if imgsz[0] > imgsz[1]:
-        if imgsz[0] * 1.2 < imgsz[1]:
-            f_dst_path = save_path + "/{}".format(f)
-            if flag == "copy" or flag == "cp":
-                shutil.copy(f_abs_path, f_dst_path)
-            elif flag == "move" or flag == "mv":
-                shutil.move(f_abs_path, f_dst_path)
-            elif flag == "delete" or flag == "del":
-                os.remove(f_abs_path)
-
-
-def draw_bbox(img, result, color=(0, 0, 255), thickness=2):
-    for point in result:
-        point = point.astype(int)
-        cv2.polylines(img, [point], True, color, thickness)
-    return img
-
-
-# def softmax(x):
-#     exps = np.exp(x - np.max(x))
-#     return exps / np.sum(exps)
-
-
-def expand_kpt(imgsz, pts, r):
-    minSide = min(imgsz[0], imgsz[1])
-    if minSide > 400:
-        minSide = minSide / 5
-    elif minSide > 300:
-        minSide = minSide / 4
-    elif minSide > 200:
-        minSide = minSide / 3
-    elif minSide > 100:
-        minSide = minSide / 2
-    else:
-        minSide = minSide
-
-    expandP = round(minSide * r)
-    expandP_half = round(minSide * r / 2)
-    expandP_quarter = round(minSide * r / 4)
-    expandP_one_sixth = round(minSide * r / 6)
-    expandP_one_eighth = round(minSide * r / 8)
-
-    for i in range(len(pts)):
-        if pts[i][0] - expandP >= 0:
-            if i == 0 or i == 3:
-                pts[i][0] = pts[i][0] - expandP
-            else:
-                pts[i][0] = pts[i][0] + expandP
-        elif pts[i][0] - expandP_half >= 0:
-            if i == 0 or i == 3:
-                pts[i][0] = pts[i][0] - expandP_half
-            else:
-                pts[i][0] = pts[i][0] + expandP_half
-        elif pts[i][0] - expandP_quarter >= 0:
-            if i == 0 or i == 3:
-                pts[i][0] = pts[i][0] - expandP_quarter
-            else:
-                pts[i][0] = pts[i][0] + expandP_quarter
-        elif pts[i][0] - expandP_one_sixth >= 0:
-            if i == 0 or i == 3:
-                pts[i][0] = pts[i][0] - expandP_one_sixth
-            else:
-                pts[i][0] = pts[i][0] + expandP_one_sixth
-        elif pts[i][0] - expandP_one_eighth >= 0:
-            if i == 0 or i == 3:
-                pts[i][0] = pts[i][0] - expandP_one_eighth
-            else:
-                pts[i][0] = pts[i][0] + expandP_one_eighth
-        else:
-            pts[i][0] = pts[i][0]
-
-        if pts[i][1] - expandP >= 0:
-            if i == 0 or i == 1:
-                pts[i][1] = pts[i][1] - expandP
-            else:
-                pts[i][1] = pts[i][1] + expandP
-        elif pts[i][1] - expandP_half >= 0:
-            if i == 0 or i == 1:
-                pts[i][1] = pts[i][1] - expandP_half
-            else:
-                pts[i][1] = pts[i][1] + expandP_half
-        elif pts[i][1] - expandP_quarter >= 0:
-            if i == 0 or i == 1:
-                pts[i][1] = pts[i][1] - expandP_quarter
-            else:
-                pts[i][1] = pts[i][1] + expandP_quarter
-        elif pts[i][1] - expandP_one_sixth >= 0:
-            if i == 0 or i == 1:
-                pts[i][1] = pts[i][1] - expandP_one_sixth
-            else:
-                pts[i][1] = pts[i][1] + expandP_one_sixth
-        elif pts[i][1] - expandP_one_eighth >= 0:
-            if i == 0 or i == 1:
-                pts[i][1] = pts[i][1] - expandP_one_eighth
-            else:
-                pts[i][1] = pts[i][1] + expandP_one_eighth
-        else:
-            pts[i][1] = pts[i][1]
-
-    for i in range(len(pts)):
-        pts[i][0] = int(round(pts[i][0]))
-        pts[i][1] = int(round(pts[i][1]))
-
-    return pts
-
-
-def cal_hw(b):
-    MIN_X = 1e6
-    MAX_X = -1e6
-    MIN_Y = 1e6
-    MAX_Y = -1e6
-
-    for bi in b:
-        if bi[0] <= MIN_X:
-            MIN_X = bi[0]
-        if bi[0] >= MAX_X:
-            MAX_X = bi[0]
-        if bi[1] <= MIN_Y:
-            MIN_Y = bi[1]
-        if bi[1] >= MAX_Y:
-            MAX_Y = bi[1]
-
-    h = int(round(abs(MAX_Y - MIN_Y)))
-    w = int(round(abs(MAX_X - MIN_X)))
-    return (h, w)
-
-def get_new_boxes(boxes, rhw, r=0.12):
-    boxes_orig = []
-    for bi in boxes:
-        bi_ = []
-        for bj in bi:
-            bi_orig = [bj[0] / rhw[1], bj[1] / rhw[0]]
-            bi_.append(bi_orig)
-        boxes_orig.append(bi_)
-
-    boxes_new = []
-    for bbi in boxes_orig:
-        # x1, x2 = round(min(bi[0], bi[0])), round(max(bi[0], bi[0]))
-        # y1, y2 = round(min(bi[1], bi[1])), round(max(bi[1], bi[1]))
-        # basesz = (abs(y2 - y1), abs(x2 - x1))
-        basesz = cal_hw(bbi)
-        bi_ = expand_kpt(basesz, bbi, r)
-        boxes_new.append(bi_)
-
-    return boxes_new
-
-
-def perspective_transform(p1, dstsz, img):
-    p1 = np.array([p1[0], p1[1], p1[3], p1[2]], dtype=np.float32)
-    p2 = np.array([[0, 0], [dstsz[1], 0], [0, dstsz[0]], [dstsz[1], dstsz[0]]], dtype=np.float32)
-
-    M = cv2.getPerspectiveTransform(p1, p2)
-    warped = cv2.warpPerspective(img, M, dstsz[::-1])
-    return warped
-
-
-def softmax(x):
-    ex = np.exp(x - np.max(x))
-    return ex / np.sum(ex)
-
-
-def median_blur(img, k=3):
-    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    dst = cv2.medianBlur(img, k)
-    return dst
-
-
-def clahe(img, clipLimit=40):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(8, 8))
-    dst1 = clahe.apply(gray)
-    dst = cv2.merge([dst1, dst1, dst1])
-    return dst
-
-
-def isAllDigits(string):
-    pattern = r'^\d+$'
-    if re.match(pattern, string):
-        return True
-    else:
-        return False
-
-
-def hasDigits(string):
-    pattern = r'^\d'
-    if re.match(pattern, string):
-        return True
-    else:
-        return False
-
-
-def hasChinese(string):
-    pattern = '[\u4e00-\u9fa5]'
-    if re.match(pattern, string):
-        return True
-    else:
-        return False
-
-
-def containChinese(string):
-    pattern = r'[\u4e00-\u9fff]'
-    return re.search(pattern, string) is not None
-
-
-def process_sliding_window_results(res):
-    # TODO
-    final_res = ""
-    for i, resi in enumerate(res):
-        if i == 0:
-            final_res += resi
-        else:
-            resi_new = resi
-            for j in range(len(resi)):
-                if len(resi) >= j + 1 and len(final_res) >= j + 1:
-                    if resi[0:j + 1] == final_res[-(j + 1):]:
-                        resi_new = resi[j + 1:]
-            final_res += resi_new
-
-    return final_res
-
-
-def get_label(img_name):
-    label = ""
-    if "=" in img_name:
-        equal_num = img_name.count("=")
-        if equal_num > 1:
-            print("equal_num > 1!")
-        else:
-            # label = img_name.split("=")[-1]
-
-            img_name_r = img_name[::-1]
-            idx_r = img_name_r.find("=")
-            idx = -(idx_r + 1)
-            label = img_name[(idx + 1):]
-
-    return label
-
-
-def get_alpha(flag="digits_19"):
-    global alpha
-
-    if flag == "digits_15":
-        # alpha = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        # alpha = ' ' + '0123456789.-:' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-        alpha = ' ' + '0123456789.' + 'AbC'
-    elif flag == "digits_19":
-        alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC'
-    elif flag == "digits_20":
-        alpha = ' ' + '0123456789' + '.:/\\-' + 'ABbC'
-    elif flag == "digits_26":
-        alpha = ' ' + '0123456789' + '.:/\\-' + 'AbC' + '℃' + 'MPa' + '㎡m³'
-    elif flag == "Chinese1":
-        CH_SIM_CHARS = ' ' + '0123456789.' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-        CH_SIM_CHARS += ',;~!@#$%^&*()_+-={}:"<>?-=[]/|\\' + "'"
-        CH_SIM_CHARS += '、。┅《》「」【】¥®πи‰℃№Ⅱ←↑→↓①②③④▪☆❤'
-        print(len(CH_SIM_CHARS))
-
-        ch_sim_chars = open("words/ch_sim_char.txt", "r", encoding="utf-8")
-        lines = ch_sim_chars.readlines()
-        for l in lines:
-            CH_SIM_CHARS += l.strip()
-        alpha = CH_SIM_CHARS  # len = 6738  7568
-    elif flag == "Chinese_6867":
-        CH_SIM_CHARS = ' '
-        ch_sim_chars = open("words/chinese_simple_with_special_chars.txt", "r", encoding="utf-8")
-        lines = ch_sim_chars.readlines()
-        for l in lines:
-            CH_SIM_CHARS += l.strip()
-        alpha = CH_SIM_CHARS  # len = 6867
-    elif flag == "ppocr_6625":
-        CH_SIM_CHARS = ' '
-        ch_sim_chars = open("words/ppocr_keys_v1.txt", "r", encoding="utf-8")
-        lines = ch_sim_chars.readlines()
-        for l in lines:
-            CH_SIM_CHARS += l.strip()
-        alpha = CH_SIM_CHARS
-    else:
-        raise NotImplementedError
-
-    return alpha
-
-
-def resize_norm_padding_img(img, imgsz, max_wh_ratio):
-    # max_wh_ratio: 320 / 48
-    imgC, imgH, imgW = imgsz
-    assert imgC == img.shape[2]
-    imgW = int((imgH * max_wh_ratio))
-    h, w = img.shape[:2]
-    ratio = w / float(h)
-    if math.ceil(imgH * ratio) > imgW:
-        resized_w = imgW
-    else:
-        resized_w = int(math.ceil(imgH * ratio))
-    resized_image = cv2.resize(img, (resized_w, imgH))
-    resized_image = resized_image.astype('float32')
-    resized_image = resized_image.transpose((2, 0, 1)) / 255
-    resized_image -= 0.5
-    resized_image /= 0.5
-    padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
-    padding_im[:, :, 0:resized_w] = resized_image
-    return padding_im
-
-
-def putText_Chinese(img_pil, p, string, color=(255, 0, 255)):
-    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
-
-    # img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    draw = ImageDraw.Draw(img_pil)
-    font = ImageFont.truetype('./utils/gen_fake/Fonts/chinese_2/仿宋_GB2312.ttf', 20)
-    draw.text(p, string, font=font, fill=color)
-    # img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-    return img_pil
-
-
-def draw_e2e_res(image, boxes, txts, font_path="utils/gen_fake/Fonts/chinese_2/楷体_GB2312.ttf"):
-    from PIL import ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageFile
-
-    if isinstance(image, np.ndarray):
-        image = Image.fromarray(np.uint8(image))
-
-    font = ImageFont.truetype(font_path, 15, encoding="utf-8")
-    h, w = image.height, image.width
-    img_left = image.copy()
-    img_right = Image.new('RGB', (w, h), (255, 255, 255))
-
-    random.seed(0)
-    draw_left = ImageDraw.Draw(img_left)
-    draw_right = ImageDraw.Draw(img_right)
-    for idx, (box, txt) in enumerate(zip(boxes, txts)):
-        box = np.array(box)
-        box = [tuple(x) for x in box]
-        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        draw_left.polygon(box, fill=color)
-        draw_right.polygon(box, outline=color)
-        draw_right.text([box[0][0], box[0][1]], txt, fill=(0, 0, 0), font=font)
-    img_left = Image.blend(image, img_left, 0.5)
-    img_show = Image.new('RGB', (w * 2, h), (255, 255, 255))
-    img_show.paste(img_left, (0, 0, w, h))
-    img_show.paste(img_right, (w, 0, w * 2, h))
-
-    return np.array(img_show)[:, :, ::-1]
-
-
-class GKFOCR(object):
-    """
-    input support: 1.image path
-    2024.09.14
-    """
-
-    def __init__(self, cfg_path: str = "configs/cfg_gkfocr.yaml", debug: bool = False):
-        with open(cfg_path, errors='ignore') as f:
-            cfg = yaml.safe_load(f)
-
-        self.cfg = cfg
-        self.m_FLAG_DeBug = debug
-        self.alpha = get_alpha(flag="Chinese_6867")  # digits Chinese
-
-        self.det_model_path = self.cfg["det"]["model_path"]
-        self.rec_model_path = self.cfg["rec"]["model_path"]
-        self.det_input_shape = eval(self.cfg["det"]["input_shape"])
-        self.rec_input_shape = eval(self.cfg["rec"]["input_shape"])
-        self.det_mean = eval(self.cfg["det"]["mean"])
-        self.det_std = eval(self.cfg["det"]["std"])
-        self.rec_mean = eval(self.cfg["rec"]["mean"])
-        self.rec_std = eval(self.cfg["rec"]["std"])
-
-        self.det_ort_session = self.init_model(self.det_model_path)
-        print("Load det model: {}\tSuccessful".format(self.det_model_path))
-        self.rec_ort_session = self.init_model(self.rec_model_path)
-        print("Load rec model: {}\tSuccessful".format(self.rec_model_path))
-
-        self.det_thresh = float(self.cfg["det"]["thresh"])
-        self.det_box_thresh = float(self.cfg["det"]["box_thresh"])
-        self.det_max_candidates = float(self.cfg["det"]["max_candidates"])
-        self.det_unclip_ratio = float(self.cfg["det"]["unclip_ratio"])
-
-        self.rec_make_border_flag = bool(self.cfg["rec"]["make_border_flag"])
-        self.rec_batch_first = bool(self.cfg["rec"]["batch_first"])
-        self.rec_ppocr_flag = bool(self.cfg["rec"]["ppocr_flag"])
-        self.rec_c = int(self.cfg["rec"]["c"])
-        self.rec_r1 = float(self.cfg["rec"]["r1"])
-        self.rec_r2 = float(self.cfg["rec"]["r2"])
-        self.rec_sliding_window_flag = bool(self.cfg["rec"]["sliding_window_flag"])
-        self.rec_color = eval(self.cfg["rec"]["color"])
-        self.rec_gap_r = eval(self.cfg["rec"]["gap_r"])
-        self.rec_medianblur_flag = bool(self.cfg["rec"]["medianblur_flag"])
-        self.rec_k = int(self.cfg["rec"]["k"])
-        self.rec_clahe_flag = bool(self.cfg["rec"]["clahe_flag"])
-        self.rec_clipLimit = int(self.cfg["rec"]["clipLimit"])
-        self.rec_score_thr = float(self.cfg["rec"]["score_thr"])
-
-    def init_model(self, model_path: str):
-        so = ort.SessionOptions()
-        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        ort_session = ort.InferenceSession(model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-        return ort_session
-
-    def inference(self, data):
-        if isinstance(data, str):
-            if os.path.isfile(data):
-                img = cv2.imread(data)
-                img_cp = img.copy()
-                mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
-                txts = self.rec_inference_v2(img_cp, boxs_new)
-                out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
-                return out_img
-            elif os.path.isdir(data):
-                dirname = os.path.basename(data)
-                save_path = os.path.abspath(os.path.join(data, "../{}_output".format(dirname)))
-                os.makedirs(save_path, exist_ok=True)
-
-                file_list = sorted(os.listdir(data))
-                for f in tqdm(file_list):
-                    fname = os.path.splitext(f)[0]
-                    f_abs_path = data + "/{}".format(f)
-                    img = cv2.imread(f_abs_path)
-                    img_cp = img.copy()
-                    mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
-                    txts = self.rec_inference(img_cp, boxs_new, save_path, fname)
-
-                    if self.m_FLAG_DeBug:
-                        pred_mask_path = save_path + "/{}_pred_mask.jpg".format(fname)
-                        cv2.imwrite(pred_mask_path, mask * 255)
-
-                    out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
-                    cv2.imwrite("{}/{}_out_img.jpg".format(save_path, fname), out_img)
-                return None
-            else:
-                print("data should be test image file path or directory path!")
-        elif isinstance(data, np.ndarray) or isinstance(data, Image.Image):
-            if isinstance(data, np.ndarray):
-                out_img = self.inference_one_array(data)
-                return out_img
-            else:
-                out_img = self.inference_one_array(np.asarray(data))
-                return out_img
-        else:
-            print("data should be: 1.test image file path. 2. test image directory path. 3. test image np.ndarray or PIL.Image.Image!")
-
-    def inference_one_array(self, img):
-        img_cp = img.copy()
-        mask, boxes, scores, draw_img_resize, boxs_new = self.det_inference(img)
-        txts = self.rec_inference_v2(img_cp, boxs_new)
-        out_img = draw_e2e_res(img_cp, boxs_new, txts, font_path=self.cfg["chinese_font_path"])
-        return out_img
-
-    def det_inference(self, img):
-        imgsz_orig = img.shape[:2]
-        rhw = (self.det_input_shape[0] / imgsz_orig[0], self.det_input_shape[1] / imgsz_orig[1])
-
-        img, img_resize = self.det_preprocess(img)
-        outputs = self.det_ort_session.run(None, {'input': img})
-        mask, boxes, scores = self.det_postprocess(outputs)
-
-        draw_img = draw_bbox(img_resize, boxes)
-        draw_img_resize = cv2.resize(draw_img, imgsz_orig[::-1])
-        boxs_new = get_new_boxes(boxes, rhw, r=0.12)
-
-        return mask, boxes, scores, draw_img_resize, boxs_new
-    
-    def det_preprocess(self, img):
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, self.det_input_shape)
-        img_resize = img.copy()
-        img = (img / 255. - np.array(self.det_mean)) / np.array(self.det_std)
-        img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0).astype(np.float32)
-        return img, img_resize
-    
-    def det_postprocess(self, outputs, is_output_polygon=False):
-        b, c, h, w = outputs[0].shape
-        mask = outputs[0][0, 0, ...]
-        batch = {'shape': [(h, w)]}
-
-        box_list, score_list = SegDetectorRepresenter(thresh=self.det_thresh, box_thresh=self.det_box_thresh, max_candidates=self.det_max_candidates, unclip_ratio=self.det_unclip_ratio)(batch, outputs[0], is_output_polygon)
-        box_list, score_list = box_list[0], score_list[0]
-
-        if len(box_list) > 0:
-            if is_output_polygon:
-                idx = [x.sum() > 0 for x in box_list]
-                box_list = [box_list[i] for i, v in enumerate(idx) if v]
-                score_list = [score_list[i] for i, v in enumerate(idx) if v]
-            else:
-                idx = box_list.reshape(box_list.shape[0], -1).sum(axis=1) > 0  # 去掉全为0的框
-                box_list, score_list = box_list[idx], score_list[idx]
-        else:
-            box_list, score_list = [], []
-
-        return mask, box_list, score_list
-
-    def rec_inference(self, img, boxes, save_path, fname):
-        txts = []
-        mask_vis = np.zeros(shape=img.shape, dtype=np.uint8)
-        mask_vis_pil = Image.fromarray(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB))
-        for b in boxes:
-            try:
-                dstsz = cal_hw(b)
-                warpped = perspective_transform(b, dstsz, img)
-
-                makeBorderRes = makeBorder_inference(warpped, new_shape=self.rec_input_shape, sliding_window=self.rec_sliding_window_flag, gap_r=self.rec_gap_r)
-                pred, score = self.rec_inference_one(makeBorderRes)
-                txts.append(pred)
-
-                if self.m_FLAG_DeBug:
-                    print("pred: {}\tscore: {}".format(pred, score))
-                    cv2.imwrite("{}/{}_cropped_img={}.jpg".format(save_path, fname, pred), warpped)
-
-                p0 = tuple(map(int, b[0]))
-                mask_vis_pil = putText_Chinese(mask_vis_pil, p0, pred, color=(255, 0, 255))
-
-            except Exception as Error:
-                print(Error)
-
-        if self.m_FLAG_DeBug:
-            mask_vis = cv2.cvtColor(np.array(mask_vis_pil), cv2.COLOR_RGB2BGR)
-            cv2.imwrite("{}/{}_vis_results.jpg".format(save_path, fname), mask_vis)
-
-        return txts
-    
-    def rec_inference_v2(self, img, boxes):
-        txts = []
-        mask_vis = np.zeros(shape=img.shape, dtype=np.uint8)
-        mask_vis_pil = Image.fromarray(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB))
-        for b in boxes:
-            try:
-                dstsz = cal_hw(b)
-                warpped = perspective_transform(b, dstsz, img)
-
-                makeBorderRes = makeBorder_inference(warpped, new_shape=self.rec_input_shape, sliding_window=self.rec_sliding_window_flag, gap_r=self.rec_gap_r)
-                pred, score = self.rec_inference_one(makeBorderRes)
-                txts.append(pred)
-
-                p0 = tuple(map(int, b[0]))
-                mask_vis_pil = putText_Chinese(mask_vis_pil, p0, pred, color=(255, 0, 255))
-
-            except Exception as Error:
-                print(Error)
-
-        return txts
-    
-    def rec_inference_one(self, img):
-        img = self.rec_preprocess(img)
-        ort_outs = self.rec_ort_session.run(["output"], {self.rec_ort_session.get_inputs()[0].name: img})
-        pred, scores_mean = self.rec_postprocess(ort_outs[0])
-        return pred, scores_mean
-
-    def rec_preprocess(self, img):
-        """
-        """
-        if self.rec_medianblur_flag:
-            img = median_blur(img, k=self.rec_k)
-        if self.rec_clahe_flag:
-            img = clahe(img, clipLimit=self.rec_clipLimit)
-
-        imgsz = (self.rec_c, self.rec_input_shape[0], self.rec_input_shape[1])
-
-        if self.rec_ppocr_flag:
-            max_wh_ratio = self.rec_input_shape[1] / self.rec_input_shape[0]
-            img = resize_norm_padding_img(img, imgsz=imgsz, max_wh_ratio=max_wh_ratio)
-            img = img[np.newaxis, :].astype(np.float32)
-        else:
-            imgsz_ = img.shape[:2]
-            if imgsz_ != self.rec_input_shape:
-                img = cv2.resize(img, self.rec_input_shape[::-1])
-            img = (img / 255. - np.array(self.rec_mean)) / np.array(self.rec_std)
-            img = img.transpose(2, 0, 1)
-            img = img[np.newaxis, :].astype(np.float32)
-
-        return img
-    
-    def rec_postprocess(self, pred):
-        res = []
-        scores = []
-
-        if self.rec_batch_first:
-            for i in range(pred.shape[1]):
-                argmax_i = np.argmax(pred[0][i])
-                res.append(argmax_i)
-
-                sc_ = softmax(pred[0][i])
-                sc = sc_[1:]
-                max_ = max(sc)
-                if max_ >= self.rec_score_thr:
-                    scores.append(max_)
-        else:
-            for i in range(pred.shape[0]):
-                argmax_i = np.argmax(pred[i][0])
-                res.append(argmax_i)
-
-                sc_ = softmax(pred[i][0])
-                sc = sc_[1:]
-                max_ = max(sc)
-                if max_ >= self.rec_score_thr:
-                    scores.append(max_)
-
-        scores_mean = np.mean(scores)
-
-        pred_ = [self.alpha[class_id] for class_id in res]
-        pred_ = [k for k, g in itertools.groupby(list(pred_))]
-        pred = ''.join(pred_).replace(' ', '')
-
-        return pred, scores_mean
-
-
-def main_gkfocr():
-    data = "data/doc/imgs"
-    # data = "data/doc/imgs/11.jpg"
-    ocr = GKFOCR(cfg_path="configs/cfg_gkfocr.yaml", debug=False)
-    out_img = ocr.inference(data)
-    if out_img is not None:
-        cv2.imwrite("data/doc/test_out_img.jpg", out_img)
 
 
 def cal_distance(p1, p2):

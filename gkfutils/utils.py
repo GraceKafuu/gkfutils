@@ -34,38 +34,39 @@ import pandas as pd
 from tqdm import tqdm
 
 
-def get_strftime():
-    datetime = time.strftime("%Y%m%d", time.localtime(time.time()))
-    return datetime
+def timestamp_to_strftime(timestamp: float):
+    if timestamp is None or timestamp == "":
+        strftime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+        return strftime
+    else:
+        assert type(timestamp) == float, "Error: timestamp should be float!"
+        strftime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+        return strftime
 
 
-def timestamp_to_strftime(curr_timestamp):
-    strftime_ = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(curr_timestamp))
-    return strftime_
-
-
-def strftime_to_timestamp(curr_strftime):
-    # time_str = "2024-11-06 12:00:00"
-    struct_time = time.strptime(curr_strftime, "%Y-%m-%d %H:%M:%S")
+def strftime_to_timestamp(strftime: str):
+    # strftime = "2024-11-06 12:00:00"
+    assert strftime is not None or strftime != "", "Error: strftime is empty!"
+    struct_time = time.strptime(strftime, "%Y-%m-%d %H:%M:%S")
     timestamp = time.mktime(struct_time)
     return timestamp
 
 
 def get_date_time(mode=0):
     if mode == 0:
-        datetime1 = time.strftime("%Y %m %d %H:%M:%S", time.localtime(time.time()))
-        return datetime1
+        datetime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+        return datetime
     elif mode == 1:
-        datetime2 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-        return datetime2
+        datetime = time.strftime("%Y %m %d %H:%M:%S", time.localtime(time.time()))
+        return datetime
     elif mode == 2:
-        datetime3 = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-        return datetime3
+        datetime = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
+        return datetime
     else:
-        print("mode should be 0, 1, 2")
+        print("mode should be 0, 1, 2!")
 
 
-def get_file_list(data_path, abspath=False):
+def get_file_list(data_path: str, abspath=False) -> list:
     file_list = []
     list_ = sorted(os.listdir(data_path))
     for f in list_:
@@ -78,7 +79,7 @@ def get_file_list(data_path, abspath=False):
     return file_list
 
 
-def get_dir_list(data_path, abspath=False):
+def get_dir_list(data_path: str, abspath=False):
     dir_list = []
     list_ = sorted(os.listdir(data_path))
     for f in list_:
@@ -91,8 +92,7 @@ def get_dir_list(data_path, abspath=False):
     return dir_list
 
 
-def get_dir_file_list(data_path, abspath=False):
-
+def get_dir_file_list(data_path: str, abspath=False):
     list_ = sorted(os.listdir(data_path))
     if abspath:
         list_new = []
@@ -104,56 +104,48 @@ def get_dir_file_list(data_path, abspath=False):
         return list_
 
 
-def get_dir_name(data_path):
+def get_dir_name(data_path: str):
+    assert os.path.isdir(data_path), "Error: {} is not a dir!".format(data_path)
     dir_name = os.path.basename(data_path)
     return dir_name
 
 
-def get_base_name(data_path):
+def get_file_name(data_path: str):
+    assert os.path.isfile(data_path), "Error: {} is not a file!".format(data_path)
     base_name = os.path.basename(data_path)
     return base_name
 
 
-def get_basename_filename_suffix(file_path):
-    base_name = os.path.basename(file_path)
+def get_base_name(data_path: str):
+    base_name = os.path.basename(data_path)
+    return base_name
+
+
+def get_file_suffix(data_path: str):
+    assert os.path.isfile(data_path), "Error: {} is not a file!".format(data_path)
+    base_name = os.path.basename(data_path)
     file_name = os.path.splitext(base_name)[0]
     suffix = os.path.splitext(base_name)[1]
-    return base_name, file_name, suffix
+    return suffix
 
 
-def make_save_path(data_path, dir_name_add_str="results"):
-    dir_name = get_base_name(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_{}".format(dir_name, dir_name_add_str)
+def make_save_path(data_path: str, relative=".", add_str="results"):
+    base_name = get_base_name(data_path)
+    if relative == ".":
+        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_{}".format(base_name, add_str)
+    elif relative == "..":
+        save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_{}".format(base_name, add_str)
+    elif relative == "...":
+        save_path = os.path.abspath(os.path.join(data_path, "../../..")) + "/{}_{}".format(base_name, add_str)
+    else:
+        print("relative should be . or .. or ...")
+        raise ValueError
     os.makedirs(save_path, exist_ok=True)
     return save_path
 
 
-def LogInit(prex):
-    from logging.handlers import TimedRotatingFileHandler
-
-    """
-    日志按日输出 单进程适用
-    """
-    log_fmt = "%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
-    formatter = logging.Formatter(log_fmt)
-    # 创建TimedRotatingFileHandler对象
-    # dirname, filename = os.path.split(os.path.abspath(__file__))
-    dirname = os.getcwd()
-    # logpath = os.path.dirname(os.getcwd()) + '/Logs/'
-    logpath = dirname + '/Logs/'
-    if not os.path.exists(logpath):
-        os.mkdir(logpath)
-    log_file_handler = TimedRotatingFileHandler(filename=logpath + prex+'-log.', when="D", interval=1)
-    log_file_handler.suffix = prex + "-%Y-%m-%d_%H-%M-%S.log"
-    log_file_handler.setFormatter(formatter)
-    logging.basicConfig(level=logging.INFO)
-    log = logging.getLogger(prex)
-    log.addHandler(log_file_handler)
-
-    return log
-
-
-def save_file_path_to_txt(data_path, abspath=True):
+def save_file_path_to_txt(data_path: str, abspath=True):
+    assert type(data_path) == str, "{} should be str!".format(data_path)
     dirname = os.path.basename(data_path)
     data_list = sorted(os.listdir(data_path))
     txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
@@ -166,59 +158,6 @@ def save_file_path_to_txt(data_path, abspath=True):
                 fw.write("{}\n".format(f))
 
     print("Success! --> {}".format(txt_save_path))
-    
-
-
-def change_txt_content(txt_base_path):
-    """
-    Just a simple example.
-    :param txt_base_path:
-    :return:
-    """
-    txt_path = txt_base_path + "/labels"
-    save_path = txt_base_path + "/labels_new"
-    os.makedirs(save_path, exist_ok=True)
-
-    txt_list = sorted(os.listdir(txt_path))
-    for txt in tqdm(txt_list):
-        txt_abs_path = txt_path + "/{}".format(txt)
-        txt_new_abs_path = save_path + "/{}".format(txt)
-
-        txt_data = open(txt_abs_path, "r", encoding="utf-8")
-        txt_data_new = open(txt_new_abs_path, "w", encoding="utf-8")
-        lines = txt_data.readlines()
-        for l_ in lines:
-            l = l_.strip().split(" ")
-            cls = int(l[0])
-
-            # if cls == 0:
-            #     cls_new = 1
-            #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
-            # elif cls == 1:
-            #     cls_new = 1
-            #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
-
-            if cls == 80 or cls == 81:
-                cls_new = cls - 80
-                l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
-
-                # if cls == 0:
-                #     l_new = str(cls) + " " + " ".join([i for i in l[1:]]) + "\n"
-
-                txt_data_new.write(l_new)
-
-        txt_data.close()
-        txt_data_new.close()
-
-        # Remove empty file
-        txt_data_new_r = open(txt_new_abs_path, "r", encoding="utf-8")
-        lines_new_r = txt_data_new_r.readlines()
-        txt_data_new_r.close()
-        if len(lines_new_r) == 0:
-            os.remove(txt_new_abs_path)
-            print("os.remove: {}".format(txt_new_abs_path))
-        # else:
-        #     shutil.copy(txt_abs_path, txt_new_abs_path)
 
 
 def rename_files(data_path, use_orig_name=False, new_name_prefix="", zeros_num=7, start_num=0):
@@ -244,20 +183,25 @@ def rename_files_add_str_before_filename(data_path, add_str=""):
         os.rename(img_abs_path, new_name)
 
 
-def unzip_lots_of_files(data_path):
-    zip_list = sorted(os.listdir(data_path))
-    for f in zip_list:
+def untar_many_files(data_path):
+    tar_list = sorted(os.listdir(data_path))
+    for f in tar_list:
         f_abs_path = data_path + "/{}".format(f)
-        file_name = os.path.splitext(f)[0]
-        dir_name = os.path.abspath(os.path.join(f_abs_path, "../..")) + "/{}".format(file_name)
-        cmd_line = "tar -xf %s -C %s" % (f_abs_path, dir_name)
-        os.makedirs(dir_name, exist_ok=True)
+        if os.path.isfile(f_abs_path):
+            file_name = os.path.splitext(f)[0]
+            dir_name = os.path.abspath(os.path.join(f_abs_path, "../..")) + "/{}".format(file_name)
+            cmd_line = "tar -xf %s -C %s" % (f_abs_path, dir_name)
+            os.makedirs(dir_name, exist_ok=True)
 
-        print(cmd_line)
-        os.system(cmd_line)
+            print(cmd_line)
+            os.system(cmd_line)
 
 
-def merge_dirs_to_one_dir(data_path, use_glob=True, n_subdir=2):
+def unzip_many_files(data_path):
+    pass
+
+
+def merge_dirs(data_path, use_glob=False, n_subdir=2):
     dst_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_merged".format(data_path.split("/")[-1])
     os.makedirs(dst_path, exist_ok=True)
 
@@ -284,29 +228,407 @@ def merge_dirs_to_one_dir(data_path, use_glob=True, n_subdir=2):
     shutil.rmtree(data_path)
 
 
-def random_select_files(data_path, select_num=1000, move_or_copy="copy", select_mode=0):
+def random_select_files(data_path, mvcp="copy", select_num=1000, select_mode=0):
     data_list = sorted(os.listdir(data_path))
-    data_dir_name = os.path.basename(data_path)
+    dir_name = os.path.basename(data_path)
+
+    assert select_num <= len(data_list), "{} > total num!".format(select_num)
 
     if select_mode == 0:
         selected = random.sample(data_list, select_num)
-        save_path = os.path.abspath(os.path.join(data_path, "../")) + "/Random_Selected/{}_random_selected_{}".format(data_dir_name, select_num)
+        save_path = os.path.abspath(os.path.join(data_path, "../")) + "/Random_Selected/{}_random_selected_{}".format(dir_name, select_num)
         os.makedirs(save_path, exist_ok=True)
     else:
         selected = random.sample(data_list, len(data_list) - select_num)
-        save_path = os.path.abspath(os.path.join(data_path, "../")) + "/Random_Selected/{}_random_selected_{}".format(data_dir_name, len(data_list) - select_num)
+        save_path = os.path.abspath(os.path.join(data_path, "../")) + "/Random_Selected/{}_random_selected_{}".format(dir_name, len(data_list) - select_num)
         os.makedirs(save_path, exist_ok=True)
 
     for s in tqdm(selected):
         f_src_path = data_path + "/{}".format(s)
         f_dst_path = save_path + "/{}".format(s)
 
-        if move_or_copy == "copy":
+        if mvcp == "copy" or mvcp == "cp":
             shutil.copy(f_src_path, f_dst_path)
-        elif move_or_copy == "move":
+        elif mvcp == "move" or mvcp == "mv":
             shutil.move(f_src_path, f_dst_path)
         else:
-            print("Error!")
+            print("Error: mvcp should be one of [copy, cp, move, mv]!")
+            raise ValueError
+
+
+def get_json_data(data_path):
+    fr = open(data_path, "r", encoding="utf-8")
+    json_data = json.load(fr)
+    fr.close()
+    return json_data
+
+
+def dict_save_to_file(data_path, flag="pickle"):
+    """
+
+    :param data_path:
+    :param flag:
+    :return:
+    """
+    file_list = sorted(os.listdir(data_path))
+    list_dict = {}
+    for i, f in tqdm(enumerate(file_list)):
+        if str(i) not in list_dict.keys():
+            list_dict[str(i)] = f
+
+    if flag == "pickle":
+        with open("10010_list_dict.pickle", "wb") as fw:
+            pickle.dump(list_dict, fw)
+    elif flag == "numpy":
+        np.save("10010_list_dict.npy", list_dict)
+    elif flag == "json":
+        with open("10010_list_dict.json", "w", encoding="utf-8") as fw:
+            json.dump(list_dict, fw)
+    else:
+        print("flag should be one of pickle, numpy or json!")
+        raise ValueError
+
+
+def load_saved_dict_file(file_path):
+    """
+
+    :param file_path:
+    :param flag:
+    :return:
+    """
+    if file_path.endswith("pickle"):
+        with open(file_path, "rb") as fr:
+            dict_ = pickle.load(fr)
+        return dict_.items()
+    elif file_path.endswith("npy"):
+        dict_ = np.load(file_path, allow_pickle=True).item()
+        return dict_
+    elif file_path.endswith("json"):
+        with open(file_path, "r", encoding="utf-8") as fr:
+            dict_ = json.load(fr)
+        return dict_
+    else:
+        print("Please input one of pickle, numpy or json file!")
+        raise ValueError
+
+
+def compare_two_dict_files(file_path1, file_path2):
+    dict_data1 = load_saved_dict_file(file_path1)
+    dict_data2 = load_saved_dict_file(file_path2)
+    list1 = list(dict_data1.values())
+    list2 = list(dict_data2.values())
+    diff = set(list1) ^ set(list2)
+    return diff
+
+
+def read_csv(file_path):
+    csv_data = pd.read_csv(file_path)
+    return csv_data.values
+
+
+def is_all_digits(string):
+    pattern = r'^\d+$'
+    if re.match(pattern, string):
+        return True
+    else:
+        return False
+
+
+def is_all_chinese(string):
+    pattern = '[\u4e00-\u9fa5]+'
+    if re.match(pattern, string) and len(string) == len(set(string)):
+        return True
+    else:
+        return False
+
+
+def find_chinese(chars):
+    pattern = re.compile(r'[^\u4e00-\u9fa5]')
+    chinese = re.sub(pattern, '', chars)
+    return chinese
+
+
+def find_sub_str_index(substr, str, time):
+    """
+    # 找字符串substr在str中第time次出现的位置
+    """
+    times = str.count(substr)
+    if (times == 0) or (times < time):
+        pass
+    else:
+        i = 0
+        index = -1
+        while i < time:
+            index = str.find(substr, index+1)
+            i += 1
+        return index
+
+
+def examples_change_console_str_color():
+    """
+    @Time: 2021/1/22 21:16
+    @Author: gracekafuu
+    https://blog.csdn.net/qq_34857250/article/details/79673698
+
+    """
+
+    print('This is a \033[1;35m test \033[0m!')
+    print('This is a \033[1;32;43m test \033[0m!')
+    print('\033[1;33;44mThis is a test !\033[0m')
+
+
+def remove_list_repeat_elements(list1):
+    list2 = []
+    [list2.append(i) for i in list1 if i not in list2]
+
+    return list2
+
+
+def udp_send_txt_content(txtfile, client="127.0.0.1", port=60015):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    with open(txtfile) as f:
+        msgs = f.readlines()
+
+    while True:
+        for msg in msgs:
+            msg = msg.strip().replace("\\", "/")
+            if not msg: break
+            sock.sendto(bytes(msg, "utf-8"), (client, port))
+            print("UDP sent: {}".format(msg))
+            time.sleep(.0001)
+        sock.close()
+
+
+def majority_element(arr):
+    if arr == []:
+        return None
+    else:
+        dict_ = {}
+        for key in arr:
+            dict_[key] = dict_.get(key, 0) + 1
+        maybe_maj_element = max(dict_, key=lambda k: dict_[k])
+        maybe_maj_key = [k for k, v in dict_.items() if v == dict_[maybe_maj_element]]
+
+        if len(maybe_maj_key) == 1:
+            maj_element = maybe_maj_element
+            return maj_element
+        else:
+            return None
+
+
+def second_majority_element(arr, remove_first_mj):
+    for i in range(len(arr)):
+        if remove_first_mj in arr:
+            arr.remove(remove_first_mj)
+    if arr != []:
+        second_mj = majority_element(arr)
+        return second_mj
+    else:
+        return None
+
+
+def RANSAC_fit_2Dline(X_data, Y_data, iters=100000, sigma=0.25, pretotal=0, P=0.99):
+    """
+
+    Parameters
+    ----------
+    X
+    Y
+    # 使用RANSAC算法估算模型
+    # 迭代最大次数，每次得到更好的估计会优化iters的数值
+    iters = 100000
+    # 数据和模型之间可接受的差值
+    sigma = 0.25
+    # 最好模型的参数估计和内点数目
+    best_a = 0
+    best_b = 0
+    pretotal = 0
+    # 希望的得到正确模型的概率
+    P = 0.99
+    Returns
+    -------
+
+    """
+
+    SIZE = X_data.shape[0]
+
+    best_a = 0
+    best_b = 0
+
+    for i in range(iters):
+        # 随机在数据中红选出两个点去求解模型
+        # sample_index = random.sample(range(SIZE), 2)
+        sample_index = random.choices(range(SIZE), k=2)
+        x_1 = X_data[sample_index[0]]
+        x_2 = X_data[sample_index[1]]
+        y_1 = Y_data[sample_index[0]]
+        y_2 = Y_data[sample_index[1]]
+
+        # y = ax + b 求解出a，b
+        try:
+            a = (y_2 - y_1) / ((x_2 - x_1) + 1e-2)
+            b = y_1 - a * x_1
+        except Exception as Error:
+            print("RANSAC_fit_2Dline: a = (y_2 - y_1) / (x_2 - x_1) --> {}".format(Error))
+
+        # 算出内点数目
+        total_inlier = 0
+        for index in range(SIZE):
+            y_estimate = a * X_data[index] + b
+            if abs(y_estimate - Y_data[index]) < sigma:
+                total_inlier = total_inlier + 1
+
+        # 判断当前的模型是否比之前估算的模型好
+        if total_inlier > pretotal:
+            # iters = math.log(1 - P) / math.log(1 - pow(total_inlier / (SIZE), 2))
+            pretotal = total_inlier
+            best_a = a
+            best_b = b
+
+        # 判断是否当前模型已经符合超过一半的点
+        if total_inlier > SIZE // 2:
+            break
+
+    return best_a, best_b
+
+
+def median_filter_1d(res_list, k=15):
+    """
+    中值滤波
+    """
+    edge = int(k / 2)
+    new_res = res_list.copy()
+    for i in range(len(res_list)):
+        if i <= edge or i >= len(res_list) - edge - 1:
+            pass
+        else:
+            medianv = np.median(res_list[i - edge:i + edge + 1])
+            if new_res[i] != medianv:
+                new_res[i] = medianv
+            else:
+                pass
+
+    return new_res
+
+
+def gaussian2D(shape, sigma=1):
+    m, n = [(ss - 1.) / 2. for ss in shape]
+    y, x = np.ogrid[-m:m + 1, -n:n + 1]
+
+    h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
+    h[h < np.finfo(h.dtype).eps * h.max()] = 0
+    # 限制最小的值
+    return h
+
+
+def draw_umich_gaussian(heatmap, center, radius, k=1):
+    diameter = 2 * radius + 1
+    gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
+    # 一个圆对应内切正方形的高斯分布
+
+    x, y = int(center[0]), int(center[1])
+
+    height, width = heatmap.shape
+
+    left, right = min(x, radius), min(width - x, radius + 1)
+    top, bottom = min(y, radius), min(height - y, radius + 1)
+
+    masked_heatmap = heatmap[y - top:y + bottom, x - left:x + right]
+    masked_gaussian = gaussian[radius - top:radius +
+                               bottom, radius - left:radius + right]
+
+    if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:  # TODO debug
+        np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
+        # 将高斯分布覆盖到heatmap上，取最大，而不是叠加
+    return heatmap
+
+
+def to_numpy(tensor):
+    return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+
+def calculate_md5(file_path):
+    with open(file_path, "rb") as file:
+        data = file.read()
+
+    md5_hash = hashlib.md5()
+    md5_hash.update(data)
+    md5_value = md5_hash.hexdigest()
+
+    return md5_value
+
+
+def calculate_hash(file_path, hash_algorithm='sha256'):
+    hash_obj = hashlib.new(hash_algorithm)
+    with open(file_path, 'rb') as file:
+        while True:
+            data = file.read(65536)
+            if not data: break
+            hash_obj.update(data)
+
+    return hash_obj.hexdigest()
+
+
+def move_same_file(data_path):
+    dir_name = os.path.basename(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "../{}_same_files".format(dir_name)))
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = get_file_list(data_path)
+    duplicates = {}
+
+    for f in tqdm(file_list):
+        f_abs_path = data_path + "/{}".format(f)
+        f_hash = calculate_hash(f_abs_path, hash_algorithm='sha256')
+        if f_hash in duplicates:
+            duplicates[f_hash].append(f)
+        else:
+            duplicates[f_hash] = [f]
+
+    duplicates_new = {k: v for k, v in duplicates.items() if len(v) > 1}
+
+    for k, v in duplicates_new.items():
+        for fi in v[1:]:
+            f_src_path = data_path + "/{}".format(fi)
+            f_dst_path = save_path + "/{}".format(fi)
+            shutil.move(f_src_path, f_dst_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def copy_file_exist_corresponding_file(dir1, dir2):
@@ -955,15 +1277,6 @@ def copy_file_by_name(data_path, key_words, mode):
             print(Error)
 
 
-def return_json_data(data_path, dt, d):
-    if not d:
-        json_data = json.load(open(data_path + "/annotations/tiny_set_{}.json".format(dt), "r", encoding="utf-8"))
-        return json_data
-    else:
-        json_data = json.load(open(data_path + "/annotations/tiny_set_{}_with_dense.json".format(dt), "r", encoding="utf-8"))
-        return json_data
-
-
 def split_dir(data_path, split_n=5):
     """
     If a directory contains large amount of files, then split to split_n dirs.
@@ -1074,60 +1387,7 @@ def change_Linux_conda_envs_bin_special_files_content(conda_envs_path):
                 fw.writelines(lines)
 
 
-def dict_save_to_file(data_path, flag="pickle"):
-    """
 
-    :param data_path:
-    :param flag:
-    :return:
-    """
-    file_list = sorted(os.listdir(data_path))
-    list_dict = {}
-    for i, f in tqdm(enumerate(file_list)):
-        if str(i) not in list_dict.keys():
-            list_dict[str(i)] = f
-
-    if flag == "pickle":
-        with open("10010_list_dict.pickle", "wb") as fw:
-            pickle.dump(list_dict, fw)
-    elif flag == "numpy":
-        np.save("10010_list_dict.npy", list_dict)
-    elif flag == "json":
-        with open("10010_list_dict.json", "w", encoding="utf-8") as fw:
-            json.dump(list_dict, fw)
-    else:
-        print("Please enter one of pickle, numpy or json!")
-
-
-def load_saved_dict_file(file_path):
-    """
-
-    :param file_path:
-    :param flag:
-    :return:
-    """
-    if file_path.endswith("pickle"):
-        with open(file_path, "rb") as fr:
-            dict_ = pickle.load(fr)
-        return dict_.items()
-    elif file_path.endswith("npy"):
-        dict_ = np.load(file_path, allow_pickle=True).item()
-        return dict_
-    elif file_path.endswith("json"):
-        with open(file_path, "r", encoding="utf-8") as fr:
-            dict_ = json.load(fr)
-        return dict_
-    else:
-        print("Please input one of pickle, numpy or json file!")
-
-
-def compare_two_dicts(file_path1, file_path2):
-    dict_data1 = load_saved_dict_file(file_path1)
-    dict_data2 = load_saved_dict_file(file_path2)
-    list1 = list(dict_data1.values())
-    list2 = list(dict_data2.values())
-    diff = set(list1) ^ set(list2)
-    print(diff)
 
 
 def merge_txt(path1, path2):
@@ -1156,21 +1416,6 @@ def merge_txt(path1, path2):
         print("----------------------------")
 
 
-def calculate_md5(file_path):
-    with open(file_path, "rb") as file:
-        data = file.read()
-
-    md5_hash = hashlib.md5()
-    md5_hash.update(data)
-    md5_value = md5_hash.hexdigest()
-
-    return md5_value
-
-
-def read_csv(file_path):
-    csv_data = pd.read_csv(file_path)
-    return csv_data.values
-
 
 def split_dir_by_file_suffix(data_path):
     save_path = make_save_path(data_path, "splited_by_file_suffix")
@@ -1193,254 +1438,6 @@ def split_dir_by_file_suffix(data_path):
         if suffix != "":
             f_dst_path = save_path + "/{}/{}".format(suffix.replace(".", ""), f)
             shutil.move(f_abs_path, f_dst_path)
-
-
-def isAllDigits(string):
-    pattern = r'^\d+$'
-    if re.match(pattern, string):
-        return True
-    else:
-        return False
-
-
-def isAllChinese(string):
-    pattern = '[\u4e00-\u9fa5]+'
-    if re.match(pattern, string) and len(string) == len(set(string)):
-        return True
-    else:
-        return False
-
-
-def findSubStrIndex(substr, str, time):
-    """
-    # 找字符串substr在str中第time次出现的位置
-    """
-    times = str.count(substr)
-    if (times == 0) or (times < time):
-        pass
-    else:
-        i = 0
-        index = -1
-        while i < time:
-            index = str.find(substr, index+1)
-            i += 1
-        return index
-
-
-def change_console_str_color():
-    """
-    @Time: 2021/1/22 21:16
-    @Author: gracekafuu
-    https://blog.csdn.net/qq_34857250/article/details/79673698
-
-    """
-
-    print('This is a \033[1;35m test \033[0m!')
-    print('This is a \033[1;32;43m test \033[0m!')
-    print('\033[1;33;44mThis is a test !\033[0m')
-
-
-def remove_Thumbs(img_path):
-    thumbs = img_path + "/Thumbs.db"
-    if os.path.exists(thumbs):
-        os.remove(thumbs)
-        print("Removed --> {}".format(thumbs))
-
-
-def remove_list_repeat_elements(list1):
-    list2 = []
-    [list2.append(i) for i in list1 if i not in list2]
-
-    return list2
-
-
-def udp_send_txt_content(txtfile, client="127.0.0.1", port=60015):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    with open(txtfile) as f:
-        msgs = f.readlines()
-
-    while True:
-        for msg in msgs:
-            msg = msg.strip().replace("\\", "/")
-            if not msg: break
-            sock.sendto(bytes(msg, "utf-8"), (client, port))
-            print("UDP sent: {}".format(msg))
-            time.sleep(.0001)
-        sock.close()
-
-
-def majority_element(arr):
-    if arr == []:
-        return None
-    else:
-        dict_ = {}
-        for key in arr:
-            dict_[key] = dict_.get(key, 0) + 1
-        maybe_maj_element = max(dict_, key=lambda k: dict_[k])
-        maybe_maj_key = [k for k, v in dict_.items() if v == dict_[maybe_maj_element]]
-
-        if len(maybe_maj_key) == 1:
-            maj_element = maybe_maj_element
-            return maj_element
-        else:
-            return None
-
-
-def second_majority_element(arr, remove_first_mj):
-    for i in range(len(arr)):
-        if remove_first_mj in arr:
-            arr.remove(remove_first_mj)
-    if arr != []:
-        second_mj = majorityElement_v2(arr)
-        return second_mj
-    else:
-        return None
-
-
-def find_chinese(chars):
-    pattern = re.compile(r'[^\u4e00-\u9fa5]')
-    chinese = re.sub(pattern, '', chars)
-    return chinese
-
-
-def RANSAC_fit_2Dline(X_data, Y_data, iters=100000, sigma=0.25, pretotal=0, P=0.99):
-    """
-
-    Parameters
-    ----------
-    X
-    Y
-    # 使用RANSAC算法估算模型
-    # 迭代最大次数，每次得到更好的估计会优化iters的数值
-    iters = 100000
-    # 数据和模型之间可接受的差值
-    sigma = 0.25
-    # 最好模型的参数估计和内点数目
-    best_a = 0
-    best_b = 0
-    pretotal = 0
-    # 希望的得到正确模型的概率
-    P = 0.99
-    Returns
-    -------
-
-    """
-
-    SIZE = X_data.shape[0]
-
-    best_a = 0
-    best_b = 0
-
-    for i in range(iters):
-        # 随机在数据中红选出两个点去求解模型
-        # sample_index = random.sample(range(SIZE), 2)
-        sample_index = random.choices(range(SIZE), k=2)
-        x_1 = X_data[sample_index[0]]
-        x_2 = X_data[sample_index[1]]
-        y_1 = Y_data[sample_index[0]]
-        y_2 = Y_data[sample_index[1]]
-
-        # y = ax + b 求解出a，b
-        try:
-            a = (y_2 - y_1) / ((x_2 - x_1) + 1e-2)
-            b = y_1 - a * x_1
-        except Exception as Error:
-            print("RANSAC_fit_2Dline: a = (y_2 - y_1) / (x_2 - x_1) --> {}".format(Error))
-
-        # 算出内点数目
-        total_inlier = 0
-        for index in range(SIZE):
-            y_estimate = a * X_data[index] + b
-            if abs(y_estimate - Y_data[index]) < sigma:
-                total_inlier = total_inlier + 1
-
-        # 判断当前的模型是否比之前估算的模型好
-        if total_inlier > pretotal:
-            # iters = math.log(1 - P) / math.log(1 - pow(total_inlier / (SIZE), 2))
-            pretotal = total_inlier
-            best_a = a
-            best_b = b
-
-        # 判断是否当前模型已经符合超过一半的点
-        if total_inlier > SIZE // 2:
-            break
-
-    return best_a, best_b
-
-
-def median_filter_1d(res_list, k=15):
-    """
-    中值滤波
-    """
-    edge = int(k / 2)
-    new_res = res_list.copy()
-    for i in range(len(res_list)):
-        if i <= edge or i >= len(res_list) - edge - 1:
-            pass
-        else:
-            medianv = np.median(res_list[i - edge:i + edge + 1])
-            if new_res[i] != medianv:
-                new_res[i] = medianv
-            else:
-                pass
-
-    return new_res
-
-
-def gaussian2D(shape, sigma=1):
-    m, n = [(ss - 1.) / 2. for ss in shape]
-    y, x = np.ogrid[-m:m + 1, -n:n + 1]
-
-    h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
-    h[h < np.finfo(h.dtype).eps * h.max()] = 0
-    # 限制最小的值
-    return h
-
-
-def draw_umich_gaussian(heatmap, center, radius, k=1):
-    diameter = 2 * radius + 1
-    gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
-    # 一个圆对应内切正方形的高斯分布
-
-    x, y = int(center[0]), int(center[1])
-
-    height, width = heatmap.shape
-
-    left, right = min(x, radius), min(width - x, radius + 1)
-    top, bottom = min(y, radius), min(height - y, radius + 1)
-
-    masked_heatmap = heatmap[y - top:y + bottom, x - left:x + right]
-    masked_gaussian = gaussian[radius - top:radius +
-                               bottom, radius - left:radius + right]
-
-    if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:  # TODO debug
-        np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
-        # 将高斯分布覆盖到heatmap上，取最大，而不是叠加
-    return heatmap
-
-
-def to_numpy(tensor):
-    return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
-
-
-def merge_mdb_files(source_files, target_file):
-    from accessdbtools import AccessDatabase, AccessTableData
-
-    # 打开目标数据库（用于存储合并后的数据）
-    target_db = AccessDatabase(target_file, create_if_missing=True)
-
-    # 遍历所有源文件
-    for source_file in source_files:
-        source_db = AccessDatabase(source_file)
-
-        # 遍历所有表
-        for table_name in source_db.table_names:
-            # 读取表数据
-            table_data = source_db.read_table(table_name)
-
-            # 将表数据写入目标数据库
-            target_db.write_table(table_name, table_data)
 
 
 def merge_txt_files(data_path):
@@ -1666,41 +1663,6 @@ def rename_files_under_dirs(data_path):
             f_dst_path = d_path + "/{}_{}".format(d, f)
             os.rename(f_abs_path, f_dst_path)
 
-
-def calculate_file_hash(file_path, hash_algorithm='sha256'):
-    hash_obj = hashlib.new(hash_algorithm)
-    with open(file_path, 'rb') as file:
-        while True:
-            data = file.read(65536)
-            if not data: break
-            hash_obj.update(data)
-
-    return hash_obj.hexdigest()
-
-
-def move_same_file(data_path):
-    dir_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../{}_same_files".format(dir_name)))
-    os.makedirs(save_path, exist_ok=True)
-
-    file_list = get_file_list(data_path)
-    duplicates = {}
-
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        f_hash = calculate_file_hash(f_abs_path, hash_algorithm='sha256')
-        if f_hash in duplicates:
-            duplicates[f_hash].append(f)
-        else:
-            duplicates[f_hash] = [f]
-
-    duplicates_new = {k: v for k, v in duplicates.items() if len(v) > 1}
-
-    for k, v in duplicates_new.items():
-        for fi in v[1:]:
-            f_src_path = data_path + "/{}".format(fi)
-            f_dst_path = save_path + "/{}".format(fi)
-            shutil.move(f_src_path, f_dst_path)
             
 
 class Logger(object):
@@ -1726,6 +1688,31 @@ class Logger(object):
         th.setFormatter(format_str) # 设置文件里写入的格式
         self.logger.addHandler(sh) # 把对象加到logger里
         self.logger.addHandler(th)
+
+
+def LogInit(prex):
+    from logging.handlers import TimedRotatingFileHandler
+
+    """
+    日志按日输出 单进程适用
+    """
+    log_fmt = "%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
+    formatter = logging.Formatter(log_fmt)
+    # 创建TimedRotatingFileHandler对象
+    # dirname, filename = os.path.split(os.path.abspath(__file__))
+    dirname = os.getcwd()
+    # logpath = os.path.dirname(os.getcwd()) + '/Logs/'
+    logpath = dirname + '/Logs/'
+    if not os.path.exists(logpath):
+        os.mkdir(logpath)
+    log_file_handler = TimedRotatingFileHandler(filename=logpath + prex+'-log.', when="D", interval=1)
+    log_file_handler.suffix = prex + "-%Y-%m-%d_%H-%M-%S.log"
+    log_file_handler.setFormatter(formatter)
+    logging.basicConfig(level=logging.INFO)
+    log = logging.getLogger(prex)
+    log.addHandler(log_file_handler)
+
+    return log
 
 
 class ImProgressBar(object):

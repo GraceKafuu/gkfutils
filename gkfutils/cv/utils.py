@@ -15876,7 +15876,56 @@ def convert_to_ocr_rec_data_ShopSign2(data_path):
                 cv2.imwrite(save_path_i, warped)
 
 
-                
+def change_txt_content(txt_base_path):
+    """
+    Just a simple example.
+    :param txt_base_path:
+    :return:
+    """
+    txt_path = txt_base_path + "/labels"
+    save_path = txt_base_path + "/labels_new"
+    os.makedirs(save_path, exist_ok=True)
+
+    txt_list = sorted(os.listdir(txt_path))
+    for txt in tqdm(txt_list):
+        txt_abs_path = txt_path + "/{}".format(txt)
+        txt_new_abs_path = save_path + "/{}".format(txt)
+
+        txt_data = open(txt_abs_path, "r", encoding="utf-8")
+        txt_data_new = open(txt_new_abs_path, "w", encoding="utf-8")
+        lines = txt_data.readlines()
+        for l_ in lines:
+            l = l_.strip().split(" ")
+            cls = int(l[0])
+
+            # if cls == 0:
+            #     cls_new = 1
+            #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
+            # elif cls == 1:
+            #     cls_new = 1
+            #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
+
+            if cls == 80 or cls == 81:
+                cls_new = cls - 80
+                l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
+
+                # if cls == 0:
+                #     l_new = str(cls) + " " + " ".join([i for i in l[1:]]) + "\n"
+
+                txt_data_new.write(l_new)
+
+        txt_data.close()
+        txt_data_new.close()
+
+        # Remove empty file
+        txt_data_new_r = open(txt_new_abs_path, "r", encoding="utf-8")
+        lines_new_r = txt_data_new_r.readlines()
+        txt_data_new_r.close()
+        if len(lines_new_r) == 0:
+            os.remove(txt_new_abs_path)
+            print("os.remove: {}".format(txt_new_abs_path))
+        # else:
+        #     shutil.copy(txt_abs_path, txt_new_abs_path)               
 
 
 

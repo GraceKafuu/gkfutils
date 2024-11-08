@@ -10,7 +10,7 @@ import setuptools
 
 setuptools.setup(
     name="gkfutils",
-    version="1.0.9",
+    version="1.1.0",
     author="GraceKafuu",
     author_email="gracekafuu@gmail.com",
     description="GraceKafuu utils",

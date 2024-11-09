@@ -6,7 +6,7 @@ from .utils import rename_files, save_file_path_to_txt
 
 
 __appname__ = "gkfutils"
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 __all__ = [
     "rename_files", "save_file_path_to_txt"

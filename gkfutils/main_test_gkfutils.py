@@ -1,11 +1,9 @@
 import gkfutils
-import gkfutils.utils
 
 
 if __name__ == '__main__':
-    # print("Test!")
-    # gkfutils.utils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", use_orig_name=False, new_name_prefix="Test", zeros_num=20, start_num=0)
-    gkfutils.utils.save_file_path_to_txt()
+    # gkfutils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", use_orig_name=False, new_name_prefix="Test", zeros_num=20, start_num=0)
+    gkfutils.save_file_path_to_txt()
     
 
     # rnf =  gkfutils.utils.RenameFiles()

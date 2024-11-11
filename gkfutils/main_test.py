@@ -22,6 +22,7 @@ Change Log:
 """
 
 
+import PIL.Image
 from cv.utils import *
 from utils import *
 
@@ -49,6 +50,11 @@ from tqdm import tqdm
 import torch
 import torchvision
 from torchvision import transforms
+import PIL
+
+
+
+
 
 
 if __name__ == '__main__':

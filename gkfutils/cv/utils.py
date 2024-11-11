@@ -40,6 +40,7 @@ import threading
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import PIL
 from PIL import Image
 import skimage
 import scipy
@@ -5371,8 +5372,10 @@ def random_paste_four_corner(positive_img_path, negative_img_path):
 
 # ================================================================================
 # ================================================================================
+# Image Processing
+
 def pil2cv(image):
-    assert isinstance(image, PIL.Image.Image) or isinstance(image, PIL.JpegImagePlugin.JpegImageFile), f'input image type is not PIL.image and is {type(image)}'
+    assert isinstance(image, PIL.Image.Image), f'input image type is not PIL.image and is {type(image)}'
     if len(image.split()) == 1:
         return np.asarray(image)
     elif len(image.split()) == 3:

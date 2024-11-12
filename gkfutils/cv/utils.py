@@ -14,8 +14,12 @@ Description:
 
 """
 
-from ..utils import get_file_list
-from ..utils import make_save_path
+from ..utils import (
+    get_file_list, get_base_name,
+    get_dir_name, make_save_path,
+    is_all_chinese, is_all_digits
+)
+
 
 import os
 import re
@@ -26,6 +30,7 @@ import time
 import math
 import copy
 import glob
+import yaml
 import random
 import shutil
 import codecs
@@ -37,6 +42,7 @@ import base64
 import socket
 import argparse
 import threading
+import itertools
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -46,9 +52,12 @@ import skimage
 import scipy
 import torch
 import torchvision
-import onnxruntime
+import onnxruntime as ort
 from torchvision import transforms
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import pyclipper
+from shapely.geometry import Polygon
 
 
 def bbox_voc_to_yolo(size, box):
@@ -418,9 +427,9 @@ def yolo_to_voc(args):
     input_xml_file_path = args.input_xml_file_path
     output_folder_path = args.output_folder_path
 
-    text_list = get_file_list_(input_file_record_path)
-    label_list = get_label_list_(input_label_checker_path)
-    content_dict = generate_dict_(text_list, label_list)
+    text_list = get_file_list(input_file_record_path)
+    label_list = get_label_list(input_label_checker_path)
+    content_dict = generate_dict(text_list, label_list)
 
     for key in content_dict.keys():
         file_name = key
@@ -696,8 +705,8 @@ def labelbee_seg_json_to_yolo_txt(data_path):
 
     for j in json_list:
         img_abs_path = data_path + "/{}".format(j.strip(".json"))
-        # cv2img = cv2.imread(img_abs_path)
-        # if cv2img is None: continue
+        # img = cv2.imread(img_abs_path)
+        # if img is None: continue
 
         img_dst_path = removed_damaged_img + "/{}".format(j.strip(".json"))
         shutil.copy(img_abs_path, img_dst_path)
@@ -833,8 +842,8 @@ def vis_yolo_label(data_path, print_flag=True, color_num=1000, rm_small_object=F
             img_name = os.path.splitext(img)[0]
             img_abs_path = img_path + "/{}".format(img)
             txt_abs_path = txt_path + "/{}.txt".format(img_name)
-            cv2img = cv2.imread(img_abs_path)
-            h, w = cv2img.shape[:2]
+            img = cv2.imread(img_abs_path)
+            h, w = img.shape[:2]
 
             # txt_new_abs_path = txt_new_path + "/{}.txt".format(img_name)
             # txt_data_new = open(txt_new_abs_path, "w", encoding="utf-8")
@@ -852,10 +861,10 @@ def vis_yolo_label(data_path, print_flag=True, color_num=1000, rm_small_object=F
                     #     if ow >= rm_size and oh >= rm_size:
                     #         txt_data_new.write(l_orig)
 
-                    cv2.rectangle(cv2img, (bbx_VOC_format[0], bbx_VOC_format[1]), (bbx_VOC_format[2], bbx_VOC_format[3]), (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])), 2)
-                    cv2.putText(cv2img, "{}".format(cls), (bbx_VOC_format[0], bbx_VOC_format[1] - 4), cv2.FONT_HERSHEY_PLAIN, 2, (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])))
+                    cv2.rectangle(img, (bbx_VOC_format[0], bbx_VOC_format[1]), (bbx_VOC_format[2], bbx_VOC_format[3]), (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])), 2)
+                    cv2.putText(img, "{}".format(cls), (bbx_VOC_format[0], bbx_VOC_format[1] - 4), cv2.FONT_HERSHEY_PLAIN, 2, (int(colors[cls][0]), int(colors[cls][1]), int(colors[cls][2])))
 
-                    cv2.imwrite("{}/{}".format(vis_path, img), cv2img)
+                    cv2.imwrite("{}/{}".format(vis_path, img), img)
                     if print_flag:
                         print("--> {}/{}".format(vis_path, img))
 
@@ -1002,8 +1011,8 @@ def merge_det_bbx_and_kpt_points_to_yolov5_pose_labels(data_path, cls=0):
             det_s_abs_path = det_lbl_path + "/{}".format(s)
             kpt_s_abs_path = kpt_lbl_path + "/{}".format(s)
 
-            cv2img = cv2.imread(img_s_abs_path)
-            imgsz = cv2img.shape[:2]
+            img = cv2.imread(img_s_abs_path)
+            imgsz = img.shape[:2]
 
             det_bbxs = []
 
@@ -1245,8 +1254,8 @@ def convert_to_jpg_format(data_path):
         img_abs_path = data_path + "/{}".format(img)
 
         if img.endswith(".jpeg") or img.endswith(".png") or img.endswith(".bmp") or img.endswith(".JPG") or img.endswith(".JPEG") or img.endswith(".PNG") or img.endswith(".BMP"):
-            cv2img = cv2.imread(img_abs_path)
-            cv2.imwrite("{}/{}.jpg".format(data_path, img_name), cv2img)
+            img = cv2.imread(img_abs_path)
+            cv2.imwrite("{}/{}.jpg".format(data_path, img_name), img)
             os.remove(img_abs_path)
             print("remove --> {} | write --> {}.jpg".format(img_abs_path, img_name))
         elif img.endswith(".jpg"):
@@ -1267,8 +1276,8 @@ def convert_to_png_format(data_path):
             img_name = os.path.splitext(img)[0]
             if img.endswith(".jpeg") or img.endswith(".jpg") or img.endswith(".bmp") or img.endswith(".JPEG") or img.endswith(".JPG") or img.endswith(".BMP"):
                 # img_abs_path = data_path + "/{}".format(img)
-                cv2img = cv2.imread(img_abs_path)
-                cv2.imwrite("{}/{}.png".format(data_path, img_name), cv2img)
+                img = cv2.imread(img_abs_path)
+                cv2.imwrite("{}/{}.png".format(data_path, img_name), img)
                 os.remove(img_abs_path)
                 print("write --> {}.png  |  remove --> {}".format(img_name, img))
 
@@ -1347,9 +1356,9 @@ def cal_green_sensitivity(hsv_img, mask_img):
 
 
 def exit_light_patent_algorithm_test(img_path):
-    cv2img = cv2.imread(img_path)
-    g_img = cv2.split(cv2img)[1]
-    hsvimg = cv2.cvtColor(cv2img, cv2.COLOR_BGR2HSV)
+    img = cv2.imread(img_path)
+    g_img = cv2.split(img)[1]
+    hsvimg = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
     ret, thresh = cv2.threshold(g_img, 127, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
 
@@ -1378,22 +1387,22 @@ def black_area_change_pixel(img_path):
 
     for img in img_list:
         img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        cv2img_cp = cv2img.copy()
+        img = cv2.imread(img_abs_path)
+        img_cp = img.copy()
 
-        # black_area = np.where((cv2img[:, :, 0] < 5) & (cv2img[:, :, 1] < 5) & (cv2img[:, :, 2] < 5))
-        black_area = np.where((cv2img[:, :, 0] < 10) & (cv2img[:, :, 1] < 10) & (cv2img[:, :, 2] < 10))
-        # black_area = np.where((cv2img[:, :, 0] < 20) & (cv2img[:, :, 1] < 20) & (cv2img[:, :, 2] < 20))
-        # black_area = np.where((cv2img[:, :, 0] < 30) & (cv2img[:, :, 1] < 30) & (cv2img[:, :, 2] < 30))
+        # black_area = np.where((img[:, :, 0] < 5) & (img[:, :, 1] < 5) & (img[:, :, 2] < 5))
+        black_area = np.where((img[:, :, 0] < 10) & (img[:, :, 1] < 10) & (img[:, :, 2] < 10))
+        # black_area = np.where((img[:, :, 0] < 20) & (img[:, :, 1] < 20) & (img[:, :, 2] < 20))
+        # black_area = np.where((img[:, :, 0] < 30) & (img[:, :, 1] < 30) & (img[:, :, 2] < 30))
 
-        # bg_cv2img = bg_cv2img.copy()
+        # bg_img = bg_img.copy()
         for x_b, y_b in zip(black_area[1], black_area[0]):
             try:
-                cv2img_cp[y_b, x_b] = (255, 0, 255)
+                img_cp[y_b, x_b] = (255, 0, 255)
             except Exception as Error:
                 print(Error)
 
-        cv2.imwrite("{}/{}".format(save_path, img), cv2img_cp)
+        cv2.imwrite("{}/{}".format(save_path, img), img_cp)
 
 
 def perspective_transform(image, rect):
@@ -1421,7 +1430,7 @@ def perspective_transform(image, rect):
     return warped
 
 
-def crop_img_via_perspective_transform(img_path):
+def crop_img_via_perspective_transform(img_path: str):
     # Need to test
     
     def click_event(event, x, y, flags, param):
@@ -1466,10 +1475,10 @@ def process_black_images(img_path, flag="mv", pixel_sum=100000):
         img_abs_path = img_path + "/{}".format(img)
         try:
 
-            cv2img = cv2.imread(img_abs_path)
-            cv2img = cv2.resize(cv2img, (128, 128))
-            h, w = cv2img.shape[:2]
-            sum_ = np.sum(cv2img[:, :, :])
+            img = cv2.imread(img_abs_path)
+            img = cv2.resize(img, (128, 128))
+            h, w = img.shape[:2]
+            sum_ = np.sum(img[:, :, :])
             if sum_ < pixel_sum:
                 if flag == "mv":
                     shutil.move(img_abs_path, save_path)
@@ -1516,7 +1525,7 @@ def remove_corrupt_images_pil(img_path, move_or_delete="delete"):
         img_abs_path = img_path + "/{}".format(img)
         if move_or_delete == "move":
             img_dst_path = move_path + "/{}".format(img)
-        # cv2img = cv2.imread(img_abs_path)
+        # img = cv2.imread(img_abs_path)
         try:
             res = check_image(img_abs_path)
             if not res:
@@ -1673,15 +1682,15 @@ def remove_corrupt_images_opencv(img_path):
     for img in img_list:
         img_abs_path = img_path + "/{}".format(img)
         try:
-            # cv2img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-            cv2img = cv2.imread(img_abs_path)
+            # img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+            img = cv2.imread(img_abs_path)
 
-            if cv2img is None:
+            if img is None:
                 os.remove(img_abs_path)
                 print("[img is None]: Removed --> {}".format(img_abs_path))
                 continue
 
-            cv2img_ = np.asarray(cv2img)
+            img_ = np.asarray(img)
 
         except Exception as Error:
             print(Error)
@@ -1809,18 +1818,18 @@ def remove_small_area(img_path):
     for img in img_list:
         try:
             img_abs_path = img_path + "/{}".format(img)
-            cv2img = cv2.imread(img_abs_path)
-            cv2img_gray = cv2.cvtColor(cv2img, cv2.COLOR_BGR2GRAY)
+            img = cv2.imread(img_abs_path)
+            img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-            ret, thresh = cv2.threshold(cv2img_gray.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
+            ret, thresh = cv2.threshold(img_gray.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
             cnts, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             for c in cnts:
                 cx, cy, cw, ch = cv2.boundingRect(c)
                 if cw * ch < 5000:
-                    cv2img[cy:cy + ch, cx:cx + cw] = (0, 0, 0)
+                    img[cy:cy + ch, cx:cx + cw] = (0, 0, 0)
                     print("{}: {}_{}_{}_{}".format(img, cx, cy, cw, ch))
 
-            cv2.imwrite("{}/{}".format(save_path, img), cv2img)
+            cv2.imwrite("{}/{}".format(save_path, img), img)
 
         except Exception as Error:
             print(Error)
@@ -1837,9 +1846,9 @@ def process_small_images(img_path, rmsz=48, mode=0):
         try:
             img_abs_path = img_path + "/{}".format(img)
             img_dst_path = save_path + "/{}".format(img)
-            cv2img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+            img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
 
-            h, w = cv2img.shape[:2]
+            h, w = img.shape[:2]
             if mode == 0:
                 if (h < rmsz and w < rmsz) or (h > 8 * w or w > 5 * h):
                     shutil.move(img_abs_path, img_dst_path)
@@ -2001,7 +2010,7 @@ def saliency_map_ft_test():
         # bg_img_cp = bg_img.copy()
         saliency_map2 = get_saliency_ft(img_abs_path)
         saliency_map2_merge = cv2.merge([saliency_map2, saliency_map2, saliency_map2])
-        saliency_map = cal_saliency_map_FT(img) * 255
+        saliency_map = cal_saliency_map(img) * 255
         b, g, r = cv2.split(saliency_map)
         ret, b_bin = cv2.threshold(np.uint8(b), 70, 255, cv2.THRESH_BINARY)
         cv2.imwrite("{}/{}_saliency_map2.jpg".format(save_path, img_name), saliency_map2)
@@ -2027,7 +2036,7 @@ def saliency_map_ft_test():
         # bgcAH = np.hstack((bgcA, bgcH))
         # bgcVD = np.hstack((bgcV, bgcD))
         # bgcAHVD = np.vstack((bgcAH, bgcVD))
-        # bg_cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
+        # bg_img_resz = cv2.resize(img, (cA.shape[1], cA.shape[0]))
         bg_energy_gray = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
         print("E_bg_gray: ", bg_energy_gray)
 
@@ -2036,7 +2045,7 @@ def saliency_map_ft_test():
         # bgcAH = np.hstack((bgcA, bgcH))
         # bgcVD = np.hstack((bgcV, bgcD))
         # bgcAHVD = np.vstack((bgcAH, bgcVD))
-        # bg_cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
+        # bg_img_resz = cv2.resize(img, (cA.shape[1], cA.shape[0]))
         bg_energy = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
         print("E_bg_b: ", bg_energy)
 
@@ -2045,8 +2054,8 @@ def saliency_map_ft_test():
         cAH = np.hstack((cA, cH))
         cVD = np.hstack((cV, cD))
         cAHVD = np.vstack((cAH, cVD))
-        cv2img_resz = cv2.resize(cAHVD, (W, H))
-        cv2img_resz_merge = cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz])
+        img_resz = cv2.resize(cAHVD, (W, H))
+        img_resz_merge = cv2.merge([img_resz, img_resz, img_resz])
         energy_gray = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
         print("E_gray: ", energy_gray)
 
@@ -2055,7 +2064,7 @@ def saliency_map_ft_test():
         cAH = np.hstack((cA, cH))
         cVD = np.hstack((cV, cD))
         cAHVD = np.vstack((cAH, cVD))
-        cv2img_resz = cv2.resize(cAHVD, (W, H))
+        img_resz = cv2.resize(cAHVD, (W, H))
         energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
         print("E_b: ", energy)
 
@@ -2075,7 +2084,7 @@ def saliency_map_ft_test():
         cv2.putText(img_cp, "B_, G_, R_: {:.2f} {:.2f} {:.2f}".format(B_, G_, R_), (20, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
 
         cv2.imwrite("{}/{}_saliency_map_img_cp.jpg".format(save_path, img_name), img_cp)
-        out_img = np.hstack((img, saliency_map, b_bin_merge, cv2img_resz_merge, img_cp))
+        out_img = np.hstack((img, saliency_map, b_bin_merge, img_resz_merge, img_cp))
         cv2.imwrite("{}/{}_saliency_map_stacked.jpg".format(save_path, img_name), out_img)
 
 
@@ -2102,22 +2111,22 @@ def wt_test():
     for img in img_list:
         img_name = os.path.splitext(img)[0]
         img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path, 0)
-        cA, (cH, cV, cD) = dwt2(cv2img, "haar")
+        img = cv2.imread(img_abs_path, 0)
+        cA, (cH, cV, cD) = dwt2(img, "haar")
 
         cAH = np.hstack((cA, cH))
         cVD = np.hstack((cV, cD))
         cAHVD = np.vstack((cAH, cVD))
         cv2.imwrite("{}/{}_dwt2.jpg".format(save_path, img_name), cAHVD)
 
-        cv2img_resz = cv2.resize(cv2img, (cA.shape[1], cA.shape[0]))
-        img_cha = cv2.subtract(np.uint8(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz])), np.uint8(cv2.merge([cA, cA, cA])))
-        # img_cha = cv2.subtract(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz]), cv2.merge([cA, cA, cA]))
-        # img_cha = cv2.subtract(cv2.merge([cv2img_resz, cv2img_resz, cv2img_resz]), cv2.merge([cA, cA, cA]))
+        img_resz = cv2.resize(img, (cA.shape[1], cA.shape[0]))
+        img_cha = cv2.subtract(np.uint8(cv2.merge([img_resz, img_resz, img_resz])), np.uint8(cv2.merge([cA, cA, cA])))
+        # img_cha = cv2.subtract(cv2.merge([img_resz, img_resz, img_resz]), cv2.merge([cA, cA, cA]))
+        # img_cha = cv2.subtract(cv2.merge([img_resz, img_resz, img_resz]), cv2.merge([cA, cA, cA]))
         print(img_cha.sum())
         cv2.imwrite("{}/{}_img_cha.jpg".format(save_path, img_name), img_cha)
 
-        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / cv2img.size
+        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / img.size
         print("E: ", energy)
 
         Es.append(energy)
@@ -2153,10 +2162,10 @@ def convert_to_gray_image(data_path):
 
 
 def crop_one_image(img_path, crop_area):
-    cv2img = cv2.imread(img_path)
+    img = cv2.imread(img_path)
     par_path = os.path.abspath(os.path.join(img_path, "../.."))
     img_name = os.path.splitext(os.path.basename(img_path))[0]
-    cropped = cv2img[crop_area[0]:crop_area[1], crop_area[2]:crop_area[3]]
+    cropped = img[crop_area[0]:crop_area[1], crop_area[2]:crop_area[3]]
     cv2.imwrite("{}/{}_cropped.jpg".format(par_path, img_name), cropped)
 
 
@@ -2220,9 +2229,9 @@ def classify_images_via_bgr_values(img_path):
 
     for i in img_list:
         img_abs_path = img_path + "/{}".format(i)
-        cv2img = cv2.imread(img_abs_path)
-        imgsz = cv2img.shape[:2]
-        b, g, r = cv2.split(cv2img)
+        img = cv2.imread(img_abs_path)
+        imgsz = img.shape[:2]
+        b, g, r = cv2.split(img)
         b_ = np.mean(np.asarray(b).reshape(1, -1))
         g_ = np.mean(np.asarray(g).reshape(1, -1))
         r_ = np.mean(np.asarray(r).reshape(1, -1))
@@ -2284,7 +2293,7 @@ def find_red_bbx(img, expand_p=2):
         width = np.int32(x2 - x1)
         height = np.int32(y2 - y1)
 
-        roi = cv2img[y1 + expand_p: y2 - expand_p, x1 + expand_p:x2 - expand_p]
+        roi = img[y1 + expand_p: y2 - expand_p, x1 + expand_p:x2 - expand_p]
         # print
         # print(x1,y1,x2,y2)
         if width < 80 or height < 80:
@@ -2340,13 +2349,13 @@ def detect_shape(c):
         return shape, approx
 
 
-def seg_crop_object(cv2img, bgimg, maskimg):
-    # imgsz = cv2img.shape
-    outimg = np.zeros(cv2img.shape)
+def seg_crop_object(img, bgimg, maskimg):
+    # imgsz = img.shape
+    outimg = np.zeros(img.shape)
     # outimg2 = bgimg.copy()
     # roi = np.where(maskimg[:, :, 0] != 0 & maskimg[:, :, 1] != 0 & maskimg[:, :, 2] != 0)
     roi = np.where(maskimg[:, :, 0] != 0)
-    outimg[roi] = cv2img[roi]
+    outimg[roi] = img[roi]
     # outimg2[roi] = (0, 0, 0)
 
     conts, hierarchy = cv2.findContours(maskimg[:, :, 0].astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -2470,10 +2479,10 @@ def crop_images(data_path):
     data_list = sorted(os.listdir(data_path))
     for f in tqdm(data_list):
         f_abs_path = data_path + "/{}".format(f)
-        cv2img = cv2.imread(f_abs_path)
-        imgsz = cv2img.shape[:2]
-        # cropped = cv2img[212:imgsz[0], :]
-        cropped = cv2img[0:165, :]
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        # cropped = img[212:imgsz[0], :]
+        cropped = img[0:165, :]
         cv2.imwrite("{}/{}".format(save_path, f), cropped)
 
 
@@ -2784,7 +2793,7 @@ def blend_mask(image, mask, alpha=0.5, cmap='jet', color='b', color_alpha=1.0):
     mask = (mask * 255).astype(dtype=np.uint8)
 
     # set the basic color
-    basic_color = np.array(colors.to_rgb(color)) * 255
+    basic_color = np.array(mpl.colors.to_rgb(color)) * 255
     basic_color = np.tile(basic_color, [image.shape[0], image.shape[1], 1])
     basic_color = basic_color.astype(dtype=np.uint8)
     # blend with basic color
@@ -2936,21 +2945,21 @@ def find_specific_color(img, lower=(0, 0, 100), upper=(80, 80, 255)):
     return res
 
 
-def change_pixels_value(cv2img):
-    hsv = cv2.cvtColor(cv2img, cv2.COLOR_BGR2HSV)
+def change_pixels_value(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     h, s, v = cv2.split(hsv)
     thresh1 = cv2.threshold(s, 92, 255, cv2.THRESH_BINARY)[1]
     thresh2 = cv2.threshold(v, 10, 255, cv2.THRESH_BINARY)[1]
     thresh2 = 255 - thresh2
     mask = cv2.add(thresh1, thresh2)
 
-    H, W, _ = cv2img.shape
-    newimg = cv2img.copy()
+    H, W, _ = img.shape
+    newimg = img.copy()
 
     for i in range(H):
         for j in range(W):
             if mask[i, j] != 0:
-                newimg[i, j] = cv2img[i - 12, j - 12]
+                newimg[i, j] = img[i - 12, j - 12]
 
     return newimg
 
@@ -3105,8 +3114,8 @@ def color_identify(data_path):
     img_list = os.listdir(data_path)
     for img in img_list:
         img_abs_path = data_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        RES = identify_colors(cv2img, COLORS, THRESHOLD=60, N_COLORS=5, SIZE=(32, 16))
+        img = cv2.imread(img_abs_path)
+        RES = identify_colors(img, COLORS, THRESHOLD=60, N_COLORS=5, SIZE=(32, 16))
         if RES["WHITE"] and not RES["GREEN_128"] and not RES["GREEN_255"]:
             img_dst_path = off_path + "/{}".format(img)
             shutil.copy(img_abs_path, img_dst_path)
@@ -3129,8 +3138,8 @@ def rotate_image_90(img_path):
     img_list = sorted(os.listdir(img_path))
     for img in img_list:
         img_abs_path = img_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        img90 = np.rot90(cv2img, 1)
+        img = cv2.imread(img_abs_path)
+        img90 = np.rot90(img, 1)
         cv2.imwrite("{}/{}".format(save_path, img), img90)
     
 
@@ -3141,8 +3150,8 @@ def cal_images_mean_height_width(data_path):
 
     for img in img_list:
         img_abs_path = data_path + "/{}".format(img)
-        cv2img = cv2.imread(img_abs_path)
-        h, w = cv2img.shape[:2]
+        img = cv2.imread(img_abs_path)
+        h, w = img.shape[:2]
         hs.append(h)
         ws.append(w)
 
@@ -3153,48 +3162,6 @@ def cal_images_mean_height_width(data_path):
     print(w_mean)  # 478.03767430481935
 
     return h_mean, w_mean
-
-
-# PCL
-def mat2pcl(img, K):
-    import open3d as o3d
-
-    f_x = K[0, 0]
-    f_y = K[1, 1]
-    s = K[0, 1]
-    p_x = K[0, 2]
-    p_y = K[1, 2]
-
-    y_values, x_values = np.where(img > 300)
-    z_values = img[y_values, x_values]
-
-    Y_values = (y_values - p_y) * z_values / f_y
-    X_values = (x_values - p_x - (y_values - p_y) * s / f_y) * z_values / f_x
-
-    points_3d = np.array([X_values, Y_values, z_values]).T
-
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points_3d)
-
-    return pcd
-
-
-def main_pcl():
-    import open3d as o3d
-
-    fs = cv2.FileStorage(r"data/matrix.yml", cv2.FileStorage_READ)
-    K = fs.getNode("M").mat()
-    fs.release()
-
-    image_path = r"data/2111043208/1-1067.data"
-    h_image = cv2.imread(image_path, 2)
-
-    # h_image = (h_image/65535)*900+200
-
-    pcd = mat2pcl(h_image, K)
-    o3d.io.write_point_cloud(image_path.replace(".data", ".ply"), pcd)
-
-    return 0
 
 
 # OCR
@@ -4140,24 +4107,24 @@ def aug_dbnet_data(data_path, bg_path, maxnum=20000):
                 mask_abs_path = mask_path + "/{}.png".format(img_name)
                 gt_abs_path = dbnet_gt_path + "/{}.gt".format(img_name)
 
-                cv2img = cv2.imread(img_abs_path)
-                cv2imgsz = cv2img.shape[:2]
+                img = cv2.imread(img_abs_path)
+                imgsz = img.shape[:2]
                 maskimg = cv2.imread(mask_abs_path)
 
                 rdmnum = np.random.random()
-                if cv2imgsz[0] > 3000 and cv2imgsz[1] > 3000:
+                if imgsz[0] > 3000 and imgsz[1] > 3000:
                     if rdmnum < 0.25:
-                        cv2img = cv2.resize(cv2img, (cv2imgsz[1] // 2, cv2imgsz[0] // 2))
-                        maskimg = cv2.resize(maskimg, (cv2imgsz[1] // 2, cv2imgsz[0] // 2))
+                        img = cv2.resize(img, (imgsz[1] // 2, imgsz[0] // 2))
+                        maskimg = cv2.resize(maskimg, (imgsz[1] // 2, imgsz[0] // 2))
                     elif rdmnum > 0.75:
-                        cv2img = cv2.resize(cv2img, (cv2imgsz[1] // 4, cv2imgsz[0] // 4))
-                        maskimg = cv2.resize(maskimg, (cv2imgsz[1] // 4, cv2imgsz[0] // 4))
+                        img = cv2.resize(img, (imgsz[1] // 4, imgsz[0] // 4))
+                        maskimg = cv2.resize(maskimg, (imgsz[1] // 4, imgsz[0] // 4))
                 else:
                     if rdmnum < 0.45:
-                        cv2img = cv2.resize(cv2img, (cv2imgsz[1] // 2, cv2imgsz[0] // 2))
-                        maskimg = cv2.resize(maskimg, (cv2imgsz[1] // 2, cv2imgsz[0] // 2))
+                        img = cv2.resize(img, (imgsz[1] // 2, imgsz[0] // 2))
+                        maskimg = cv2.resize(maskimg, (imgsz[1] // 2, imgsz[0] // 2))
 
-                outimg_crop, bbox, relative_roi = seg_crop_object(cv2img, bgimg, maskimg)
+                outimg_crop, bbox, relative_roi = seg_crop_object(img, bgimg, maskimg)
 
                 with open(gt_abs_path, "r", encoding="utf-8") as fo:
                     lines = fo.readlines()
@@ -4168,7 +4135,7 @@ def aug_dbnet_data(data_path, bg_path, maxnum=20000):
                         # relative_points_x = np.array(line[::2]) - bbox[0]
                         # relative_points_y = np.array(line[1::2]) - bbox[1]
 
-                        if cv2imgsz[0] > 3000 and cv2imgsz[1] > 3000:
+                        if imgsz[0] > 3000 and imgsz[1] > 3000:
                             if rdmnum < 0.25:
                                 line = line.strip().split(", ")[:8]
                                 line = list(map(float, line))
@@ -4249,7 +4216,7 @@ def vis_dbnet_gt(data_path):
         gt_abs_path = gt_path + "/{}".format(gt)
         img_abs_path = img_path + "/{}.jpg".format(gt_name)
 
-        cv2img = cv2.imread(img_abs_path)
+        img = cv2.imread(img_abs_path)
 
         with open(gt_abs_path, "r", encoding="utf-8") as fo:
             lines = fo.readlines()
@@ -4257,9 +4224,9 @@ def vis_dbnet_gt(data_path):
                 line = line.strip().split(", ")[:8]
                 line = list(map(int, map(round, map(float, line))))
                 for j in range(0, 8, 2):
-                    cv2.circle(cv2img, (line[j], line[j + 1]), 4, (255, 0, 255), 2)
+                    cv2.circle(img, (line[j], line[j + 1]), 4, (255, 0, 255), 2)
 
-        cv2.imwrite("{}/{}.jpg".format(vis_path, gt_name), cv2img)
+        cv2.imwrite("{}/{}.jpg".format(vis_path, gt_name), img)
         
 
 def crop_ocr_rec_img_via_labelbee_det_json(data_path):
@@ -4279,7 +4246,7 @@ def crop_ocr_rec_img_via_labelbee_det_json(data_path):
         img_name = os.path.splitext(j.replace(".json", ""))[0]
         json_abs_path = json_path + "/{}".format(j)
         img_abs_path = img_path + "/{}".format(j.replace(".json", ""))
-        cv2img = cv2.imread(img_abs_path)
+        img = cv2.imread(img_abs_path)
         json_ = json.load(open(json_abs_path, 'r', encoding='utf-8'))
         if not json_: continue
         w, h = json_["width"], json_["height"]
@@ -4308,7 +4275,7 @@ def crop_ocr_rec_img_via_labelbee_det_json(data_path):
             label = result_[i]["textAttribute"]
 
             try:
-                cropped_img0 = cv2img[y_min:y_max, x_min:x_max]
+                cropped_img0 = img[y_min:y_max, x_min:x_max]
                 cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 0, label), cropped_img0)
                 if "A" in label or "b" in label or "C" in label:
                     rdm_w = np.random.randint(55, 76)
@@ -4323,7 +4290,7 @@ def crop_ocr_rec_img_via_labelbee_det_json(data_path):
                 print(Error)
 
             try:
-                cropped_img1 = cv2img[y_min - np.random.randint(0, 4):y_max + np.random.randint(0, 4), x_min - np.random.randint(0, 4):x_max + np.random.randint(0, 4)]
+                cropped_img1 = img[y_min - np.random.randint(0, 4):y_max + np.random.randint(0, 4), x_min - np.random.randint(0, 4):x_max + np.random.randint(0, 4)]
                 cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 1, label), cropped_img1)
                 if "A" in label or "b" in label or "C" in label:
                     rdm_w = np.random.randint(55, 76)
@@ -4338,7 +4305,7 @@ def crop_ocr_rec_img_via_labelbee_det_json(data_path):
                 print(Error)
 
             try:
-                cropped_img2 = cv2img[y_min - np.random.randint(0, 4):y_max - np.random.randint(0, 4), x_min - np.random.randint(0, 4):x_max - np.random.randint(0, 4)]
+                cropped_img2 = img[y_min - np.random.randint(0, 4):y_max - np.random.randint(0, 4), x_min - np.random.randint(0, 4):x_max - np.random.randint(0, 4)]
                 cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 2, label), cropped_img2)
                 if "A" in label or "b" in label or "C" in label:
                     rdm_w = np.random.randint(55, 76)
@@ -4353,7 +4320,7 @@ def crop_ocr_rec_img_via_labelbee_det_json(data_path):
                 print(Error)
 
             try:
-                cropped_img3 = cv2img[y_min + np.random.randint(0, 4):y_max - np.random.randint(0, 4), x_min + np.random.randint(0, 4):x_max - np.random.randint(0, 4)]
+                cropped_img3 = img[y_min + np.random.randint(0, 4):y_max - np.random.randint(0, 4), x_min + np.random.randint(0, 4):x_max - np.random.randint(0, 4)]
                 cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 3, label), cropped_img3)
                 if "A" in label or "b" in label or "C" in label:
                     rdm_w = np.random.randint(55, 76)
@@ -4368,7 +4335,7 @@ def crop_ocr_rec_img_via_labelbee_det_json(data_path):
                 print(Error)
 
             try:
-                cropped_img4 = cv2img[y_min + np.random.randint(0, 4):y_max + np.random.randint(0, 4), x_min + np.random.randint(0, 4):x_max + np.random.randint(0, 4)]
+                cropped_img4 = img[y_min + np.random.randint(0, 4):y_max + np.random.randint(0, 4), x_min + np.random.randint(0, 4):x_max + np.random.randint(0, 4)]
                 cv2.imwrite("{}/{}_{}_{}={}.jpg".format(cropped_path, img_name, i, 4, label), cropped_img4)
                 if "A" in label or "b" in label or "C" in label:
                     rdm_w = np.random.randint(55, 76)
@@ -4746,7 +4713,7 @@ def crop_img_via_labelbee_kpt_json(data_path):
             # with open(txt_save_path, "w", encoding="utf-8") as fw:
 
             img_abs_path = img_path + "/{}.jpg".format(fname)
-            cv2img = cv2.imread(img_abs_path)
+            img = cv2.imread(img_abs_path)
 
             kpts = []
             for i in range(len_result):
@@ -4763,7 +4730,7 @@ def crop_img_via_labelbee_kpt_json(data_path):
 
             x1, x2 = round(min(kpts[0][0], kpts[3][0])), round(max(kpts[1][0], kpts[2][0]))
             y1, y2 = round(min(kpts[0][1], kpts[1][1])), round(max(kpts[2][1], kpts[3][1]))
-            cropped_base = cv2img[y1:y2, x1:x2]
+            cropped_base = img[y1:y2, x1:x2]
             basesz = cropped_base.shape[:2]
 
             kpts = expand_kpt(basesz, kpts, r=0.12)
@@ -4777,13 +4744,13 @@ def crop_img_via_labelbee_kpt_json(data_path):
                     src_points = np.float32([[kpts[ki][0], kpts[ki][1]], [kpts[ki][2], kpts[ki][3]], [kpts[ki][6], kpts[ki][7]], [kpts[ki][4], kpts[ki][5]]])
                     dst_points = np.float32([[0, 0], [h // 2, 0], [0, w // 2], [h // 2, w // 2]])
                     M = cv2.getPerspectiveTransform(src_points, dst_points)
-                    warpped = cv2.warpPerspective(cv2img, M, (h // 2, w // 2))
+                    warpped = cv2.warpPerspective(img, M, (h // 2, w // 2))
                     cv2.imwrite("{}/{}_{}.jpg".format(save_path, fname, ki), warpped)
                 else:
                     src_points = np.float32([[kpts[ki][0], kpts[ki][1]], [kpts[ki][2], kpts[ki][3]], [kpts[ki][6], kpts[ki][7]], [kpts[ki][4], kpts[ki][5]]])
                     dst_points = np.float32([[0, 0], [w // 2, 0], [0, h // 2], [w // 2, h // 2]])
                     M = cv2.getPerspectiveTransform(src_points, dst_points)
-                    warpped = cv2.warpPerspective(cv2img, M, (w // 2, h // 2))
+                    warpped = cv2.warpPerspective(img, M, (w // 2, h // 2))
                     cv2.imwrite("{}/{}_{}.jpg".format(save_path, fname, ki), warpped)
 
         except Exception as Error:
@@ -4808,8 +4775,8 @@ def labelbee_kpt_to_labelme_kpt(data_path):
             fname = os.path.splitext(img_name)[0]
             f_abs_path = jsons_path + "/{}".format(f)
             img_abs_path = images_path + "/{}.jpg".format(fname)
-            cv2img = cv2.imread(img_abs_path)
-            imgsz = cv2img.shape[:2]
+            img = cv2.imread(img_abs_path)
+            imgsz = img.shape[:2]
 
             with open(f_abs_path, "r") as fr:
                 src_data = json.load(fr)
@@ -4831,7 +4798,7 @@ def labelbee_kpt_to_labelme_kpt(data_path):
             json_labelme["flags"] = eval("{}")
             json_labelme["shapes"] = shapes_data
             json_labelme["imagePath"] = img_name
-            json_labelme["imageData"] = labelme.utils.img_arr_to_b64(cv2img).strip()
+            json_labelme["imageData"] = labelme.utils.img_arr_to_b64(img).strip()
             json_labelme["imageHeight"] = imgsz[0]
             json_labelme["imageWidth"] = imgsz[1]
 
@@ -4882,8 +4849,8 @@ def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
             fname = os.path.splitext(img_name)[0]
             f_abs_path = jsons_path + "/{}".format(f)
             img_abs_path = images_path + "/{}.jpeg".format(fname)
-            cv2img = cv2.imread(img_abs_path)
-            imgsz = cv2img.shape[:2]
+            img = cv2.imread(img_abs_path)
+            imgsz = img.shape[:2]
 
             with open(f_abs_path, "r") as fr:
                 src_data = json.load(fr)
@@ -4908,7 +4875,7 @@ def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
                 augNum = 3
                 x1, x2 = round(min(p1[0], p4[0])), round(max(p2[0], p3[0]))
                 y1, y2 = round(min(p1[1], p2[1])), round(max(p3[1], p4[1]))
-                cropped_base = cv2img[y1:y2, x1:x2]
+                cropped_base = img[y1:y2, x1:x2]
                 basesz = cropped_base.shape[:2]
                 # ptsnew = aug_points(pt, n=10, imgsz=basesz, r=0.25)
                 # # ptsnew = list(set(ptsnew))
@@ -4928,7 +4895,7 @@ def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
                     # for idx, pi in enumerate([pt]):
                     ix1, ix2 = round(min(pi[0][0], pi[3][0])), round(max(pi[1][0], pi[2][0]))
                     iy1, iy2 = round(min(pi[0][1], pi[1][1])), round(max(pi[2][1], pi[3][1]))
-                    cropped = cv2img[iy1:iy2, ix1:ix2]
+                    cropped = img[iy1:iy2, ix1:ix2]
                     croppedsz = cropped.shape[:2]
 
                     shapes_data = []
@@ -5049,8 +5016,8 @@ def crop_img_via_labelme_json(data_path, r=0.10):
         img_abs_path = img_path + "/{}".format(f)
         json_abs_path = json_path + "/{}.json".format(fname)
 
-        cv2img = cv2.imread(img_abs_path)
-        imgsz = cv2img.shape[:2]
+        img = cv2.imread(img_abs_path)
+        imgsz = img.shape[:2]
 
         with open(json_abs_path, "r") as fr:
             json_ = json.load(fr)
@@ -5074,7 +5041,7 @@ def crop_img_via_labelme_json(data_path, r=0.10):
         dstPoints = np.array([[0, 0], [dstW, 0], [0, dstH], [dstW, dstH]], dtype=np.float32)
 
         M = cv2.getPerspectiveTransform(srcPoints, dstPoints)
-        warped = cv2.warpPerspective(cv2img, M, (dstW, dstH))
+        warped = cv2.warpPerspective(img, M, (dstW, dstH))
         cv2.imwrite("{}/{}".format(save_path, f), warped)
 
 
@@ -5091,12 +5058,12 @@ class GKFCLS():
         self.keep_ratio_flag = keep_ratio_flag
         self.device = device
         self.print_infer_time = print_infer_time
-        self.ort_session = onnxruntime.InferenceSession(self.model_path, providers=['CUDAExecutionProvider', "CPUExecutionProvider"])
+        self.ort_session = ort.InferenceSession(self.model_path, providers=['CUDAExecutionProvider', "CPUExecutionProvider"])
 
     def keep_ratio(self, pilimg, flag=True, shape=(128, 128)):
         if flag:
-            cv2img = np.array(np.uint8(pilimg))
-            img_src, ratio, (dw, dh) = letterbox(cv2img, new_shape=shape)
+            img = np.array(np.uint8(pilimg))
+            img_src, ratio, (dw, dh) = letterbox(img, new_shape=shape)
             keep_ratio_pilimg = Image.fromarray(img_src)
             return keep_ratio_pilimg
         else:
@@ -5280,8 +5247,8 @@ def gen_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 160)
         img_name = os.path.splitext(img)[0]
         img_abs_path = data_path + "/{}".format(img)
         try:
-            cv2img = cv2.imread(img_abs_path)
-            h, w = cv2img.shape[:2]
+            img = cv2.imread(img_abs_path)
+            h, w = img.shape[:2]
             n = np.random.randint(randint_low, randint_high)
             for i in range(n):
                 try:
@@ -5298,7 +5265,7 @@ def gen_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 160)
                     size_i = (size_i_h, size_i_w)
 
                     random_pos = [np.random.randint(0, w - size_i[1][0]), np.random.randint(0, h - size_i[0][0])]
-                    random_cropped = cv2img[random_pos[1]:(random_pos[1] + size_i[0][0]), random_pos[0]:(random_pos[0] + size_i[1][0])]
+                    random_cropped = img[random_pos[1]:(random_pos[1] + size_i[0][0]), random_pos[0]:(random_pos[0] + size_i[1][0])]
                     cv2.imwrite("{}/{}_{}_{}_{}.jpg".format(save_path, img_name, size_i[0][0], size_i[1][0], i), random_cropped)
 
                     total_num += 1
@@ -5575,7 +5542,7 @@ def change_brightness_opencv_official(img, alpha=1.0, beta=0):
 def gamma_correction(img, random=False, p=1, value=(4, 17)):
     if random:
         if np.random.random() <= p:
-            gamma_value = 0.1 * np.random.randint(lower, upper)
+            gamma_value = 0.1 * np.random.randint(value[0], value[1])
             lookUpTable = np.empty((1, 256), np.uint8)
             for i in range(256):
                 lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma_value) * 255.0, 0, 255)
@@ -6359,9 +6326,9 @@ def compress(img, random=False, p=1, quality=(25, 90)):
     
 
 def random_exposure(img, random=False, p=1):
+    from PIL import ImageDraw
     if random:
         if np.random.random() <= p:
-            img = getcvimage(img)
             h, w = img.shape[:2]
             x0 = random.randint(0, w)
             y0 = random.randint(0, h)
@@ -6381,7 +6348,6 @@ def random_exposure(img, random=False, p=1):
         else:
             return img
     else:
-        img = getcvimage(img)
         h, w = img.shape[:2]
         x0 = random.randint(0, w)
         y0 = random.randint(0, h)
@@ -6403,7 +6369,6 @@ def random_exposure(img, random=False, p=1):
 def random_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
     if random:
         if np.random.random() <= p:
-            img = getpilimage(img)
             w, h = img.size
             rate = np.random.random() * (max_rate - min_rate) + min_rate
             w2 = int(w * rate)
@@ -6414,7 +6379,6 @@ def random_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
         else:
             return img
     else:
-        img = getpilimage(img)
         w, h = img.size
         rate = np.random.random() * (max_rate - min_rate) + min_rate
         w2 = int(w * rate)
@@ -6788,285 +6752,6 @@ def translate(img, random=False, p=1, translate_xy=(20, 30), border_color=(114, 
         return img
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
-
-
-
-
-
-
-
-
-
-
-
-
-def get_trans_mat(center, degrees=0, translate=(0, 0), scale=1, shear=(0, 0), perspective=(0, 0)):
-    C = np.eye(3)
-    C[0, 2] = center[0]  # x translation (pixels)
-    C[1, 2] = center[1]  # y translation (pixels)
-
-    # Perspective
-    P = np.eye(3)
-    P[2, 0] = perspective[0]  # x perspective (about y)
-    P[2, 1] = perspective[1]  # y perspective (about x)
-
-    # Rotation and Scale
-    R = np.eye(3)
-    a = degrees
-    # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
-    s = scale
-    # s = 2 ** random.uniform(-scale, scale)
-    R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
-
-    # Shear
-    S = np.eye(3)
-    S[0, 1] = shear[0]  # x shear (deg)
-    S[1, 0] = shear[1]  # y shear (deg)
-
-    # Translation
-    T = np.eye(3)
-    T[0, 2] = translate[0]  # x translation (pixels)
-    T[1, 2] = translate[1]  # y translation (pixels)
-
-    # Combined rotation matrix
-    M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
-    return M
-
-def TransAffine(img, degrees=10, translate=0.1, scale=0.1, shear=0.1, perspective=0.1, border=(4, 4), prob=0.5):
-    img = img  # results["img"]
-    height = img.shape[0]
-    width = img.shape[1]
-
-    center_src = (-img.shape[1] / 2, -img.shape[0] / 2)
-    perspective_src = (random.uniform(-perspective, perspective), random.uniform(-perspective, perspective))
-    degrees_src = random.uniform(-degrees, degrees)
-    scale_src = random.uniform(1 - 0.25, 1 + scale)
-    shear_src = (math.tan(random.uniform(-shear, shear) * math.pi / 180), math.tan(random.uniform(-shear, shear) * math.pi / 180))
-    translate_src = [random.uniform(0.5 - translate, 0.5 + translate) * width, random.uniform(0.5 - translate, 0.5 + translate) * height]
-
-    M_src = self.get_trans_mat(center_src, degrees_src, translate_src, scale_src, shear_src, perspective_src)
-    four_pt = np.array([[0, 0, 1], [width, 0, 1], [0, height, 1], [width, height, 1]])
-    res_pt = M_src @ four_pt.T
-    res_pt = res_pt.astype(np.int_).T
-    res_pt = res_pt[:, :2]
-    min_x = np.min(res_pt[:, 0])
-    max_x = np.max(res_pt[:, 0])
-    min_y = np.min(res_pt[:, 1])
-    max_y = np.max(res_pt[:, 1])
-    if (min_x < 0):
-        translate_src[0] -= min_x
-    if (min_y < 0):
-        translate_src[1] -= min_y
-
-    if (max_x - min_x > width):
-        new_width = (max_x - min_x)
-    else:
-        new_width = width
-    if (max_y - min_y > height):
-        new_height = (max_y - min_y)
-    else:
-        new_height = height
-
-    M = self.get_trans_mat((-width / 2, -height / 2), degrees_src, translate_src, scale_src, shear_src, perspective_src)
-
-    border_color = (random.randint(220, 250), random.randint(220, 250), random.randint(220, 250))
-    if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
-        if perspective:
-            img = cv2.warpPerspective(img, M, dsize=(new_width, new_height), borderMode=cv2.BORDER_CONSTANT, borderValue=border_color)
-        else:  # affine
-            img = cv2.warpAffine(img, M[:2], dsize=(new_width, new_height), borderMode=cv2.BORDER_CONSTANT, borderValue=border_color)
-    return img
-
-
 def resize_images(img_path, size=(128, 128), n=8):
     img_list = os.listdir(img_path)
     save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_resize".format(img_path.split("/")[-1])
@@ -7110,12 +6795,12 @@ def crop_red_bbx_area(data_path, expand_p=5):
     for f in tqdm(file_list):
         fname = os.path.splitext(f)[0]
         f_abs_path = data_path + "/{}".format(f)
-        cv2img = cv2.imread(f_abs_path)
-        results = find_red_bbx(cv2img, expand_p=expand_p)
+        img = cv2.imread(f_abs_path)
+        results = find_red_bbx(img, expand_p=expand_p)
         for ri, r in enumerate(results):
             try:
                 f_ri_dst_path = save_path + "/{}_{}_{}_cropped.jpg".format(fname, expand_p, ri)
-                cropped = cv2img[r[2]:r[3], r[0]:r[1]]
+                cropped = img[r[2]:r[3], r[0]:r[1]]
                 cv2.imwrite(f_ri_dst_path, cropped)
             except Exception as Error:
                 print(Error)
@@ -7138,1394 +6823,37 @@ def is_gray_img(img, dstsz=(64, 64), mean_thr=1):
     return False
 
 
-class BlurAug(object):
-    def __init__(self, ratio=1.0, type="EASY"):  # easy hard
-        self.ratio = ratio
-        self.pre_rotate_angle = 135.0
-        self.type = type
-
-    def padding(self, img):
-        res = math.sqrt(img.shape[0] * img.shape[0] + img.shape[1] * img.shape[1])
-        pad_x = int(res - img.shape[1] * 0.5 + 1)
-        pad_y = int(res - img.shape[0] * 0.5 + 1)
-        img_pad = cv2.copyMakeBorder(img, pad_y, pad_y, pad_x, pad_x, borderType=cv2.BORDER_CONSTANT, value=0)
-        return img_pad, (pad_x, pad_y)
-
-    def aug_resize(self, img):
-        img, crop_rect = self.padding(img)
-        angle = random.uniform(-self.pre_rotate_angle, self.pre_rotate_angle)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-
-        factor = random.uniform(0, 1.0)
-        if (self.type == "EASY"):
-            scale = factor * 0.25 + 0.8
-        else:
-            scale = factor * 0.1 + 0.2
-        rows, cols, _ = img.shape
-        dst = cv2.resize(dst, (int(cols * scale), int(rows * scale)))
-        dst = cv2.resize(dst, (cols, rows))
-
-        rows, cols, _ = dst.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(dst, affine_mat, (cols, rows))
-        out_img = out_img[crop_rect[1]: out_img.shape[0] - crop_rect[1], crop_rect[0]: out_img.shape[1] - crop_rect[0], :]
-        return out_img
-
-    def aug_blur(self, img):
-        img, crop_rect = self.padding(img)
-        angle = random.uniform(-self.pre_rotate_angle, self.pre_rotate_angle)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-        if (self.type == "EASY"):
-            random_value = random.randint(0, 3)
-            size = int(random_value / 2) * 2 + 1
-        else:
-            random_value = random.randint(5, 7)
-            size = int(random_value / 2) * 2 + 3
-        blur_img = cv2.blur(dst, (size, size))
-        rows, cols, _ = blur_img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-        out_img = out_img[crop_rect[1]: out_img.shape[0] - crop_rect[1], crop_rect[0]: out_img.shape[1] - crop_rect[0], :]
-        return out_img
-
-    def aug_motion_blur(self, img):
-        img, crop_rect = self.padding(img)
-        angle = random.uniform(-self.pre_rotate_angle, self.pre_rotate_angle)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-
-        if self.type == "EASY":
-            size = int(random.uniform(0.0, 3.0) + 2)
-        else:
-            size = int(random.uniform(5.0, 7.0) + 5)
-        kernel = np.zeros((size, size), np.float32)
-        h = (size - 1) // 2
-        for i in range(size):
-            kernel[h][i] = 1.0 / float(size)
-
-        blur_img = cv2.filter2D(dst, -1, kernel)
-        rows, cols, _ = blur_img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-
-        out_img = out_img[crop_rect[1]: out_img.shape[0] - crop_rect[1], crop_rect[0]: out_img.shape[1] - crop_rect[0], :]
-        return out_img
-
-    def aug_medianblur(self, img):
-        img, crop_rect = self.padding(img)
-        angle = random.uniform(-self.pre_rotate_angle, self.pre_rotate_angle)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-        if (self.type == "EASY"):
-            random_value = random.randint(0, 3)
-            size = int(random_value / 2) * 2 + 1
-        else:
-            random_value = random.randint(3, 7)
-            size = int(random_value / 2) * 2 + 3
-        blur_img = cv2.medianBlur(dst, size)
-        rows, cols, _ = blur_img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-        out_img = out_img[crop_rect[1]: out_img.shape[0] - crop_rect[1], crop_rect[0]: out_img.shape[1] - crop_rect[0], :]
-        return out_img
-
-    def aug_gaussblur(self, img):
-        img, crop_rect = self.padding(img)
-        angle = random.uniform(-self.pre_rotate_angle, self.pre_rotate_angle)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-        if (self.type == "EASY"):
-            random_value = random.randint(0, 2)
-            size = int(random_value / 2) * 2 + 3
-        else:
-            random_value = random.randint(5, 7)
-            size = int(random_value / 2) * 2 + 7
-        blur_img = cv2.GaussianBlur(dst, (size, size), 0)
-        rows, cols, _ = blur_img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-        out_img = out_img[crop_rect[1]: out_img.shape[0] - crop_rect[1], crop_rect[0]: out_img.shape[1] - crop_rect[0], :]
-        return out_img
-
-    def __call__(self, img):
-        if (np.random.rand() < self.ratio):
-            img = img.astype(np.uint8)
-            select_id = random.choice([1, 2, 4])
-            # select_id = random.choice( [0] )
-            if (select_id == 0):
-                img = self.aug_resize(img)
-            elif (select_id == 1):
-                img = self.aug_blur(img)
-            elif (select_id == 2):
-                img = self.aug_motion_blur(img)
-            elif (select_id == 3):
-                img = self.aug_medianblur(img)
-            else:
-                img = self.aug_gaussblur(img)
-            # print ("blur type : " , select_id)
-            img = img.astype(np.float32)
-
-        # bbox_mosaic = results["gt_bboxes"]
-        # img_mosaic = results["img"].astype(np.uint8)
-        # for k in range(bbox_mosaic.shape[0]):
-        #     bbox = bbox_mosaic[k].astype(np.int)
-        #     cv2.rectangle(img_mosaic, (bbox[0], bbox[1]), (bbox[2], bbox[3]) , (0,0,255), 2)
-        # if (img_mosaic.shape[0] > 1000 or img_mosaic.shape[1] > 1000):
-        #     img_mosaic = cv2.resize(img_mosaic, (img_mosaic.shape[1] // 4, img_mosaic.shape[0] // 4 ) )
-        # cv2.imshow("blur", img_mosaic)
-        # cv2.waitKey(-1)
-
-        return img
-
-
-class NoiseAug(object):
-    def __init__(self, ratio=0.9):
-        self.ratio = ratio
-
-    # sault and peper noise
-    def sp_noise(self, image, prob):
-        output = np.zeros(image.shape, np.uint8)
-        thres = 1 - prob
-        for i in range(image.shape[0]):
-            for j in range(image.shape[1]):
-                rdn = random.random()
-                if rdn < prob:
-                    output[i][j] = 0
-                elif rdn > thres:
-                    output[i][j] = 255
-                else:
-                    output[i][j] = image[i][j]
-        return output
-
-    def gasuss_noise(self, image, mean=0, var=0.001):
-        image = np.array(image / 255, dtype=float)
-        noise = np.random.normal(mean, var ** 0.5, image.shape)
-        out = image + noise
-        out = np.clip(out, 0.0, 1.0)
-        out = np.uint8(out * 255)
-        # cv.imshow("gasuss", out)
-        return out
-
-    def __call__(self, img):
-        if (np.random.rand() < self.ratio):
-            img = img.astype(np.uint8)
-
-            select_id = random.choice([0, 1])
-            if (select_id == 0):
-                img = self.sp_noise(img, 0.01)
-            elif (select_id == 1):
-                img = self.gasuss_noise(img, mean=0, var=0.005)
-            # img = self.gasuss_noise(img)
-
-            img = img.astype(np.float32)
-
-        # bbox_mosaic = results["gt_bboxes"].astype(np.int)
-        # img_mosaic = results["img"].astype(np.uint8)
-        # for k in range(bbox_mosaic.shape[0]):
-        #     bbox = bbox_mosaic[k]
-        #     cv2.rectangle(img_mosaic, (bbox[0], bbox[1]), (bbox[2], bbox[3]) , (0,0,255), 2)
-        # cv2.imshow("noise", img_mosaic)
-        # cv2.waitKey(-1)
-
-        return img
-
-
-def get_trans_mat(center, degrees=0, translate=(0, 0), scale=1, shear=(0, 0), perspective=(0, 0)):
-    C = np.eye(3)
-    C[0, 2] = center[0]  # x translation (pixels)
-    C[1, 2] = center[1]  # y translation (pixels)
-
-    # Perspective
-    P = np.eye(3)
-    P[2, 0] = perspective[0]  # x perspective (about y)
-    P[2, 1] = perspective[1]  # y perspective (about x)
-
-    # Rotation and Scale
-    R = np.eye(3)
-    a = degrees
-    # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
-    s = scale
-    # s = 2 ** random.uniform(-scale, scale)
-    R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
-
-    # Shear
-    S = np.eye(3)
-    S[0, 1] = shear[0]  # x shear (deg)
-    S[1, 0] = shear[1]  # y shear (deg)
-
-    # Translation
-    T = np.eye(3)
-    T[0, 2] = translate[0]  # x translation (pixels)
-    T[1, 2] = translate[1]  # y translation (pixels)
-
-    # Combined rotation matrix
-    M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
-    return M
-
-
-def TransAffine(img, degrees=10, translate=0.1, scale=0.1, shear=0.1, perspective=0.1, border=(4, 4), prob=0.5):
-    if (random.random() < prob):
-        img = img  # results["img"]
-        height = img.shape[0]
-        width = img.shape[1]
-
-        center_src = (-img.shape[1] / 2, -img.shape[0] / 2)
-        perspective_src = (random.uniform(-perspective, perspective), random.uniform(-perspective, perspective))
-        degrees_src = random.uniform(-degrees, degrees)
-        scale_src = random.uniform(1 - 0.25, 1 + scale)
-        shear_src = (math.tan(random.uniform(-shear, shear) * math.pi / 180), math.tan(random.uniform(-shear, shear) * math.pi / 180))
-        translate_src = [random.uniform(0.5 - translate, 0.5 + translate) * width, random.uniform(0.5 - translate, 0.5 + translate) * height]
-
-        M_src = get_trans_mat(center_src, degrees_src, translate_src, scale_src, shear_src, perspective_src)
-        four_pt = np.array([[0, 0, 1], [width, 0, 1], [0, height, 1], [width, height, 1]])
-        res_pt = M_src @ four_pt.T
-        res_pt = res_pt.astype(np.int).T
-        res_pt = res_pt[:, :2]
-        min_x = np.min(res_pt[:, 0])
-        max_x = np.max(res_pt[:, 0])
-        min_y = np.min(res_pt[:, 1])
-        max_y = np.max(res_pt[:, 1])
-        if (min_x < 0):
-            translate_src[0] -= min_x
-        if (min_y < 0):
-            translate_src[1] -= min_y
-
-        if (max_x - min_x > width):
-            new_width = (max_x - min_x)
-        else:
-            new_width = width
-        if (max_y - min_y > height):
-            new_height = (max_y - min_y)
-        else:
-            new_height = height
-
-        M = get_trans_mat((-width / 2, -height / 2), degrees_src, translate_src, scale_src, shear_src, perspective_src)
-
-        border_color = (random.randint(220, 250), random.randint(220, 250), random.randint(220, 250))
-        if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
-            if perspective:
-                img = cv2.warpPerspective(img, M, dsize=(new_width, new_height), borderMode=cv2.BORDER_CONSTANT, borderValue=border_color)
-            else:  # affine
-                img = cv2.warpAffine(img, M[:2], dsize=(new_width, new_height), borderMode=cv2.BORDER_CONSTANT, borderValue=border_color)
-        return img
-    else:
-        return img
-
-
-class HSVAug(object):
-    def __init__(self, hgain=0.5, sgain=0.5, vgain=0.5, ratio=0.95):
-        self.ratio = ratio
-        self.hgain = hgain
-        self.sgain = sgain
-        self.vgain = vgain
-
-    def __call__(self, img):
-        if (np.random.rand() < self.ratio):
-            img = img.astype(np.uint8)
-            r = np.random.uniform(-1, 1, 3) * [self.hgain, self.sgain, self.vgain] + 1  # random gains
-            hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
-            dtype = img.dtype  # uint8
-
-            x = np.arange(0, 256, dtype=np.int16)
-            lut_hue = ((x * r[0]) % 180).astype(dtype)
-            lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
-            lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
-
-            img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
-            cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
-            # Histogram equalization
-            # if random.random() < 0.2:
-            #     for i in range(3):
-            #         img[:, :, i] = cv2.equalizeHist(img[:, :, i])
-            img = img.astype(np.float32)
-
-        # bbox_mosaic = results["gt_bboxes"].astype(np.int)
-        # img_mosaic = results["img"].astype(np.uint8)
-        # for k in range(bbox_mosaic.shape[0]):
-        #     bbox = bbox_mosaic[k]
-        #     cv2.rectangle(img_mosaic, (bbox[0], bbox[1]), (bbox[2], bbox[3]) , (0,0,255), 2)
-        # cv2.imshow("hsv_img", img_mosaic)
-        # cv2.waitKey(-1)
-
-        return img
-
-
-def doing_aug(img, use_trans_affine=True):
-    if (use_trans_affine):
-        # border_width = random.randint(2,4)
-        # border_height = random.randint(2,4)
-        border_width = 0
-        border_height = 0
-        # img = TransAffine(img, degrees=8, translate=0.0, scale=0.2, shear=0, perspective=0, border=(2,border_width), prob=0.95)
-        img = TransAffine(img, degrees=3, translate=0.00025, scale=0.1, shear=3, perspective=0.0005, border=(border_height, border_width), prob=1.0)
-
-        # TODO tiling  resize x or y resize !
-    img = img.astype(np.uint8)
-    return img
-
-
-def do_aug(data_path):
-    dir_name = os.path.basename(data_path)
-    file_list = sorted(os.listdir(data_path))
-
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_aug".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    datetime = get_strftime()
-
-    for f in tqdm(file_list):
-        try:
-            f_abs_path = data_path + "/{}".format(f)
-            f_dst_path = save_path + "/{}".format(f)
-            fname = os.path.basename(f)
-            img_name, suffix = os.path.splitext(fname)[0], os.path.splitext(fname)[1]
-            img_name0 = img_name.split("=")[0]
-            label = img_name.split("=")[1]
-            cv2img = cv2.imread(f_abs_path)
-
-            noise_aug = NoiseAug(ratio=0.9)
-            blur_rdm = np.random.random()
-            if blur_rdm < 0.5:
-                blur_aug = BlurAug(type="EASY", ratio=0.9)
-            else:
-                blur_aug = BlurAug(type="HARD", ratio=0.9)
-            hsv_aug = HSVAug(hgain=0.2, sgain=0.7, vgain=0.5, ratio=0.9)
-
-            cv2img = noise_aug(cv2img)
-            cv2img = blur_aug(cv2img)
-            cv2img = hsv_aug(cv2img)
-            cv2img_aug = doing_aug(cv2img)
-
-            fname_rdm = np.random.random()
-            cv2.imwrite("{}/{}_aug_{}_{}={}.jpg".format(save_path, datetime, str(fname_rdm).replace(".", ""), img_name0, label), cv2img_aug)
-        except Exception as Error:
-            print(Error)
-
-
-def do_aug_base(file_list_i, data_path, save_path):
-    # dir_name = os.path.basename(data_path)
-    # file_list = sorted(os.listdir(data_path))
-
-    # save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_aug".format(dir_name)
-    # os.makedirs(save_path, exist_ok=True)
-
-    datetime = get_strftime()
-
-    for f in tqdm(file_list_i):
-        try:
-            f_abs_path = data_path + "/{}".format(f)
-            f_dst_path = save_path + "/{}".format(f)
-            fname = os.path.basename(f)
-            img_name, suffix = os.path.splitext(fname)[0], os.path.splitext(fname)[1]
-            img_name0 = img_name.split("=")[0]
-            label = img_name.split("=")[1]
-            cv2img = cv2.imread(f_abs_path)
-
-            noise_aug = NoiseAug(ratio=0.9)
-            blur_rdm = np.random.random()
-            if blur_rdm < 0.5:
-                blur_aug = BlurAug(type="EASY", ratio=0.9)
-            else:
-                blur_aug = BlurAug(type="HARD", ratio=0.9)
-            hsv_aug = HSVAug(hgain=0.2, sgain=0.7, vgain=0.5, ratio=0.9)
-
-            cv2img = noise_aug(cv2img)
-            cv2img = blur_aug(cv2img)
-            cv2img = hsv_aug(cv2img)
-            cv2img_aug = doing_aug(cv2img)
-
-            fname_rdm = np.random.random()
-            cv2.imwrite("{}/{}_aug_{}_{}={}.jpg".format(save_path, datetime, str(fname_rdm).replace(".", ""), img_name0, label), cv2img_aug)
-        except Exception as Error:
-            print(Error)
-
-
-def do_aug_multithreading(data_path, split_n=8):
-    dir_name = os.path.basename(data_path)
-    file_list = sorted(os.listdir(data_path))
-
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_aug".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    len_ = len(file_list)
-
-    img_lists = []
-    for j in range(split_n):
-        img_lists.append(file_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        list_i = img_lists[i]
-        t = threading.Thread(target=do_aug_base, args=(list_i, data_path, save_path,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-
-    ratio = 0.7  # 像素占比
-
-    # img_path = "/home/zengyifan/wujiahu/data/000.Bg/bg_natural_images_21781/images/bg_natural_images_0000000.jpg"
-    # img = cv2.imread(img_path, cv2.IMREAD_COLOR)
-    # h, w, _ = img.shape
-    # crop_w, crop_h = 200, 100  # 定义裁剪图像尺寸
-    # gap_w, gap_h = 200, 100  # 定义滑动间隔
-    # gp_w, gp_h = 100, 50
-    # cp_w, cp_h = 100, 50
-    cropsz = (560, 96)
-    gap = (cropsz[0] // 2, cropsz[1] // 2)
-
-    data_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/Others/sliding_window_test/images"
-    dir_name = get_dir_name(data_path)
-    file_list = get_file_list(data_path)
-    save_path = make_save_path(data_path, dir_name_add_str="sliding_window_crop")
-
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        base_name, file_name, suffix = get_baseName_fileName_suffix(f_abs_path)
-        cv2img = cv2.imread(f_abs_path)
-        imgsz = cv2img.shape[:2]
-
-        num = 0
-        for j in range(0, imgsz[0], gap[0]):
-            if j + cropsz[0] > imgsz[0]:
-                j_last = imgsz[0] - cropsz[0]
-
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        i_last = imgsz[1] - cropsz[1]
-
-                        print("+" * 200)
-                        print(j_last, j_last + cropsz[0], i_last, i_last + cropsz[1])
-                        cp_img = cv2img[j_last:j_last + cropsz[0], i_last:i_last + cropsz[1], :]
-                        cv2.imwrite(os.path.join(save_path, base_name.replace('.jpg', f'_{num}.jpg')), cp_img)
-
-                        num += 1
-
-
-                    else:
-                        print("&" * 200)
-                        print(j_last, j_last + cropsz[0], i, i + cropsz[1])
-                        cp_img = cv2img[j_last:j_last + cropsz[0], i:i + cropsz[1], :]
-                        cv2.imwrite(os.path.join(save_path, base_name.replace('.jpg', f'_{num}.jpg')), cp_img)
-
-                        num += 1
-            else:
-                for i in range(0, imgsz[1], gap[1]):
-                    if i + cropsz[1] > imgsz[1]:
-                        i = imgsz[1] - cropsz[1]
-
-                    print(j, j + cropsz[0], i, i + cropsz[1])
-
-                    if j + cropsz[0] > imgsz[0]:
-                        j_last = imgsz[0] - cropsz[0]
-                    if i + cropsz[1] > imgsz[1]:
-                        i_last = imgsz[1] - cropsz[1]
-
-                    cp_img = cv2img[j:j + cropsz[0], i:i + cropsz[1], :]
-                    cv2.imwrite(os.path.join(save_path, base_name.replace('.jpg', f'_{num}.jpg')), cp_img)
-
-                    num += 1
-
-
-class CVRandomRotation(object):
-    def __init__(self, degrees=15):
-        assert isinstance(degrees, numbers.Number), "degree should be a single number."
-        assert degrees >= 0, "degree must be positive."
-        self.degrees = degrees
-
-    @staticmethod
-    def get_params(degrees):
-        return sample_sym(degrees)
-
-    def __call__(self, img):
-        angle = self.get_params(self.degrees)
-        src_h, src_w = img.shape[:2]
-        M = cv2.getRotationMatrix2D(center=(src_w / 2, src_h / 2), angle=angle, scale=1.0)
-        abs_cos, abs_sin = abs(M[0, 0]), abs(M[0, 1])
-        dst_w = int(src_h * abs_sin + src_w * abs_cos)
-        dst_h = int(src_h * abs_cos + src_w * abs_sin)
-        M[0, 2] += (dst_w - src_w) / 2
-        M[1, 2] += (dst_h - src_h) / 2
-
-        flags = get_interpolation()
-        return cv2.warpAffine(img, M, (dst_w, dst_h), flags=flags, borderMode=cv2.BORDER_REPLICATE)
-
-
-class CVRandomAffine(object):
-    def __init__(self, degrees, translate=None, scale=None, shear=None):
-        assert isinstance(degrees, numbers.Number), "degree should be a single number."
-        assert degrees >= 0, "degree must be positive."
-        self.degrees = degrees
-
-        if translate is not None:
-            assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
-                "translate should be a list or tuple and it must be of length 2."
-            for t in translate:
-                if not (0.0 <= t <= 1.0):
-                    raise ValueError("translation values should be between 0 and 1")
-        self.translate = translate
-
-        if scale is not None:
-            assert isinstance(scale, (tuple, list)) and len(scale) == 2, \
-                "scale should be a list or tuple and it must be of length 2."
-            for s in scale:
-                if s <= 0:
-                    raise ValueError("scale values should be positive")
-        self.scale = scale
-
-        if shear is not None:
-            if isinstance(shear, numbers.Number):
-                if shear < 0:
-                    raise ValueError("If shear is a single number, it must be positive.")
-                self.shear = [shear]
-            else:
-                assert isinstance(shear, (tuple, list)) and (len(shear) == 2), \
-                    "shear should be a list or tuple and it must be of length 2."
-                self.shear = shear
-        else:
-            self.shear = shear
-
-    def _get_inverse_affine_matrix(self, center, angle, translate, scale, shear):
-        # https://github.com/pytorch/vision/blob/v0.4.0/torchvision/transforms/functional.py#L717
-        from numpy import sin, cos, tan
-
-        if isinstance(shear, numbers.Number):
-            shear = [shear, 0]
-
-        if not isinstance(shear, (tuple, list)) and len(shear) == 2:
-            raise ValueError(
-                "Shear should be a single value or a tuple/list containing " +
-                "two values. Got {}".format(shear))
-
-        rot = math.radians(angle)
-        sx, sy = [math.radians(s) for s in shear]
-
-        cx, cy = center
-        tx, ty = translate
-
-        # RSS without scaling
-        a = cos(rot - sy) / cos(sy)
-        b = -cos(rot - sy) * tan(sx) / cos(sy) - sin(rot)
-        c = sin(rot - sy) / cos(sy)
-        d = -sin(rot - sy) * tan(sx) / cos(sy) + cos(rot)
-
-        # Inverted rotation matrix with scale and shear
-        # det([[a, b], [c, d]]) == 1, since det(rotation) = 1 and det(shear) = 1
-        M = [d, -b, 0,
-             -c, a, 0]
-        M = [x / scale for x in M]
-
-        # Apply inverse of translation and of center translation: RSS^-1 * C^-1 * T^-1
-        M[2] += M[0] * (-cx - tx) + M[1] * (-cy - ty)
-        M[5] += M[3] * (-cx - tx) + M[4] * (-cy - ty)
-
-        # Apply center translation: C * RSS^-1 * C^-1 * T^-1
-        M[2] += cx
-        M[5] += cy
-        return M
-
-    @staticmethod
-    def get_params(degrees, translate, scale_ranges, shears, height):
-        angle = sample_sym(degrees)
-        if translate is not None:
-            max_dx = translate[0] * height
-            max_dy = translate[1] * height
-            translations = (np.round(sample_sym(max_dx)), np.round(sample_sym(max_dy)))
-        else:
-            translations = (0, 0)
-
-        if scale_ranges is not None:
-            scale = sample_uniform(scale_ranges[0], scale_ranges[1])
-        else:
-            scale = 1.0
-
-        if shears is not None:
-            if len(shears) == 1:
-                shear = [sample_sym(shears[0]), 0.]
-            elif len(shears) == 2:
-                shear = [sample_sym(shears[0]), sample_sym(shears[1])]
-        else:
-            shear = 0.0
-
-        return angle, translations, scale, shear
-
-    def __call__(self, img):
-        src_h, src_w = img.shape[:2]
-        angle, translate, scale, shear = self.get_params(
-            self.degrees, self.translate, self.scale, self.shear, src_h)
-
-        M = self._get_inverse_affine_matrix((src_w / 2, src_h / 2), angle, (0, 0), scale, shear)
-        M = np.array(M).reshape(2, 3)
-
-        startpoints = [(0, 0), (src_w - 1, 0), (src_w - 1, src_h - 1), (0, src_h - 1)]
-        project = lambda x, y, a, b, c: int(a * x + b * y + c)
-        endpoints = [(project(x, y, *M[0]), project(x, y, *M[1])) for x, y in startpoints]
-
-        rect = cv2.minAreaRect(np.array(endpoints))
-        bbox = cv2.boxPoints(rect).astype(dtype=np.int)
-        max_x, max_y = bbox[:, 0].max(), bbox[:, 1].max()
-        min_x, min_y = bbox[:, 0].min(), bbox[:, 1].min()
-
-        dst_w = int(max_x - min_x)
-        dst_h = int(max_y - min_y)
-        M[0, 2] += (dst_w - src_w) / 2
-        M[1, 2] += (dst_h - src_h) / 2
-
-        # add translate
-        dst_w += int(abs(translate[0]))
-        dst_h += int(abs(translate[1]))
-        if translate[0] < 0: M[0, 2] += abs(translate[0])
-        if translate[1] < 0: M[1, 2] += abs(translate[1])
-
-        flags = get_interpolation()
-        return cv2.warpAffine(img, M, (dst_w, dst_h), flags=flags, borderMode=cv2.BORDER_REPLICATE)
-
-
-class CVRandomPerspective(object):
-    def __init__(self, distortion=0.5):
-        self.distortion = distortion
-
-    def get_params(self, width, height, distortion):
-        offset_h = sample_asym(distortion * height / 2, size=4).astype(dtype=np.int)
-        offset_w = sample_asym(distortion * width / 2, size=4).astype(dtype=np.int)
-        topleft = (offset_w[0], offset_h[0])
-        topright = (width - 1 - offset_w[1], offset_h[1])
-        botright = (width - 1 - offset_w[2], height - 1 - offset_h[2])
-        botleft = (offset_w[3], height - 1 - offset_h[3])
-
-        startpoints = [(0, 0), (width - 1, 0), (width - 1, height - 1), (0, height - 1)]
-        endpoints = [topleft, topright, botright, botleft]
-        return np.array(startpoints, dtype=np.float32), np.array(endpoints, dtype=np.float32)
-
-    def __call__(self, img):
-        height, width = img.shape[:2]
-        startpoints, endpoints = self.get_params(width, height, self.distortion)
-        M = cv2.getPerspectiveTransform(startpoints, endpoints)
-
-        # TODO: more robust way to crop image
-        rect = cv2.minAreaRect(endpoints)
-        bbox = cv2.boxPoints(rect).astype(dtype=np.int)
-        max_x, max_y = bbox[:, 0].max(), bbox[:, 1].max()
-        min_x, min_y = bbox[:, 0].min(), bbox[:, 1].min()
-        min_x, min_y = max(min_x, 0), max(min_y, 0)
-
-        flags = get_interpolation()
-        img = cv2.warpPerspective(img, M, (max_x, max_y), flags=flags, borderMode=cv2.BORDER_REPLICATE)
-        img = img[min_y:, min_x:]
-        return img
-
-
-class CVRescale(object):
-
-    def __init__(self, factor=4, base_size=(128, 512)):
-        """ Define image scales using gaussian pyramid and rescale image to target scale.
-
-        Args:
-            factor: the decayed factor from base size, factor=4 keeps target scale by default.
-            base_size: base size the build the bottom layer of pyramid
-        """
-        if isinstance(factor, numbers.Number):
-            self.factor = round(sample_uniform(0, factor))
-        elif isinstance(factor, (tuple, list)) and len(factor) == 2:
-            self.factor = round(sample_uniform(factor[0], factor[1]))
-        else:
-            raise Exception('factor must be number or list with length 2')
-        # assert factor is valid
-        self.base_h, self.base_w = base_size[:2]
-
-    def __call__(self, img):
-        if self.factor == 0: return img
-        src_h, src_w = img.shape[:2]
-        cur_w, cur_h = self.base_w, self.base_h
-        scale_img = cv2.resize(img, (cur_w, cur_h), interpolation=get_interpolation())
-        for _ in range(self.factor):
-            scale_img = cv2.pyrDown(scale_img)
-        scale_img = cv2.resize(scale_img, (src_w, src_h), interpolation=get_interpolation())
-        return scale_img
-
-
-class CVGaussianNoise(object):
-    def __init__(self, mean=0, var=20):
-        self.mean = mean
-        if isinstance(var, numbers.Number):
-            self.var = max(int(sample_asym(var)), 1)
-        elif isinstance(var, (tuple, list)) and len(var) == 2:
-            self.var = int(sample_uniform(var[0], var[1]))
-        else:
-            raise Exception('degree must be number or list with length 2')
-
-    def __call__(self, img):
-        noise = np.random.normal(self.mean, self.var ** 0.5, img.shape)
-        img = np.clip(img + noise, 0, 255).astype(np.uint8)
-        return img
-
-
-class CVMotionBlur(object):
-    def __init__(self, degrees=12, angle=90):
-        if isinstance(degrees, numbers.Number):
-            self.degree = max(int(sample_asym(degrees)), 1)
-        elif isinstance(degrees, (tuple, list)) and len(degrees) == 2:
-            self.degree = int(sample_uniform(degrees[0], degrees[1]))
-        else:
-            raise Exception('degree must be number or list with length 2')
-        self.angle = sample_uniform(-angle, angle)
-
-    def __call__(self, img):
-        M = cv2.getRotationMatrix2D((self.degree // 2, self.degree // 2), self.angle, 1)
-        motion_blur_kernel = np.zeros((self.degree, self.degree))
-        motion_blur_kernel[self.degree // 2, :] = 1
-        motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, M, (self.degree, self.degree))
-        motion_blur_kernel = motion_blur_kernel / self.degree
-        img = cv2.filter2D(img, -1, motion_blur_kernel)
-        img = np.clip(img, 0, 255).astype(np.uint8)
-        return img
-
-
-class CVGeometry(object):
-    def __init__(self, degrees=15, translate=(0.3, 0.3), scale=(0.5, 2.),
-                 shear=(45, 15), distortion=0.5, p=0.5):
-        self.p = p
-        type_p = random.random()
-        if type_p < 0.33:
-            self.transforms = CVRandomRotation(degrees=degrees)
-        elif type_p < 0.66:
-            self.transforms = CVRandomAffine(degrees=degrees, translate=translate, scale=scale, shear=shear)
-        else:
-            self.transforms = CVRandomPerspective(distortion=distortion)
-
-    def __call__(self, img):
-        if random.random() < self.p:
-            img = np.array(img)
-            return Image.fromarray(self.transforms(img))
-        else:
-            return img
-
-
-class CVDeterioration(object):
-    def __init__(self, var, degrees, factor, p=0.5):
-        self.p = p
-        transforms = []
-        if var is not None:
-            transforms.append(CVGaussianNoise(var=var))
-        if degrees is not None:
-            transforms.append(CVMotionBlur(degrees=degrees))
-        if factor is not None:
-            transforms.append(CVRescale(factor=factor))
-
-        random.shuffle(transforms)
-        transforms = Compose(transforms)
-        self.transforms = transforms
-
-    def __call__(self, img):
-        if random.random() < self.p:
-            img = np.array(img)
-            return Image.fromarray(self.transforms(img))
-        else:
-            return img
-
-
-class CVColorJitter(object):
-    def __init__(self, brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1, p=0.5):
-        self.p = p
-        self.transforms = transforms.ColorJitter(brightness=brightness, contrast=contrast,
-                                                 saturation=saturation, hue=hue)
-
-    def __call__(self, img):
-        if random.random() < self.p:
-            return self.transforms(img)
-        else:
-            return img
-
-
-# ========================================================================================================================================================================
-# ========================================================================================================================================================================
-# DET
-class YOLOv5_ONNX(object):
-    """
-    onnx_path = "/home/zengyifan/wujiahu/data/003.Cigar_Detection/weights/smoke/best.onnx"
-    img_path = "/home/zengyifan/wujiahu/data/003.Cigar_Detection/test/test_20221206/1/20221115_baidudisk_00000007.jpg"
-
-    model = YOLOv5_ONNX(onnx_path)
-    model_input_size = (384, 384)
-    img0, img, src_size = model.pre_process(img_path, img_size=model_input_size)
-    print("src_size: ", src_size)
-    pred = model.inference(img)
-    out_bbx = model.post_process(pred, src_size, img_size=model_input_size)
-    print("out_bbx: ", out_bbx)
-    for b in out_bbx:
-        cv2.rectangle(img0, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
-    cv2.imshow("test", img0)
-    cv2.waitKey(0)
-    """
-    def __init__(self, onnx_path):
-        cuda = torch.cuda.is_available()
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-        self.session = onnxruntime.InferenceSession(onnx_path, providers=providers)
-        self.input_names = self.session.get_inputs()[0].name
-        self.output_names = self.session.get_outputs()[0].name
-
-    def letterbox(self, im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
-        # Resize and pad image while meeting stride-multiple constraints
-        shape = im.shape[:2]  # current shape [height, width]
-        if isinstance(new_shape, int):
-            new_shape = (new_shape, new_shape)
-
-        # Scale ratio (new / old)
-        r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-        if not scaleup:  # only scale down, do not scale up (for better val mAP)
-            r = min(r, 1.0)
-
-        # Compute padding
-        ratio = r, r  # width, height ratios
-        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-        dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
-        if auto:  # minimum rectangle
-            dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
-        elif scaleFill:  # stretch
-            dw, dh = 0.0, 0.0
-            new_unpad = (new_shape[1], new_shape[0])
-            ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
-
-        dw /= 2  # divide padding into 2 sides
-        dh /= 2
-
-        if shape[::-1] != new_unpad:  # resize
-            im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
-        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        return im, ratio, (dw, dh)
-
-    def xywh2xyxy(self, x):
-        # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
-        y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
-        y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
-        y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
-        y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
-        y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
-        return y
-
-    def box_area(self, box):
-        # box = xyxy(4,n)
-        return (box[2] - box[0]) * (box[3] - box[1])
-
-    def box_iou(self, box1, box2, eps=1e-7):
-        # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
-        """
-        Return intersection-over-union (Jaccard index) of boxes.
-        Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
-        Arguments:
-            box1 (Tensor[N, 4])
-            box2 (Tensor[M, 4])
-        Returns:
-            iou (Tensor[N, M]): the NxM matrix containing the pairwise
-                IoU values for every element in boxes1 and boxes2
-        """
-
-        # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
-        (a1, a2), (b1, b2) = box1[:, None].chunk(2, 2), box2.chunk(2, 1)
-        inter = (torch.min(a2, b2) - torch.max(a1, b1)).clamp(0).prod(2)
-
-        # IoU = inter / (area1 + area2 - inter)
-        return inter / (self.box_area(box1.T)[:, None] + self.box_area(box2.T) - inter + eps)
-
-    def non_max_suppression(self, prediction,
-                            conf_thres=0.25,
-                            iou_thres=0.45,
-                            classes=None,
-                            agnostic=False,
-                            multi_label=False,
-                            labels=(),
-                            max_det=300):
-        """Non-Maximum Suppression (NMS) on inference results to reject overlapping bounding boxes
-
-        Returns:
-             list of detections, on (n,6) tensor per image [xyxy, conf, cls]
-        """
-
-        bs = prediction.shape[0]  # batch size
-        nc = prediction.shape[2] - 5  # number of classes
-        xc = prediction[..., 4] > conf_thres  # candidates
-
-        # Checks
-        assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
-        assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
-
-        # Settings
-        # min_wh = 2  # (pixels) minimum box width and height
-        max_wh = 7680  # (pixels) maximum box width and height
-        max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-        time_limit = 0.3 + 0.03 * bs  # seconds to quit after
-        redundant = True  # require redundant detections
-        multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-        merge = False  # use merge-NMS
-
-        t = time.time()
-        # output = [torch.zeros((0, 6), device=prediction.device)] * bs
-        output = [torch.zeros((0, 6))] * bs
-        for xi, x in enumerate(prediction):  # image index, image inference
-            # Apply constraints
-            # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-            x = x[xc[xi]]  # confidence
-
-            # Cat apriori labels if autolabelling
-            if labels and len(labels[xi]):
-                lb = labels[xi]
-                # v = torch.zeros((len(lb), nc + 5), device=x.device)
-                v = torch.zeros((len(lb), nc + 5), device=x)
-                v[:, :4] = lb[:, 1:5]  # box
-                v[:, 4] = 1.0  # conf
-                v[range(len(lb)), lb[:, 0].long() + 5] = 1.0  # cls
-                x = torch.cat((x, v), 0)
-
-            # If none remain process next image
-            if not x.shape[0]:
-                continue
-
-            # Compute conf
-            x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
-
-            # Box (center x, center y, width, height) to (x1, y1, x2, y2)
-            box = self.xywh2xyxy(x[:, :4])
-
-            # Detections matrix nx6 (xyxy, conf, cls)
-            if multi_label:
-                i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
-                x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
-            else:  # best class only
-                # conf, j = x[:, 5:].max(1, keepdim=True)
-                conf, j = torch.tensor(x[:, 5:]).float().max(1, keepdim=True)
-                # x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
-                x = torch.cat((torch.tensor(box), conf, j.float()), 1)[conf.view(-1) > conf_thres]
-
-            # Filter by class
-            if classes is not None:
-                # x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
-                x = x[(x[:, 5:6] == torch.tensor(classes)).any(1)]
-
-            # Apply finite constraint
-            # if not torch.isfinite(x).all():
-            #     x = x[torch.isfinite(x).all(1)]
-
-            # Check shape
-            n = x.shape[0]  # number of boxes
-            if not n:  # no boxes
-                continue
-            elif n > max_nms:  # excess boxes
-                x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
-
-            # Batched NMS
-            c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-            boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-            i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-            if i.shape[0] > max_det:  # limit detections
-                i = i[:max_det]
-            if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
-                # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-                iou = self.box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-                weights = iou * scores[None]  # box weights
-                # x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-                x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1)  # merged boxes
-                if redundant:
-                    i = i[iou.sum(1) > 1]  # require redundancy
-
-            output[xi] = x[i]
-            # if (time.time() - t) > time_limit:
-            #     LOGGER.warning(f'WARNING: NMS time limit {time_limit:.3f}s exceeded')
-            #     break  # time limit exceeded
-
-        return output
-
-    def clip_coords(self, boxes, shape):
-        # Clip bounding xyxy bounding boxes to image shape (height, width)
-        if isinstance(boxes, torch.Tensor):  # faster individually
-            boxes[:, 0].clamp_(0, shape[1])  # x1
-            boxes[:, 1].clamp_(0, shape[0])  # y1
-            boxes[:, 2].clamp_(0, shape[1])  # x2
-            boxes[:, 3].clamp_(0, shape[0])  # y2
-        else:  # np.array (faster grouped)
-            boxes[:, [0, 2]] = boxes[:, [0, 2]].clip(0, shape[1])  # x1, x2
-            boxes[:, [1, 3]] = boxes[:, [1, 3]].clip(0, shape[0])  # y1, y2
-
-    def scale_coords(self, img1_shape, coords, img0_shape, ratio_pad=None):
-        # Rescale coords (xyxy) from img1_shape to img0_shape
-        if ratio_pad is None:  # calculate from img0_shape
-            gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-            pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
-        else:
-            gain = ratio_pad[0][0]
-            pad = ratio_pad[1]
-
-        coords[:, [0, 2]] -= pad[0]  # x padding
-        coords[:, [1, 3]] -= pad[1]  # y padding
-        coords[:, :4] /= gain
-        self.clip_coords(coords, img0_shape)
-        return coords
-
-    def pre_process(self, img_path, img_size=(640, 640), stride=32):
-        img0 = cv2.imread(img_path)
-        src_size = img0.shape[:2]
-        img = self.letterbox(img0, img_size, stride=stride, auto=False)[0]
-        img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        img = np.ascontiguousarray(img)
-        img = img.astype(dtype=np.float32)
-        img /= 255.0
-        img = np.expand_dims(img, axis=0)
-        return img0, img, src_size
-
-    def inference(self, img):
-        # im = img.cpu().numpy()  # torch to numpy
-        pred = self.session.run([self.output_names], {self.input_names: img})[0]
-        return pred
-
-    def post_process(self, pred, src_size, img_size):
-        output = self.non_max_suppression(pred, conf_thres=0.25, iou_thres=0.45, agnostic=False)
-        out_bbx = []
-        for i, det in enumerate(output):  # detections per image
-            if len(det):
-                det[:, :4] = self.scale_coords(img_size, det[:, :4], src_size).round()
-                for *xyxy, conf, cls in reversed(det):
-                    x1y1x2y2_VOC = [int(round(ci)) for ci in torch.tensor(xyxy).view(1, 4).view(-1).tolist()]
-                    out_bbx.append(x1y1x2y2_VOC)
-
-        return out_bbx
-
-
-class YOLOv8_ONNX(object):
-    def __init__(self, onnx_path):
-        cuda = torch.cuda.is_available()
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-        self.session = onnxruntime.InferenceSession(onnx_path, providers=providers)
-        self.input_names = self.session.get_inputs()[0].name
-        self.output_names = self.session.get_outputs()[0].name
-
-        # output_names = [x.name for x in self.session.get_outputs()]
-        # metadata = self.session.get_modelmeta().custom_metadata_map  # metadata
-
-        # Load external metadata YAML
-        # if isinstance(metadata, (str, Path)) and Path(metadata).exists():
-        #     metadata = yaml_load(metadata)
-        # if metadata:
-        #     for k, v in metadata.items():
-        #         if k in ('stride', 'batch'):
-        #             metadata[k] = int(v)
-        #         elif k in ('imgsz', 'names') and isinstance(v, str):
-        #             metadata[k] = eval(v)
-        #     stride = metadata['stride']
-        #     task = metadata['task']
-        #     batch = metadata['batch']
-        #     imgsz = metadata['imgsz']
-        #     names = metadata['names']
-
-    def letterbox(self, im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
-        # Resize and pad image while meeting stride-multiple constraints
-        shape = im.shape[:2]  # current shape [height, width]
-        if isinstance(new_shape, int):
-            new_shape = (new_shape, new_shape)
-
-        # Scale ratio (new / old)
-        r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-        if not scaleup:  # only scale down, do not scale up (for better val mAP)
-            r = min(r, 1.0)
-
-        # Compute padding
-        ratio = r, r  # width, height ratios
-        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-        dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
-        if auto:  # minimum rectangle
-            dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
-        elif scaleFill:  # stretch
-            dw, dh = 0.0, 0.0
-            new_unpad = (new_shape[1], new_shape[0])
-            ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
-
-        dw /= 2  # divide padding into 2 sides
-        dh /= 2
-
-        if shape[::-1] != new_unpad:  # resize
-            im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
-        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        return im, ratio, (dw, dh)
-
-    def xywh2xyxy(self, x):
-        """
-        Convert bounding box coordinates from (x, y, width, height) format to (x1, y1, x2, y2) format where (x1, y1) is the
-        top-left corner and (x2, y2) is the bottom-right corner.
-
-        Args:
-            x (np.ndarray) or (torch.Tensor): The input bounding box coordinates in (x, y, width, height) format.
-        Returns:
-            y (np.ndarray) or (torch.Tensor): The bounding box coordinates in (x1, y1, x2, y2) format.
-        """
-        y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
-        y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
-        y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
-        y[..., 2] = x[..., 0] + x[..., 2] / 2  # bottom right x
-        y[..., 3] = x[..., 1] + x[..., 3] / 2  # bottom right y
-        return y
-
-    def clip_boxes(self, boxes, shape):
-        """
-        It takes a list of bounding boxes and a shape (height, width) and clips the bounding boxes to the
-        shape
-
-        Args:
-          boxes (torch.Tensor): the bounding boxes to clip
-          shape (tuple): the shape of the image
-        """
-        if isinstance(boxes, torch.Tensor):  # faster individually
-            boxes[..., 0].clamp_(0, shape[1])  # x1
-            boxes[..., 1].clamp_(0, shape[0])  # y1
-            boxes[..., 2].clamp_(0, shape[1])  # x2
-            boxes[..., 3].clamp_(0, shape[0])  # y2
-        else:  # np.array (faster grouped)
-            boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
-            boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
-
-    def scale_boxes(self, img1_shape, boxes, img0_shape, ratio_pad=None):
-        """
-        Rescales bounding boxes (in the format of xyxy) from the shape of the image they were originally specified in
-        (img1_shape) to the shape of a different image (img0_shape).
-
-        Args:
-          img1_shape (tuple): The shape of the image that the bounding boxes are for, in the format of (height, width).
-          boxes (torch.Tensor): the bounding boxes of the objects in the image, in the format of (x1, y1, x2, y2)
-          img0_shape (tuple): the shape of the target image, in the format of (height, width).
-          ratio_pad (tuple): a tuple of (ratio, pad) for scaling the boxes. If not provided, the ratio and pad will be
-                             calculated based on the size difference between the two images.
-
-        Returns:
-          boxes (torch.Tensor): The scaled bounding boxes, in the format of (x1, y1, x2, y2)
-        """
-        if ratio_pad is None:  # calculate from img0_shape
-            gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-            pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
-        else:
-            gain = ratio_pad[0][0]
-            pad = ratio_pad[1]
-
-        boxes[..., [0, 2]] -= pad[0]  # x padding
-        boxes[..., [1, 3]] -= pad[1]  # y padding
-        boxes[..., :4] /= gain
-        self.clip_boxes(boxes, img0_shape)
-        return boxes
-
-    def box_iou(self, box1, box2, eps=1e-7):
-        """
-        Return intersection-over-union (Jaccard index) of boxes.
-        Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
-        Based on https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
-
-        Arguments:
-            box1 (Tensor[N, 4])
-            box2 (Tensor[M, 4])
-            eps
-
-        Returns:
-            iou (Tensor[N, M]): the NxM matrix containing the pairwise IoU values for every element in boxes1 and boxes2
-        """
-
-        # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
-        (a1, a2), (b1, b2) = box1.unsqueeze(1).chunk(2, 2), box2.unsqueeze(0).chunk(2, 2)
-        inter = (torch.min(a2, b2) - torch.max(a1, b1)).clamp(0).prod(2)
-
-        # IoU = inter / (area1 + area2 - inter)
-        return inter / ((a2 - a1).prod(2) + (b2 - b1).prod(2) - inter + eps)
-
-    def non_max_suppression(self,
-                            prediction,
-                            conf_thres=0.25,
-                            iou_thres=0.45,
-                            classes=None,
-                            agnostic=False,
-                            multi_label=False,
-                            labels=(),
-                            max_det=300,
-                            nc=0,  # number of classes (optional)
-                            max_time_img=0.05,
-                            max_nms=30000,
-                            max_wh=7680,
-        ):
-        """
-        Perform non-maximum suppression (NMS) on a set of boxes, with support for masks and multiple labels per box.
-
-        Arguments:
-            prediction (torch.Tensor): A tensor of shape (batch_size, num_boxes, num_classes + 4 + num_masks)
-                containing the predicted boxes, classes, and masks. The tensor should be in the format
-                output by a model, such as YOLO.
-            conf_thres (float): The confidence threshold below which boxes will be filtered out.
-                Valid values are between 0.0 and 1.0.
-            iou_thres (float): The IoU threshold below which boxes will be filtered out during NMS.
-                Valid values are between 0.0 and 1.0.
-            classes (List[int]): A list of class indices to consider. If None, all classes will be considered.
-            agnostic (bool): If True, the model is agnostic to the number of classes, and all
-                classes will be considered as one.
-            multi_label (bool): If True, each box may have multiple labels.
-            labels (List[List[Union[int, float, torch.Tensor]]]): A list of lists, where each inner
-                list contains the apriori labels for a given image. The list should be in the format
-                output by a dataloader, with each label being a tuple of (class_index, x1, y1, x2, y2).
-            max_det (int): The maximum number of boxes to keep after NMS.
-            nc (int): (optional) The number of classes output by the model. Any indices after this will be considered masks.
-            max_time_img (float): The maximum time (seconds) for processing one image.
-            max_nms (int): The maximum number of boxes into torchvision.ops.nms().
-            max_wh (int): The maximum box width and height in pixels
-
-        Returns:
-            (List[torch.Tensor]): A list of length batch_size, where each element is a tensor of
-                shape (num_boxes, 6 + num_masks) containing the kept boxes, with columns
-                (x1, y1, x2, y2, confidence, class, mask1, mask2, ...).
-        """
-
-        # Checks
-        assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
-        assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
-        if isinstance(prediction, (list, tuple)):  # YOLOv8 model in validation model, output = (inference_out, loss_out)
-            prediction = prediction[0]  # select only inference output
-
-        prediction = torch.Tensor(prediction)
-
-        device = prediction.device
-        mps = 'mps' in device.type  # Apple MPS
-        if mps:  # MPS not fully supported yet, convert tensors to CPU before NMS
-            prediction = prediction.cpu()
-        bs = prediction.shape[0]  # batch size
-        nc = nc or (prediction.shape[1] - 4)  # number of classes
-        nm = prediction.shape[1] - nc - 4
-        mi = 4 + nc  # mask start index
-        xc = prediction[:, 4:mi].amax(1) > conf_thres  # candidates
-
-        # Settings
-        # min_wh = 2  # (pixels) minimum box width and height
-        time_limit = 0.5 + max_time_img * bs  # seconds to quit after
-        redundant = True  # require redundant detections
-        multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-        merge = False  # use merge-NMS
-
-        t = time.time()
-        output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
-        for xi, x in enumerate(prediction):  # image index, image inference
-            # Apply constraints
-            # x[((x[:, 2:4] < min_wh) | (x[:, 2:4] > max_wh)).any(1), 4] = 0  # width-height
-            x = x.transpose(0, -1)[xc[xi]]  # confidence
-
-            # Cat apriori labels if autolabelling
-            if labels and len(labels[xi]):
-                lb = labels[xi]
-                v = torch.zeros((len(lb), nc + nm + 5), device=x.device)
-                v[:, :4] = lb[:, 1:5]  # box
-                v[range(len(lb)), lb[:, 0].long() + 4] = 1.0  # cls
-                x = torch.cat((x, v), 0)
-
-            # If none remain process next image
-            if not x.shape[0]:
-                continue
-
-            # Detections matrix nx6 (xyxy, conf, cls)
-            box, cls, mask = x.split((4, nc, nm), 1)
-            box = self.xywh2xyxy(box)  # center_x, center_y, width, height) to (x1, y1, x2, y2)
-            if multi_label:
-                i, j = (cls > conf_thres).nonzero(as_tuple=False).T
-                x = torch.cat((box[i], x[i, 4 + j, None], j[:, None].float(), mask[i]), 1)
-            else:  # best class only
-                conf, j = cls.max(1, keepdim=True)
-                x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
-
-            # Filter by class
-            if classes is not None:
-                x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
-
-            # Apply finite constraint
-            # if not torch.isfinite(x).all():
-            #     x = x[torch.isfinite(x).all(1)]
-
-            # Check shape
-            n = x.shape[0]  # number of boxes
-            if not n:  # no boxes
-                continue
-            x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence and remove excess boxes
-
-            # Batched NMS
-            c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-            boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-            i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-            i = i[:max_det]  # limit detections
-            if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
-                # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-                iou = self.box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-                weights = iou * scores[None]  # box weights
-                x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-                if redundant:
-                    i = i[iou.sum(1) > 1]  # require redundancy
-
-            output[xi] = x[i]
-            # if mps:
-            #     output[xi] = output[xi].to(device)
-            # if (time.time() - t) > time_limit:
-            #     LOGGER.warning(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
-            #     break  # time limit exceeded
-
-        return output
-
-    def pre_process(self, img_path, img_size=(640, 640), stride=32):
-        # img = (img if isinstance(img, torch.Tensor) else torch.from_numpy(img)).to(self.model.device)
-        # img = img.half() if self.model.fp16 else img.float()  # uint8 to fp16/32
-        # img /= 255  # 0 - 255 to 0.0 - 1.0
-        # return img
-
-        img0 = cv2.imread(img_path)
-        src_size = img0.shape[:2]
-        img = self.letterbox(img0, img_size, stride=stride, auto=False)[0]
-        img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        img = np.ascontiguousarray(img)
-        img = img.astype(dtype=np.float32)
-        img /= 255.0
-        img = np.expand_dims(img, axis=0)
-        return img0, img, src_size
-
-    def inference(self, img):
-        # im = im.cpu().numpy()  # torch to numpy
-        pred = self.session.run([self.output_names], {self.input_names: img})[0]
-        return pred
-
-    def post_process(self, preds, src_size, img_size, conf_thres=0.25, iou_thres=0.45):
-        preds = self.non_max_suppression(preds,
-                                        conf_thres,
-                                        iou_thres,
-                                        agnostic=False,
-                                        max_det=300,
-                                        classes=None)
-
-        # results = []
-        # for i, pred in enumerate(preds):
-        #     # orig_img = orig_imgs[i] if isinstance(orig_imgs, list) else orig_imgs
-        #     if not isinstance(orig_imgs, torch.Tensor):
-        #         pred[:, :4] = self.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
-        #     path, _, _, _, _ = self.batch
-        #     img_path = path[i] if isinstance(path, list) else path
-        #     results.append(Results(orig_img=orig_img, path=img_path, names=self.model.names, boxes=pred))
-        # return results
-        out_bbx = []
-        for i, det in enumerate(preds):  # detections per image
-            if len(det):
-                det[:, :4] = self.scale_boxes(img_size, det[:, :4], src_size).round()
-                for *xyxy, conf, cls in reversed(det):
-                    x1y1x2y2_VOC = [int(round(ci)) for ci in torch.tensor(xyxy).view(1, 4).view(-1).tolist()]
-                    out_bbx.append(x1y1x2y2_VOC)
-
-        return out_bbx
+def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+    # Resize and pad image while meeting stride-multiple constraints
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape)
+
+    # Scale ratio (new / old)
+    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    if not scaleup:  # only scale down, do not scale up (for better val mAP)
+        r = min(r, 1.0)
+
+    # Compute padding
+    ratio = r, r  # width, height ratios
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
+    if auto:  # minimum rectangle
+        dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
+    elif scaleFill:  # stretch
+        dw, dh = 0.0, 0.0
+        new_unpad = (new_shape[1], new_shape[0])
+        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
+
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    if shape[::-1] != new_unpad:  # resize
+        im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    return im, ratio, (dw, dh)
 
 
 def xywh2xyxy(x):
@@ -8712,275 +7040,6 @@ def seamless_clone(bg_path, obj_path):
     cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/output_MONOCHROME.png", output_MONOCHROME)
 
 
-def seamlessclone_mixed_output(bg_img, obj_img):
-    bh, bw = bg_img.shape[:2]
-    oh, ow = obj_img.shape[:2]
-    if oh > bh and ow > bw:
-        obj_img = cv2.resize(obj_img, (bw, bh))
-
-        mask = 255 * np.ones(obj_img.shape, obj_img.dtype)
-        center = (int(round(bw / 2)), int(round(bh / 2)))
-        output_mixed = cv2.seamlessClone(obj_img, bg_img, mask, center, cv2.MIXED_CLONE)  # cv::NORMAL_CLONE, cv::MIXED_CLONE or cv::MONOCHROME_TRANSFER
-
-        # gen obj bbx
-        VOC_bbxes, thresh = gen_VOC_bbx_from_image(obj_img)  # [xmin, xmax, ymin, ymax]
-
-        # gen new bbx
-        yolo_bbxes_new = []
-        for lbl in VOC_bbxes:
-            # lbl_yolo_new = convert_bbx_VOC_to_yolo((bh, bw), lbl)
-            lbl_np = np.array([lbl])
-            lbl_np = lbl_np[:, [0, 2, 1, 3]]
-            lbl_list = list(lbl_np[0])
-            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_list)
-            yolo_bbxes_new.append(lbl_yolo_new)
-
-        return output_mixed, yolo_bbxes_new, VOC_bbxes, thresh
-
-    else:
-        if (oh > bh and ow <= bw) or (oh <= bh and ow > bw):
-            obj_img = cv2.resize(obj_img, (int(round(ow / 2)), bh), int(round(oh / 2)))
-
-        mask = 255 * np.ones(obj_img.shape, obj_img.dtype)
-        center = (int(round(bw / 2)), int(round(bh / 2)))
-        output_mixed = cv2.seamlessClone(obj_img, bg_img, mask, center, cv2.MIXED_CLONE)
-
-        # gen obj bbx
-        VOC_bbxes, thresh = gen_VOC_bbx_from_image(obj_img)  # [xmin, xmax, ymin, ymax]
-        # gen new bbx
-        yolo_bbxes_new = []
-        for lbl in VOC_bbxes:
-            # lbl_VOC_new = [int(round(bw / 2 - ow / 2 + lbl[0])), int(round(bw / 2 - ow / 2 + lbl[0] + (lbl[1] - lbl[0]))),
-            #                int(round(bh / 2 - oh / 2 + lbl[2])), int(round(bh / 2 - oh / 2 + lbl[2] + (lbl[3] - lbl[2])))]
-            # lbl_yolo_new = convert_bbx_VOC_to_yolo((bh, bw), lbl_VOC_new)
-            lbl_VOC_new = [int(round(bw / 2 - ow / 2 + lbl[0])), int(round(bh / 2 - oh / 2 + lbl[2])),
-                           int(round(bw / 2 - ow / 2 + lbl[0] + (lbl[1] - lbl[0]))), int(round(bh / 2 - oh / 2 + lbl[2] + (lbl[3] - lbl[2])))]
-            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_VOC_new)
-            yolo_bbxes_new.append(lbl_yolo_new)
-
-        return output_mixed, yolo_bbxes_new, VOC_bbxes, thresh
-
-
-def aug_img_with_seamless_clone(bg_path, obj_path, save_path, aug_n=10, label=0, fname_add_content=""):
-    bg_list = sorted(os.listdir(bg_path))
-    obj_list = sorted(os.listdir(obj_path))
-
-    # save_path = os.path.abspath(os.path.join())
-    # save_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/seamless_clone_aug"
-    save_img_path = save_path + "/images"
-    save_lbl_path = save_path + "/labels"
-    os.makedirs(save_img_path, exist_ok=True)
-    os.makedirs(save_lbl_path, exist_ok=True)
-
-    for bg in bg_list:
-        bg_name = os.path.splitext(bg)[0]
-        bg_abs_path = bg_path + "/{}".format(bg)
-        rdm_obj = random.sample(obj_list, aug_n)
-        for i, obj in enumerate(rdm_obj):
-            try:
-                obj_name = os.path.splitext(obj)[0]
-                obj_abs_path = obj_path + "/{}".format(obj)
-                bg_cv2img = cv2.imread(bg_abs_path)
-                obj_cv2img = cv2.imread(obj_abs_path)
-
-                output_mixed, yolo_bbxes_new, VOC_bbxes, thresh = seamlessclone_mixed_output(bg_cv2img, obj_cv2img)
-                new_name = "{}_{}_{}_MIXED_CLONE".format(bg_name, obj_name, fname_add_content)
-
-                #
-                # cv2.rectangle(obj_img, (VOC_bbxes[0][0], VOC_bbxes[0][2]), (VOC_bbxes[0][1], VOC_bbxes[0][3]), (255, 0, 0), 2)
-                # cv2.imwrite("{}/{}_{}_thresh.jpg".format(save_img_path, new_name, i), thresh)
-                # cv2.imwrite("{}/{}_{}_rect.jpg".format(save_img_path, new_name, i), obj_img)
-                #
-
-                # save img & lbl
-                cv2.imwrite("{}/{}_{}.jpg".format(save_img_path, new_name, i), output_mixed)
-                save_lbl_abs_path = "{}/{}_{}.txt".format(save_lbl_path, new_name, i)
-                with open(save_lbl_abs_path, "w", encoding="utf-8") as fw:
-                    for bb in yolo_bbxes_new:
-                        txt_content = "{}".format(label) + " " + " ".join([str(b) for b in bb]) + "\n"
-                        fw.write(txt_content)
-            except Exception as Error:
-                print(Error)
-
-
-def aug_img_with_seamless_clone_main(bg_list, obj_list, bg_path, obj_path, save_path, aug_n=10, label=0, fname_add_content=""):
-    save_img_path = save_path + "/images"
-    save_lbl_path = save_path + "/labels"
-    os.makedirs(save_img_path, exist_ok=True)
-    os.makedirs(save_lbl_path, exist_ok=True)
-
-    for bg in tqdm(bg_list):
-        bg_name = os.path.splitext(bg)[0]
-        bg_abs_path = bg_path + "/{}".format(bg)
-        rdm_obj = random.sample(obj_list, aug_n)
-        for i, obj in enumerate(rdm_obj):
-            try:
-                obj_name = os.path.splitext(obj)[0]
-                obj_abs_path = obj_path + "/{}".format(obj)
-                bg_cv2img = cv2.imread(bg_abs_path)
-                obj_cv2img = cv2.imread(obj_abs_path)
-
-                output_mixed, yolo_bbxes_new, VOC_bbxes, thresh = seamlessclone_mixed_output(bg_cv2img, obj_cv2img)
-                new_name = "{}_{}_{}_Seamless_Clone".format(bg_name, obj_name, fname_add_content)
-
-                #
-                # cv2.rectangle(obj_img, (VOC_bbxes[0][0], VOC_bbxes[0][2]), (VOC_bbxes[0][1], VOC_bbxes[0][3]), (255, 0, 0), 2)
-                # cv2.imwrite("{}/{}_{}_thresh.jpg".format(save_img_path, new_name, i), thresh)
-                # cv2.imwrite("{}/{}_{}_rect.jpg".format(save_img_path, new_name, i), obj_img)
-                #
-
-                # save img & lbl
-                cv2.imwrite("{}/{}_{}.jpg".format(save_img_path, new_name, i), output_mixed)
-                save_lbl_abs_path = "{}/{}_{}.txt".format(save_lbl_path, new_name, i)
-                with open(save_lbl_abs_path, "w", encoding="utf-8") as fw:
-                    for bb in yolo_bbxes_new:
-                        txt_content = "{}".format(label) + " " + " ".join([str(b) for b in bb]) + "\n"
-                        fw.write(txt_content)
-            except Exception as Error:
-                print(Error)
-
-
-def aug_img_with_seamless_clone_multi_thread(bg_path, obj_path, save_path, aug_n=3, label=0, fname_add_content=""):
-    bg_list = sorted(os.listdir(bg_path))
-    obj_list = sorted(os.listdir(obj_path))
-
-    len_ = len(bg_list)
-    bg_lists = []
-    split_n = 8
-    for j in range(split_n):
-        bg_lists.append(bg_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        bg_list_i = bg_lists[i]
-        t = threading.Thread(target=aug_img_with_seamless_clone_main, args=(bg_list_i, obj_list, bg_path, obj_path, save_path, aug_n, label, fname_add_content, ))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-def gen_random_pos(paste_num, bg_size, obj_size, dis_thresh=50, scatter_num=5):
-    paste_poses = []
-    last_pos = (0, 0)  # try to scatter the bbxs.
-    for ii in range(scatter_num):
-        for k in range(paste_num):
-            # paste_pos_k = [np.random.randint(0, bg_size[1]), np.random.randint(0, bg_size[0]), obj_size[1], obj_size[0]]
-            paste_pos_k = [np.random.randint(0, (bg_size[1] - obj_size[1])), np.random.randint(0, (bg_size[0] - obj_size[1])) + obj_size[1],
-                           np.random.randint(0, (bg_size[1] - obj_size[0])), np.random.randint(0, (bg_size[1] - obj_size[0])) + obj_size[0]]
-            if last_pos != (0, 0):
-                if np.sqrt((paste_pos_k[0] - last_pos[0]) ** 2 + (paste_pos_k[2] - last_pos[2]) ** 2) < dis_thresh:
-                    continue
-                else:
-                    paste_poses.append(paste_pos_k)
-            last_pos = paste_pos_k
-
-    return paste_poses
-
-
-def pil_paste_img(bg_img, obj_img, paste_num=1):
-    bh, bw = bg_img.shape[:2]
-    oh, ow = obj_img.shape[:2]
-    if oh > bh and ow > bw:
-        obj_img = cv2.resize(obj_img, (bw, bh))
-
-        pil_bg_img = PIL_paste_image_on_bg(obj_img, bg_img, [[0, 0]])
-        array_bg_img = np.asarray(pil_bg_img)
-
-        # gen obj bbx
-        VOC_bbxes = gen_VOC_bbx_from_image(obj_img)  # [xmin, xmax, ymin, ymax]
-        # gen new bbx
-        yolo_bbxes_new = []
-        for lbl in VOC_bbxes:
-            # lbl_yolo_new = convert_bbx_VOC_to_yolo((bh, bw), lbl)
-            lbl_np = np.array([lbl])
-            lbl_np = lbl_np[:, [0, 2, 1, 3]]
-            lbl_list = list(lbl_np[0])
-            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_list)
-            yolo_bbxes_new.append(lbl_yolo_new)
-
-        return array_bg_img, yolo_bbxes_new
-
-
-    else:
-        if (oh > bh and ow <= bw) or (oh <= bh and ow > bw):
-            obj_img = cv2.resize(obj_img, (int(round(ow / 2)), bh), int(round(oh / 2)))
-
-        oh, ow = obj_img.shape[:2]
-
-        paste_poses = gen_random_pos(paste_num, (bh, bw), (oh, ow), dis_thresh=50, scatter_num=5)
-        paste_poses_selected = random.sample(paste_poses, paste_num)
-        pil_bg_img = PIL_paste_image_on_bg(obj_img, bg_img, paste_poses_selected)
-        array_bg_img = np.asarray(pil_bg_img)
-
-        # gen obj bbx
-        VOC_bbxes = gen_VOC_bbx_from_image(obj_img)  # [xmin, xmax, ymin, ymax]
-        # gen new bbx
-        yolo_bbxes_new = []
-        for i, lbl in enumerate(VOC_bbxes):
-            # lbl_VOC_new = [int(round(lbl[0] + paste_poses_selected[i][0])), int(round(lbl[1] + paste_poses_selected[i][0])),
-            #                int(round(lbl[2] + paste_poses_selected[i][1])), int(round(lbl[3] + paste_poses_selected[i][1]))]
-            # lbl_yolo_new = convert_bbx_VOC_to_yolo((bh, bw), lbl_VOC_new)
-            lbl_VOC_new = [int(round(lbl[0] + paste_poses_selected[i][0])), int(round(lbl[2] + paste_poses_selected[i][1])),
-                           int(round(lbl[1] + paste_poses_selected[i][0])), int(round(lbl[3] + paste_poses_selected[i][1]))]
-            lbl_yolo_new = bbox_voc_to_yolo((bh, bw), lbl_VOC_new)
-            yolo_bbxes_new.append(lbl_yolo_new)
-
-        return array_bg_img, yolo_bbxes_new
-
-
-def PIL_paste_image_on_bg(paste_imgs, bg_img, paste_poses_selected):
-    pil_bg_img = Image.fromarray(np.uint8(bg_img)).convert("RGBA")
-
-    for i, pos in enumerate(paste_poses_selected):
-        pil_img = Image.fromarray(np.uint8(paste_imgs)).convert("RGBA")
-        pil_img_alpha = pil_img.split()[-1]
-        pil_bg_img.paste(pil_img, (pos[0], pos[1]), mask=pil_img_alpha)
-
-    pil_bg_img = pil_bg_img.convert("RGB")
-    return pil_bg_img
-
-
-def aug_img_with_pil_image_paste(bg_path, obj_path, save_path, aug_n=10):
-    bg_list = sorted(os.listdir(bg_path))
-    obj_list = sorted(os.listdir(obj_path))
-
-    # save_path = os.path.abspath(os.path.join())
-    # save_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/seamless_clone_aug"
-    save_img_path = save_path + "/images"
-    save_lbl_path = save_path + "/labels"
-    os.makedirs(save_img_path, exist_ok=True)
-    os.makedirs(save_lbl_path, exist_ok=True)
-
-    for bg in bg_list:
-        bg_name = os.path.splitext(bg)[0]
-        bg_abs_path = bg_path + "/{}".format(bg)
-        rdm_obj = random.sample(obj_list, aug_n)
-        for i, obj in enumerate(rdm_obj):
-            try:
-                obj_name = os.path.splitext(obj)[0]
-                obj_abs_path = obj_path + "/{}".format(obj)
-                bg_cv2img = cv2.imread(bg_abs_path)
-                obj_cv2img = cv2.imread(obj_abs_path)
-
-                pasted_out, yolo_bbxes_new = pil_paste_img(bg_cv2img, obj_cv2img)
-
-                new_name = "{}_{}_pil_image_paste".format(bg_name, obj_name)
-
-                # save img & lbl
-                cv2.imwrite("{}/{}_{}.jpg".format(save_img_path, new_name, i), pasted_out)
-                save_lbl_abs_path = "{}/{}_{}.txt".format(save_lbl_path, new_name, i)
-                with open(save_lbl_abs_path, "w", encoding="utf-8") as fw:
-                    for bb in yolo_bbxes_new:
-                        txt_content = "{}".format(0) + " " + " ".join([str(b) for b in bb]) + "\n"
-                        fw.write(txt_content)
-
-            except Exception as Error:
-                print(Error)
-
-
 def draw_label(size=(384, 384, 3), polygon_list=None):
     image = np.zeros(size, np.uint8)
     img_vis = cv2.fillPoly(image, polygon_list, (128, 128, 128))
@@ -9063,7 +7122,7 @@ def crop_image_via_labelbee_labels(data_path, crop_ratio=(1, 1.5, 2, 2.5, 3)):
         img_name = os.path.splitext(j.replace(".json", ""))[0]
         json_abs_path = json_path + "/{}".format(j)
         img_abs_path = img_path + "/{}".format(j.replace(".json", ""))
-        cv2img = cv2.imread(img_abs_path)
+        img = cv2.imread(img_abs_path)
         json_ = json.load(open(json_abs_path, 'r', encoding='utf-8'))
         if not json_: continue
         w, h = json_["width"], json_["height"]
@@ -9095,13 +7154,13 @@ def crop_image_via_labelbee_labels(data_path, crop_ratio=(1, 1.5, 2, 2.5, 3)):
 
                 for nx in crop_ratio:
                     try:
-                        cropped_img = crop_img_expand_n_times_v2(cv2img, [x_min, y_min, x_max, y_max], [h, w], nx)
+                        cropped_img = crop_img_via_expand(img, [x_min, y_min, x_max, y_max], [h, w], nx)
                         cropped_nx_path = cropped_path + "/{}".format(nx)
                         os.makedirs(cropped_nx_path, exist_ok=True)
                         cv2.imwrite("{}/{}_{}_{}.jpg".format(cropped_nx_path, img_name, i, nx), cropped_img)
                     except Exception as Error:
                         print(Error)
-                        # cropped_img = crop_img_expand_n_times_v2(cv2img, [x_min, y_min, x_max, y_max], [h, w], 1)
+                        # cropped_img = crop_img_expand_n_times_v2(img, [x_min, y_min, x_max, y_max], [h, w], 1)
                         # cropped_nx_path = cropped_path + "/{}".format(nx)
                         # os.makedirs(cropped_nx_path, exist_ok=True)
                         # cv2.imwrite("{}/{}_{}_{}.jpg".format(cropped_nx_path, img_name, i, nx), cropped_img)
@@ -9128,9 +7187,9 @@ def crop_image_via_yolo_labels(data_path, CLS=(1, 2), crop_ratio=(1, 1.5, 2, 2.5
             img_name = os.path.splitext(j)[0]
             txt_abs_path = txt_path + "/{}.txt".format(img_name)
             img_abs_path = img_path + "/{}".format(j)
-            cv2img = cv2.imread(img_abs_path)
-            if cv2img is None: continue
-            h, w = cv2img.shape[:2]
+            img = cv2.imread(img_abs_path)
+            if img is None: continue
+            h, w = img.shape[:2]
 
             txt_o = open(txt_abs_path, "r", encoding="utf-8")
             lines = txt_o.readlines()
@@ -9148,7 +7207,7 @@ def crop_image_via_yolo_labels(data_path, CLS=(1, 2), crop_ratio=(1, 1.5, 2, 2.5
                     # crop_ratio_ = [crop_ratio_rdm * 0.1]
                     for nx in crop_ratio:
                         try:
-                            cropped_img = crop_img_expand_n_times_v3(cv2img, bbx_voc, [h, w], nx)
+                            cropped_img = crop_img_via_expand(img, bbx_voc, [h, w], nx)
                             cropped_nx_path = cropped_path + "/{}/{}".format(cls, nx)
                             os.makedirs(cropped_nx_path, exist_ok=True)
                             cv2.imwrite("{}/{}_{}_{}.jpg".format(cropped_nx_path, img_name, i, nx), cropped_img)
@@ -9205,9 +7264,9 @@ def select_images_via_gosuncn_cpp_output(txt_path, save_path_flag="current", sav
             res = list(map(float, ff[1:]))
             np_res = np.asarray(res).reshape(-1, 7)
 
-            cv2img = cv2.imread(fpath)
-            cv2img_cp = cv2img.copy()
-            h, w = cv2img.shape[:2]
+            img = cv2.imread(fpath)
+            img_cp = img.copy()
+            h, w = img.shape[:2]
 
             label_i_sum_ = {}
             label_i_flag = {}
@@ -9223,1354 +7282,37 @@ def select_images_via_gosuncn_cpp_output(txt_path, save_path_flag="current", sav
                     if pred_label == n:
                         label_i_flag["label_{}_flag".format(n)] = True
                         x1y1x2y2_VOC = [int(np_res[i][0]), int(np_res[i][1]), int(np_res[i][0] + np_res[i][2]), int(np_res[i][1] + np_res[i][3])]
-                        cropped_img = crop_img_expand_n_times_v2(cv2img_cp, x1y1x2y2_VOC, [h, w], crop_expand_ratio)
+                        cropped_img = crop_img_via_expand(img_cp, x1y1x2y2_VOC, [h, w], crop_expand_ratio)
 
                         cls_np_res = int(np_res[i][6])
                         if cls_np_res == 0:
                             if save_crop_img:
                                 cv2.imwrite("{}/{}_{}_{}.jpg".format(save_base_path + "/C_Plus_Plus_det_output/{}/crop_images/cls_{}/0/{}".format(dataset_name, n, crop_expand_ratio), fname.split(".")[0], i, crop_expand_ratio), cropped_img)
                             if save_vis_img:
-                                cv2.rectangle(cv2img, (int(np_res[i][0]), int(np_res[i][1])), (int(np_res[i][0] + np_res[i][2]), int(np_res[i][1] + np_res[i][3])), (0, 0, 255), 2)
-                                cv2.putText(cv2img, "{}: {}".format(int(np_res[i][4]), np_res[i][5]), (int(np_res[i][0]), int(np_res[i][1]) - 5), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 2)
+                                cv2.rectangle(img, (int(np_res[i][0]), int(np_res[i][1])), (int(np_res[i][0] + np_res[i][2]), int(np_res[i][1] + np_res[i][3])), (0, 0, 255), 2)
+                                cv2.putText(img, "{}: {}".format(int(np_res[i][4]), np_res[i][5]), (int(np_res[i][0]), int(np_res[i][1]) - 5), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 2)
 
                         else:
                             if save_crop_img:
                                 cv2.imwrite("{}/{}_{}_{}.jpg".format(save_base_path + "/C_Plus_Plus_det_output/{}/crop_images/cls_{}/1/{}".format(dataset_name, n, crop_expand_ratio), fname.split(".")[0], i, crop_expand_ratio), cropped_img)
                             if save_vis_img:
-                                cv2.rectangle(cv2img, (int(np_res[i][0]), int(np_res[i][1])), (int(np_res[i][0] + np_res[i][2]), int(np_res[i][1] + np_res[i][3])), (0, 255, 0), 2)
-                                cv2.putText(cv2img, "{}: {}".format(int(np_res[i][4]), np_res[i][5]), (int(np_res[i][0]), int(np_res[i][1]) - 5), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+                                cv2.rectangle(img, (int(np_res[i][0]), int(np_res[i][1])), (int(np_res[i][0] + np_res[i][2]), int(np_res[i][1] + np_res[i][3])), (0, 255, 0), 2)
+                                cv2.putText(img, "{}: {}".format(int(np_res[i][4]), np_res[i][5]), (int(np_res[i][0]), int(np_res[i][1]) - 5), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
                             label_i_sum_["label_{}_sum_".format(n)] += 1
 
             for n in range(n_cls):
                 if label_i_flag["label_{}_flag".format(n)]:
                     if label_i_sum_["label_{}_sum_".format(n)] == 0:
                         if save_vis_img:
-                            cv2.imwrite("{}/{}".format(save_base_path + "/C_Plus_Plus_det_output/{}/vis_images/cls_{}/0".format(dataset_name, n), fname), cv2img)
+                            cv2.imwrite("{}/{}".format(save_base_path + "/C_Plus_Plus_det_output/{}/vis_images/cls_{}/0".format(dataset_name, n), fname), img)
                         if save_src_img:
                             shutil.copy(fpath, "{}/{}".format(save_base_path + "/C_Plus_Plus_det_output/{}/src_images/cls_{}/0".format(dataset_name, n), fname))
                     else:
                         if save_vis_img:
-                            cv2.imwrite("{}/{}".format(save_base_path + "/C_Plus_Plus_det_output/{}/vis_images/cls_{}/1".format(dataset_name, n), fname), cv2img)
+                            cv2.imwrite("{}/{}".format(save_base_path + "/C_Plus_Plus_det_output/{}/vis_images/cls_{}/1".format(dataset_name, n), fname), img)
                         if save_src_img:
                             shutil.copy(fpath, "{}/{}".format(save_base_path + "/C_Plus_Plus_det_output/{}/src_images/cls_{}/1".format(dataset_name, n), fname))
 
-
-def gen_random_pos_cropped_object_aug_data_v2(cropped_imgs, random_N, scatter_bbxs_num, bg_size, bg_yolov5_false_positive_labels_path, img_name, dis_thresh):
-    """
-
-    :param random_N:
-    :param bg_size: (h, w)
-    :param bg_yolov5_false_positive_labels_path:
-    :param img_name:
-    :return:
-    """
-    try:
-        paste_poses = []
-        last_pos = (0, 0)  # try to scatter the bbxs.
-        for ii in range(scatter_bbxs_num):
-            for k in range(random_N):
-                cropped_k_size = cropped_imgs[k].shape[:2]
-                paste_pos_k = (np.random.randint(0, (bg_size[1] - cropped_k_size[1])), np.random.randint(0, (bg_size[0] - cropped_k_size[0])))
-
-                # yolov5 false positive labels
-                bg_labels_path = bg_yolov5_false_positive_labels_path + "/{}.txt".format(img_name)
-                with open(bg_labels_path, "r", encoding="utf-8") as lfo:
-                    bg_bbx_lines = lfo.readlines()
-                    for l in bg_bbx_lines:
-                        l = l.strip()
-                        l_ = [float(l.split(" ")[1]), float(l.split(" ")[2]), float(l.split(" ")[3]), float(l.split(" ")[4])]
-                        # bbx_VOC_format = convert_bbx_yolo_to_VOC(bg_size, l_)
-                        bbx_VOC_format = bbox_yolo_to_voc(bg_size, l_)
-
-                        # if in yolov5 false positive detections bbx, is not our desired results
-                        if (paste_pos_k[0] >= bbx_VOC_format[0] and paste_pos_k[0] <= bbx_VOC_format[2]) and (paste_pos_k[1] >= bbx_VOC_format[1] and paste_pos_k[1] <= bbx_VOC_format[3]):
-                            continue
-                        elif np.sqrt((paste_pos_k[0] - bbx_VOC_format[0]) ** 2 + (paste_pos_k[1] - bbx_VOC_format[1]) ** 2) < dis_thresh:
-                            continue
-                        elif last_pos != (0, 0):
-                            if np.sqrt((paste_pos_k[0] - last_pos[0]) ** 2 + (paste_pos_k[1] - last_pos[1]) ** 2) < dis_thresh:
-                                continue
-                            else:
-                                paste_poses.append(paste_pos_k)
-                        else:
-                            paste_poses.append(paste_pos_k)
-
-                last_pos = paste_pos_k
-        return paste_poses
-
-    except Exception as Error:
-        print(Error, Error.__traceback__.tb_lineno)
-
-
-def paste_on_bg_designated_pos_cropped_object_aug_data_v2(bg_cv2img, bg_size, paste_img, paste_pos):
-    """
-
-    :param bg_cv2img:
-    :param bg_size: (h, w)
-    :param out:
-    :param thresh:
-    :param bbx:
-    :param paste_pos:
-    :return:
-    """
-    try:
-        h_bg, w_bg = bg_size[0], bg_size[1]
-        h_p, w_p = paste_img.shape[:2]
-
-        added_res_bbx = [paste_pos[0], paste_pos[1], w_p, h_p]
-
-        new_1 = bg_cv2img[0:paste_pos[1], 0:w_bg]
-        new_21 = bg_cv2img[paste_pos[1]:paste_pos[1] + h_p, 0:paste_pos[0]]
-        new_22 = paste_img
-        new_23 = bg_cv2img[paste_pos[1]:paste_pos[1] + h_p, paste_pos[0] + w_p:w_bg]
-        new_3 = bg_cv2img[paste_pos[1] + h_p:h_bg, 0:w_bg]
-
-        new_mid = np.hstack((new_21, new_22, new_23))
-        pasted = np.vstack((new_1, new_mid, new_3))
-
-        added_res = pasted
-
-        return added_res, added_res_bbx, paste_pos
-
-    except Exception as Error:
-        print(Error, Error.__traceback__.tb_lineno)
-
-
-def draw_rectangle_on_added_res_cropped_object_aug_data(rectangle_flag, added_res, added_res_bbx):
-    if rectangle_flag:
-        for bb in added_res_bbx:
-            cv2.rectangle(added_res, (bb[0], bb[1]), (bb[0] + bb[2], bb[1] + bb[3]), (225, 225, 0), 2)
-
-    return added_res
-
-
-def scale_down_bbx(bbx, scale_ratio=0.02):
-    scale_h_one_side = bbx[3] * scale_ratio
-    scale_w_one_side = bbx[2] * scale_ratio
-
-    x_new = bbx[0] + scale_w_one_side
-    y_new = bbx[1] + scale_h_one_side
-    w_new = bbx[2] - 2 * scale_w_one_side
-    h_new = bbx[3] - 2 * scale_h_one_side
-    bbx_new = [x_new, y_new, w_new, h_new]
-    return bbx_new
-
-
-def scale_down_bbx_v2(bbx, scale_ratio=0.5):
-    scale_h_one_side = bbx[3] * (scale_ratio / 2)
-    scale_w_one_side = bbx[2] * (scale_ratio / 2)
-
-    x_new = bbx[0] + scale_w_one_side
-    y_new = bbx[1] + scale_h_one_side
-    w_new = bbx[2] - 2 * scale_w_one_side
-    h_new = bbx[3] - 2 * scale_h_one_side
-    bbx_new = [x_new, y_new, w_new, h_new]
-    return bbx_new
-
-
-def write_yolo_label_cropped_object_aug_data_v2(labels_save_path, added_res_bbx, bg_size, img_name, affine_style, dis_thresh=200, scale_flag=False, scale_type=1, scale_ratio=0.04, cls=0, add_rename_str=""):
-    """
-    :param labels_save_path:
-    :param added_res_bbx:
-    :param bg_size: (h_bg, w_bg)
-    :param img_name:
-    :param affine_style:
-    :param i:
-    :param dis_thresh:
-    :return:
-    """
-
-    # 1. remove special bbx
-    poses = added_res_bbx
-    # for bb_ in added_res_bbx:
-    #     poses.append([bb_[0], bb_[1], bb_[2], bb_[3]])
-
-    for bi in range(len(poses) - 2, -1, -1):
-        bi_p0 = (poses[bi][0], poses[bi][1])
-        for bj in range(len(poses) - 1, bi, -1):
-            # 1. bbxes very close, very small distance.
-            bj_p0 = (poses[bj][0], poses[bj][1])
-            bj_p1 = (poses[bj][0] + poses[bj][2], poses[bj][1])
-            bj_p2 = (poses[bj][0] + poses[bj][2], poses[bj][1] + poses[bj][3])
-            bj_p3 = (poses[bj][0], poses[bj][1] + poses[bj][3])
-
-            dis_bi_p0_bj_p0 = np.sqrt((bi_p0[0] - bj_p0[0]) ** 2 + (bi_p0[1] - bj_p0[1]) ** 2)
-            dis_bi_p0_bj_p1 = np.sqrt((bi_p0[0] - bj_p1[0]) ** 2 + (bi_p0[1] - bj_p1[1]) ** 2)
-            dis_bi_p0_bj_p2 = np.sqrt((bi_p0[0] - bj_p2[0]) ** 2 + (bi_p0[1] - bj_p2[1]) ** 2)
-            dis_bi_p0_bj_p3 = np.sqrt((bi_p0[0] - bj_p3[0]) ** 2 + (bi_p0[1] - bj_p3[1]) ** 2)
-
-            if dis_bi_p0_bj_p0 < dis_thresh or dis_bi_p0_bj_p1 < dis_thresh or dis_bi_p0_bj_p2 < dis_thresh or dis_bi_p0_bj_p3 < dis_thresh:
-                poses.remove(poses[bi])
-                print("======================== S1 ========================")
-                continue
-
-            # 2. small bbx in big bbx.
-            # 2.1 bi contain bj
-            if poses[bi][0] < poses[bj][0] and poses[bi][1] < poses[bj][1] and poses[bi][0] + poses[bi][2] > poses[bj][0] + poses[bj][2] and poses[bi][1] + poses[bi][3] > poses[bj][1] + poses[bj][3]:
-                poses.remove(poses[bi])
-                print("======================== S2.1 ========================")
-                continue
-            # 2.2 bi in bj
-            if poses[bi][0] > poses[bj][0] and poses[bi][1] > poses[bj][1] and poses[bi][0] + poses[bi][2] < poses[bj][0] + poses[bj][2] and poses[bi][1] + poses[bi][3] < poses[bj][1] + poses[bj][3]:
-                poses.remove(poses[bi])
-                print("======================== S2.2 ========================")
-                continue
-
-            # 3. cal iou
-            iou = cal_iou(poses[bi], poses[bj])
-            if iou > 0.10:
-                poses.remove(poses[bi])
-                print("======================== S3 ========================")
-                continue
-
-    # 2. write bbx
-    txt_save_path_added_res = "{}/{}_{}_v5_{}.txt".format(labels_save_path, img_name, affine_style, add_rename_str)
-    with open(txt_save_path_added_res, "w", encoding="utf-8") as fw:
-        for bb_ in poses:
-            if scale_flag:
-                if scale_type == 1:
-                    bbx_new = scale_down_bbx(bb_, scale_ratio=scale_ratio)
-                elif scale_type == 2:
-                    bbx_new = scale_down_bbx_v2(bb_, scale_ratio=scale_ratio)
-                # bb = convert_bbx_VOC_to_yolo(bg_size, [bbx_new[0], bbx_new[0] + bbx_new[2], bbx_new[1], bbx_new[1] + bbx_new[3]])
-                bb = bbox_voc_to_yolo(bg_size, [bbx_new[0], bbx_new[1], bbx_new[0] + bbx_new[2], bbx_new[1] + bbx_new[3]])
-                txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
-                fw.write(txt_content)
-            else:
-                # bb = convert_bbx_VOC_to_yolo(bg_size, [bb_[0], bb_[0] + bb_[2], bb_[1], bb_[1] + bb_[3]])
-                bb = bbox_voc_to_yolo(bg_size, [bb_[0], bb_[1], bb_[0] + bb_[2], bb_[1] + bb_[3]])
-                txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
-                fw.write(txt_content)
-
-
-def apply_paste_cropped_object_aug_data(cropped_imgs, random_N, scatter_bbxs_num, bg_size, bg_labels_path, img_name, bg_cv2img, bg_cv2img_cp, save_path, dis_thresh, scale_flag, scale_type, scale_ratio, cls, add_rename_str):
-    """
-
-    :param cropped_imgs:
-    :param random_N:
-    :param scatter_bbxs_num:
-    :param bg_size: (h, w)
-    :param bg_yolov5_false_positive_labels_path:
-    :param img_name:
-    :param bg_cv2img:
-    :param bg_cv2img_cp:
-    :return:
-    """
-    try:
-        aug_type = "paste"
-        images_save_path = save_path + "/images"
-        labels_save_path = save_path + "/labels"
-        os.makedirs(images_save_path, exist_ok=True)
-        os.makedirs(labels_save_path, exist_ok=True)
-
-        paste_poses = gen_random_pos_cropped_object_aug_data_v2(cropped_imgs, random_N, scatter_bbxs_num, bg_size, bg_labels_path, img_name, dis_thresh)
-        # print(paste_poses)
-        paste_pos_final = random.sample(paste_poses, random_N)
-
-        added_res_bbx_final = []
-        pasted_pos_final = []
-        for p in range(random_N):
-            added_res, added_res_bbx, paste_pos = paste_on_bg_designated_pos_cropped_object_aug_data_v2(bg_cv2img, bg_size, cropped_imgs[p], paste_pos_final[p])
-            added_res_bbx_final.append(added_res_bbx)
-            pasted_pos_final.append(paste_pos)
-            added_res = draw_rectangle_on_added_res_cropped_object_aug_data(rectangle_flag=False, added_res=added_res, added_res_bbx=added_res_bbx)
-            bg_cv2img = added_res
-
-        assert len(added_res_bbx_final) == len(pasted_pos_final), "len(added_res_bbx_final) != len(pasted_pos_final)"
-        flag = True
-        for ii in range(len(added_res_bbx_final)):
-            if added_res_bbx_final[ii][0] != pasted_pos_final[ii][0] and added_res_bbx_final[ii][1] != pasted_pos_final[ii][1]:
-                flag = False
-                print("flag == False !!!!!!")
-
-        if flag:
-            bbx_n = len(added_res_bbx_final)
-
-            if len(added_res_bbx_final) == random_N:
-                for bb_ in added_res_bbx_final:
-                    if bb_[2] < 50 and bb_[3] < 50:
-                        bbx_n -= 1
-                if bbx_n == random_N:
-                    cv2.imwrite("{}/{}_{}_v5_{}.jpg".format(images_save_path, img_name, aug_type, add_rename_str), bg_cv2img)
-                    write_yolo_label_cropped_object_aug_data_v2(labels_save_path, added_res_bbx_final, bg_size, img_name, aug_type, dis_thresh=dis_thresh, scale_flag=scale_flag, scale_type=scale_type, scale_ratio=scale_ratio, cls=cls, add_rename_str=add_rename_str)
-
-                    bg_cv2img = bg_cv2img_cp
-
-    except Exception as Error:
-        print(Error, Error.__traceback__.tb_lineno)
-
-
-def timeit_paste_cropped_object_aug_data(func):
-    def wrapper(bg_list, bg_images_path, bg_labels_path, object_list, object_path, random_N, scatter_bbxs_num, save_path, dis_thresh, scale_flag, scale_type, scale_ratio, cls, add_rename_str):
-        t1 = time.time()
-        func(bg_list, bg_images_path, bg_labels_path, object_list, object_path, random_N, scatter_bbxs_num, save_path, dis_thresh, scale_flag, scale_type, scale_ratio, cls, add_rename_str)
-        t2 = time.time()
-        print(t2 - t1)
-
-    return wrapper
-
-
-@timeit_paste_cropped_object_aug_data
-def main_thread_paste_cropped_object_aug_data(bg_list, bg_images_path, bg_labels_path, object_list, object_path, random_N, scatter_bbxs_num, save_path, dis_thresh, scale_flag, scale_type, scale_ratio, cls, add_rename_str):
-    for bg in tqdm(bg_list):
-        try:
-            bg_abs_path = bg_images_path + "/{}".format(bg)
-            img_name = os.path.splitext(bg)[0]
-            bg_cv2img = cv2.imread(bg_abs_path)
-            bg_cv2img_cp = bg_cv2img.copy()
-            h_bg, w_bg = bg_cv2img.shape[:2]
-            bg_size = (h_bg, w_bg)  # [H, w]
-
-            random_num = np.random.randint(1, random_N + 1)  # paste random (less than random_num(including)) objects
-            random_samples = random.sample(object_list, random_num)
-
-            cropped_imgs = []
-            for s in random_samples:
-                s_abs_path = object_path + "/{}".format(s)
-                cropped_cv2img = cv2.imread(s_abs_path)
-                cropped_imgs.append(cropped_cv2img)
-
-            apply_paste_cropped_object_aug_data(cropped_imgs, random_num, scatter_bbxs_num, bg_size, bg_labels_path, img_name, bg_cv2img, bg_cv2img_cp, save_path, dis_thresh, scale_flag, scale_type, scale_ratio, cls, add_rename_str)
-
-        except Exception as Error:
-            print(Error, Error.__traceback__.tb_lineno)
-
-
-def paste_cropped_object_for_det_aug_data_train_negative_samples_multi_thread_v5_main(bg_path, bg_images_dir_name, bg_labels_dir_name, cropped_object_path, save_path, random_N=1, scatter_bbxs_num=3, dis_thresh=50, scale_flag=True, scale_type=2, scale_ratio=0.02, cls=0, add_rename_str="lock_20230327"):
-    bg_images_path = bg_path + "/{}".format(bg_images_dir_name)
-    bg_labels_path = bg_path + "/{}".format(bg_labels_dir_name)
-
-    images_save_path = save_path + "/images"
-    labels_save_path = save_path + "/labels"
-    os.makedirs(images_save_path, exist_ok=True)
-    os.makedirs(labels_save_path, exist_ok=True)
-
-    cropped_object_list = os.listdir(cropped_object_path)
-    bg_list = os.listdir(bg_images_path)
-
-    len_ = len(bg_list)
-    bg_lists = []
-    split_n = 8
-    for j in range(split_n):
-        bg_lists.append(bg_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        bg_list_i = bg_lists[i]
-        t = threading.Thread(target=main_thread_paste_cropped_object_aug_data, args=(bg_list_i, bg_images_path, bg_labels_path, cropped_object_list, cropped_object_path, random_N, scatter_bbxs_num, save_path, dis_thresh, scale_flag, scale_type, scale_ratio, cls, add_rename_str,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-# ======================================================================================================================================
-# ================================== Paste cropped object for det train negative samples multi thread ==================================
-# ======================================================================================================================================
-
-
-# ======================================================================================================================================
-# ================================== PIL paste cropped object for det train negative samples multi thread ==================================
-# ======================================================================================================================================
-
-def get_lbl_bbx_pil_paste_cropped_object_aug_data(bg_lbl_abs_path, img_size):
-    """
-
-    :param bg_lbl_abs_path:
-    :param img_size: (h, w)
-    :return:
-    """
-    bbxes = []
-    with open(bg_lbl_abs_path, "r", encoding="utf-8") as fr:
-        lines = fr.readlines()
-        for l in lines:
-            l_ = [float(l.split(" ")[1]), float(l.split(" ")[2]), float(l.split(" ")[3]), float(l.split(" ")[4])]
-            # bbx_VOC_format = convert_bbx_yolo_to_VOC(l_, img_size)
-            bbx_VOC_format = bbox_yolo_to_voc(img_size, l_)
-            bbxes.append(bbx_VOC_format)
-    return bbxes
-
-
-def write_yolo_label_pil_paste_cropped_object_aug_data(labels_save_path, img_name, pasted_poses, bg_size, add_rename_str="pasted", scale_flag=False, scale_ratio=0.04, cls=0):
-    txt_save_path_added_res = "{}/{}_{}_v6.txt".format(labels_save_path, img_name, add_rename_str)
-    with open(txt_save_path_added_res, "w", encoding="utf-8") as fw:
-        for bb_ in pasted_poses:
-            if scale_flag:
-                bbx_new = scale_down_bbx(bb_, scale_ratio=scale_ratio)
-                # bb = convert_bbx_VOC_to_yolo((bbx_new[0], bbx_new[0] + bbx_new[2], bbx_new[1], bbx_new[1] + bbx_new[3]), bg_size)
-                bb = bbox_voc_to_yolo((bbx_new[0], bbx_new[1], bbx_new[0] + bbx_new[2], bbx_new[1] + bbx_new[3]), bg_size)
-                txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
-                fw.write(txt_content)
-            else:
-                # bb = convert_bbx_VOC_to_yolo((bb_[0], bb_[0] + bb_[2], bb_[1], bb_[1] + bb_[3]), bg_size)
-                bb = bbox_voc_to_yolo((bb_[0], bb_[1], bb_[0] + bb_[2], bb_[1] + bb_[3]), bg_size)
-                txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
-                fw.write(txt_content)
-
-
-def gen_random_pos_pil_paste_cropped_object_aug_data(bbxes, paste_num, cropped_imgs, bg_size, dis_thresh=50, scatter_bbxs_num=3):
-    paste_poses = []
-    last_pos = (0, 0)  # try to scatter the bbxs.
-    for ii in range(scatter_bbxs_num):
-        for k in range(paste_num):
-            cropped_k_size = cropped_imgs[k].shape[:2]
-            if bg_size[1] - cropped_k_size[1] <= 0 or bg_size[0] - cropped_k_size[0] <= 0:
-                continue
-            paste_pos_k = [np.random.randint(0, (bg_size[1] - cropped_k_size[1])), np.random.randint(0, (bg_size[0] - cropped_k_size[0])), cropped_k_size[1], cropped_k_size[0]]
-
-            for bb in bbxes:
-                iou = cal_iou(bb, paste_pos_k)
-                # if in yolov5 false positive detections bbx, is not our desired results
-                if (paste_pos_k[0] >= bb[0] and paste_pos_k[0] <= bb[2]) and (paste_pos_k[1] >= bb[1] and paste_pos_k[1] <= bb[3]):
-                    continue
-                elif iou > 0.10:
-                    continue
-                elif np.sqrt((paste_pos_k[0] - bb[0]) ** 2 + (paste_pos_k[1] - bb[1]) ** 2) < dis_thresh:
-                    continue
-                elif last_pos != (0, 0):
-                    if np.sqrt((paste_pos_k[0] - last_pos[0]) ** 2 + (paste_pos_k[1] - last_pos[1]) ** 2) < dis_thresh:
-                        continue
-                    else:
-                        paste_poses.append(paste_pos_k)
-                else:
-                    paste_poses.append(paste_pos_k)
-            last_pos = paste_pos_k
-
-    # 1. remove special bbx
-    poses = copy.copy(paste_poses)
-
-    if poses:
-        if len(poses) >= 2:
-            for bi in range(len(poses) - 2, -1, -1):
-                bi_p0 = (poses[bi][0], poses[bi][1])
-                for bj in range(len(poses) - 1, bi, -1):
-                    # 1. bbxes very close, very small distance.
-                    bj_p0 = (poses[bj][0], poses[bj][1])
-                    bj_p1 = (poses[bj][0] + poses[bj][2], poses[bj][1])
-                    bj_p2 = (poses[bj][0] + poses[bj][2], poses[bj][1] + poses[bj][3])
-                    bj_p3 = (poses[bj][0], poses[bj][1] + poses[bj][3])
-
-                    dis_bi_p0_bj_p0 = np.sqrt((bi_p0[0] - bj_p0[0]) ** 2 + (bi_p0[1] - bj_p0[1]) ** 2)
-                    dis_bi_p0_bj_p1 = np.sqrt((bi_p0[0] - bj_p1[0]) ** 2 + (bi_p0[1] - bj_p1[1]) ** 2)
-                    dis_bi_p0_bj_p2 = np.sqrt((bi_p0[0] - bj_p2[0]) ** 2 + (bi_p0[1] - bj_p2[1]) ** 2)
-                    dis_bi_p0_bj_p3 = np.sqrt((bi_p0[0] - bj_p3[0]) ** 2 + (bi_p0[1] - bj_p3[1]) ** 2)
-
-                    if dis_bi_p0_bj_p0 < dis_thresh or dis_bi_p0_bj_p1 < dis_thresh or dis_bi_p0_bj_p2 < dis_thresh or dis_bi_p0_bj_p3 < dis_thresh:
-                        poses.remove(poses[bi])
-                        # print("======================== S1 ========================")
-                        continue
-
-                    if poses[bi][0] < poses[bj][0] and poses[bi][1] < poses[bj][1] and poses[bi][0] + poses[bi][2] > poses[bj][0] + poses[bj][2] and poses[bi][1] + poses[bi][3] > poses[bj][1] + poses[bj][3]:
-                        poses.remove(poses[bi])
-                        # print("======================== S2.1 ========================")
-                        continue
-                    # 2.2 bi in bj
-                    if poses[bi][0] > poses[bj][0] and poses[bi][1] > poses[bj][1] and poses[bi][0] + poses[bi][2] < poses[bj][0] + poses[bj][2] and poses[bi][1] + poses[bi][3] < poses[bj][1] + poses[bj][3]:
-                        poses.remove(poses[bi])
-                        # print("======================== S2.2 ========================")
-                        continue
-
-                    # 3. cal iou
-                    iou = cal_iou(poses[bi], poses[bj])
-                    if iou > 0.10:
-                        poses.remove(poses[bi])
-                        # print("======================== S3 ========================")
-                        continue
-
-    return poses
-
-
-def PIL_paste_image_on_bg_pil_paste_cropped_object_aug_data(paste_imgs, bg_img, paste_poses_selected):
-    pil_bg_img = Image.fromarray(np.uint8(bg_img)).convert("RGBA")
-
-    for i, img in enumerate(paste_imgs):
-        pil_img = Image.fromarray(np.uint8(img)).convert("RGBA")
-        pil_img_alpha = pil_img.split()[-1]
-        pil_bg_img.paste(pil_img, (paste_poses_selected[i][0], paste_poses_selected[i][1]), mask=pil_img_alpha)
-
-    pil_bg_img = pil_bg_img.convert("RGB")
-    return pil_bg_img
-
-
-def main_thread_pil_paste_cropped_object_aug_data(bg_list_i, bg_images_path, bg_labels_path, cropped_object_list, cropped_object_path, save_path, paste_largest_num, add_rename_str, scale_flag, scale_ratio, cls, dis_thresh, scatter_bbxs_num):
-    paste_num = np.random.randint(1, paste_largest_num + 1)
-
-    images_save_path = save_path + "/images"
-    labels_save_path = save_path + "/labels"
-    os.makedirs(images_save_path, exist_ok=True)
-    os.makedirs(labels_save_path, exist_ok=True)
-
-    for img in bg_list_i:
-        try:
-            img_name = os.path.splitext(img)[0]
-            bg_img_abs_path = bg_images_path + "/{}".format(img)
-            bg_lbl_abs_path = bg_labels_path + "/{}.txt".format(img_name)
-
-            bg_img = cv2.imread(bg_img_abs_path)
-            bg_size = bg_img.shape[:2]
-
-            cropped_random_samples = random.sample(cropped_object_list, paste_num)
-            cropped_imgs = []
-            for s in cropped_random_samples:
-                s_abs_path = cropped_object_path + "/{}".format(s)
-                cropped_cv2img = cv2.imread(s_abs_path)
-                cropped_imgs.append(cropped_cv2img)
-
-            bbxes = get_lbl_bbx_pil_paste_cropped_object_aug_data(bg_lbl_abs_path, bg_size)
-            paste_poses = gen_random_pos_pil_paste_cropped_object_aug_data(bbxes, paste_num, cropped_imgs, bg_size, dis_thresh=dis_thresh, scatter_bbxs_num=scatter_bbxs_num)
-            if paste_poses:
-                if len(paste_poses) < paste_num:
-                    continue
-            if not paste_poses:
-                continue
-
-            paste_poses_selected = random.sample(paste_poses, paste_num)
-            pil_bg_img = PIL_paste_image_on_bg_pil_paste_cropped_object_aug_data(cropped_imgs, bg_img, paste_poses_selected)
-
-            # save image and yolo label
-            # pil_bg_img.save("{}/{}_{}.jpg".format(save_img_path, img_name, "pasted"))
-            array_bg_img = np.asarray(pil_bg_img)
-            cv2.imwrite("{}/{}_{}_v6.jpg".format(images_save_path, img_name, add_rename_str), array_bg_img)
-            write_yolo_label_pil_paste_cropped_object_aug_data(labels_save_path, img_name, paste_poses_selected, bg_size, add_rename_str=add_rename_str, scale_flag=scale_flag, scale_ratio=scale_ratio, cls=cls)
-        except Exception as Error:
-            print(Error, Error.__traceback__.tb_lineno)
-
-
-def pil_paste_cropped_object_for_det_aug_data_train_negative_samples_multi_thread_v6_main(bg_path, bg_images_dir_name, bg_labels_dir_name, cropped_object_path, save_path, paste_largest_num=1, add_rename_str="pasted", scale_flag=True, scale_ratio=0.02, cls=0, dis_thresh=50, scatter_bbxs_num=5):
-    bg_images_path = bg_path + "/{}".format(bg_images_dir_name)
-    bg_labels_path = bg_path + "/{}".format(bg_labels_dir_name)
-
-    cropped_object_list = os.listdir(cropped_object_path)
-    bg_list = os.listdir(bg_images_path)
-
-    len_ = len(bg_list)
-    bg_lists = []
-    split_n = 8
-    for j in range(split_n):
-        bg_lists.append(bg_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        bg_list_i = bg_lists[i]
-        t = threading.Thread(target=main_thread_pil_paste_cropped_object_aug_data, args=(bg_list_i, bg_images_path, bg_labels_path, cropped_object_list, cropped_object_path, save_path, paste_largest_num, add_rename_str, scale_flag, scale_ratio, cls, dis_thresh, scatter_bbxs_num,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-# ======================================================================================================================================
-# ================================== PIL paste cropped object for det train negative samples multi thread ==================================
-# ======================================================================================================================================
-
-
-# ======================================================================================================================================
-# ============================== Add black bg images(e.g. seg output image) for det aug data multi thread ==============================
-# ======================================================================================================================================
-def image_gen_bbx_add_black_bg_object_aug_data(res_arr, size):
-    bboxes = []
-    for img in res_arr:
-        cnts, hierarchy = cv2.findContours(img.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        for c in cnts:
-            x, y, w, h = cv2.boundingRect(c)
-            # bboxes.append((x, y, w, h))
-
-            if w > 50 and h > 50:
-                x_min = x
-                x_max = x + w
-                y_min = y
-                y_max = y + h
-
-                # bb = convert_bbx_VOC_to_yolo(size, (x_min, x_max, y_min, y_max))
-                bb = bbox_voc_to_yolo(size, (x_min, y_min, x_max, y_max))
-                bboxes.append(bb)
-
-    return bboxes
-
-
-def timeit_add_black_bg_object_aug_data(func):
-    def wrapper(bg_list, bg_path, seg_object_list, seg_object_path, data_path, random_N, save_image_path, save_txt_path, cls, rename_add_str):
-        t1 = time.time()
-        func(bg_list, bg_path, seg_object_list, seg_object_path, data_path, random_N, save_image_path, save_txt_path, cls, rename_add_str)
-        t2 = time.time()
-        print(t2 - t1)
-
-    return wrapper
-
-
-@timeit_add_black_bg_object_aug_data
-def main_thread_add_black_bg_object_aug_data(bg_list, bg_path, seg_object_list, seg_object_path, data_path, random_N, save_image_path, save_txt_path, cls, rename_add_str):
-    image_path = data_path + "/images"
-    mask_path = data_path + "/masks"
-    mask_list = os.listdir(mask_path)
-
-    for bg in tqdm(bg_list):
-        try:
-            bg_abs_path = bg_path + "/{}".format(bg)
-            bg_img_name = os.path.splitext(bg)[0]
-            bg_img_pil = Image.open(bg_abs_path)
-            bg_img_array = np.asarray(bg_img_pil)
-            w, h = bg_img_pil.size
-
-            random_num = np.random.randint(1, random_N + 1)  # paste random (less than random_num(including)) objects
-            # seg_object_random_sample = random.sample(seg_object_list, random_num)
-            seg_object_random_sample = random.sample(mask_list, random_num)
-
-            for j, s in enumerate(seg_object_random_sample):
-                s_name = os.path.splitext(s)[0]
-                s_abs_path = mask_path + "/{}".format(s)
-                seg_object_img_pil = Image.open(s_abs_path)
-                object_array = np.asarray(seg_object_img_pil)
-                resized_object = scale_uint16(object_array, (w, h))
-                resized_object = cv2.cvtColor(resized_object, cv2.COLOR_RGB2BGR)
-                resized_object_gray = cv2.cvtColor(resized_object, cv2.COLOR_BGR2GRAY)
-                bg_img_array_BGR = cv2.cvtColor(bg_img_array, cv2.COLOR_RGB2BGR)
-                bg_img_array_cp = bg_img_array_BGR.copy()
-
-                image_abs_path = image_path + "/{}.jpg".format(s_name)
-                mask_abs_path = mask_path + "/{}".format(s)
-                cv2img = cv2.imread(image_abs_path)
-                maskimg = cv2.imread(mask_abs_path)
-
-                resized_cv2img = scale_uint16(cv2img, (w, h))
-
-                resized_mask = scale_uint16(maskimg, (w, h))
-                zeros = np.zeros(shape=resized_mask.shape)
-                object_area = np.where((resized_mask[:, :, 0] != 0) & (resized_mask[:, :, 1] != 0) & (resized_mask[:, :, 2] != 0))
-                x, y = object_area[1], object_area[0]
-                for i in range(len(x)):
-                    zeros[y[i], x[i], :] = resized_cv2img[y[i], x[i], :]
-                    bg_img_array_cp[y[i], x[i], :] = (0, 0, 0)
-
-                # object_area = np.where((resized_object[:, :, 0] > 0) & (resized_object[:, :, 1] > 0) & (resized_object[:, :, 2] > 0))
-                # bg_img_array_cp = bg_img_array_BGR.copy()
-                # for x_, y_ in zip(object_area[1], object_area[0]):
-                #     try:
-                #         bg_img_array_cp[y_, x_] = (0, 0, 0)
-                #     except Exception as Error:
-                #         print(Error)
-
-                # added_res = bg_img_array_cp + resized_object
-                added_res = bg_img_array_cp + zeros
-                # open_ = cv2.morphologyEx(added_res, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-
-                # gen yolo txt
-                resized_mask_0 = resized_mask[:, :, 0]
-                cnts, hierarchy = cv2.findContours(resized_mask_0.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                sortedcnts = sorted(cnts, key=lambda x: cv2.contourArea(x), reverse=True)
-                x_, y_, w_, h_ = cv2.boundingRect(sortedcnts[0])
-                x_min, x_max, y_min, y_max = x_, x_ + w_, y_, y_ + h_
-                # bb = convert_bbx_VOC_to_yolo((h, w), (x_min, x_max, y_min, y_max))
-                bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
-
-                cv2.imwrite("{}/{}_added_{}_{}.jpg".format(save_image_path, bg_img_name, j, rename_add_str), added_res)
-                txt_save_path_added = save_txt_path + "/{}_added_{}_{}.txt".format(bg_img_name, j, rename_add_str)
-                with open(txt_save_path_added, "w", encoding="utf-8") as fw:
-                    txt_content = "{}".format(cls) + " " + " ".join([str(a) for a in bb]) + "\n"
-                    fw.write(txt_content)
-
-                # ret, thresh = cv2.threshold(resized_object_gray.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
-                # thresh_filtered = cv2.medianBlur(thresh, 7)
-                # n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_filtered)
-                # txt_save_path_added = save_txt_path + "/{}_added_{}_{}.txt".format(bg_img_name, j, rename_add_str)
-                # txt_save_path_open = save_txt_path + "/{}_added_open_{}_{}.txt".format(bg_img_name, j, rename_add_str)
-                #
-                # res_arr = labels_to_split_images(n_labels, labels, (h, w))
-                # bboxes = image_gen_bbx_add_black_bg_object_aug_data(res_arr, (h, w))
-                # if len(bboxes) == n_labels - 1:
-                #     cv2.imwrite("{}/{}_added_{}_{}.jpg".format(save_image_path, bg_img_name, j, rename_add_str), added_res)
-                #     cv2.imwrite("{}/{}_added_open_{}_{}.jpg".format(save_image_path, bg_img_name, j, rename_add_str), open_)
-                #
-                #     with open(txt_save_path_added, "w", encoding="utf-8") as fw:
-                #         for b in bboxes:
-                #             txt_content = "{}".format(cls) + " " + " ".join([str(a) for a in b]) + "\n"
-                #             fw.write(txt_content)
-                #
-                #     with open(txt_save_path_open, "w", encoding="utf-8") as fw:
-                #         for b in bboxes:
-                #             txt_content = "{}".format(cls) + " " + " ".join([str(a) for a in b]) + "\n"
-                #             fw.write(txt_content)
-
-        except Exception as Error:
-            print(Error, Error.__traceback__.tb_lineno)
-
-
-def add_black_bg_object_for_det_aug_data_multi_thread_main(bg_path, seg_object_path, data_path, save_data_path, random_N=2, cls=0, rename_add_str="moisture_absorber_20230426"):
-    save_image_path = save_data_path + "/images"
-    save_txt_path = save_data_path + "/labels"
-    os.makedirs(save_image_path, exist_ok=True)
-    os.makedirs(save_txt_path, exist_ok=True)
-
-    bg_list = os.listdir(bg_path)
-    seg_object_list = os.listdir(seg_object_path)
-
-    len_ = len(bg_list)
-    bg_lists = []
-    split_n = 8
-    for j in range(split_n):
-        bg_lists.append(bg_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        bg_list_i = bg_lists[i]
-        t = threading.Thread(target=main_thread_add_black_bg_object_aug_data, args=(bg_list_i, bg_path, seg_object_list, seg_object_path, data_path, random_N, save_image_path, save_txt_path, cls, rename_add_str,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-
-# ======================================================================================================================================
-# ============================== Add black bg images(e.g. seg output image) for det aug data multi thread ==============================
-# ======================================================================================================================================
-
-
-# ======================================================================================================================================
-# ============================= Paste object like opencv seamless clone for det aug data multi thread v6 ===============================
-# ======================================================================================================================================
-def gen_translate_M_seamless_paste_v6(affine_num=2):
-    """
-    :param n:
-    :return:
-    """
-    Ms = []
-    for i in range(affine_num):
-        M = np.array([[1, 0, np.random.randint(-30, 30)], [0, 1, np.random.randint(-30, 30)]], dtype=np.float32)
-        Ms.append(M)
-
-    return Ms
-
-
-def gen_rotate_M_seamless_paste_v6(affine_num=2):
-    Ms = []
-    theta_list = [np.pi / 180, np.pi / 170, np.pi / 160, np.pi / 150, np.pi / 145, np.pi / 90]
-    theta_list_select = random.sample(theta_list, affine_num)
-    for theta in theta_list_select:
-        M = np.array([[np.cos(theta), np.sin(theta), 0], [-np.sin(theta), np.cos(theta), 0]], dtype=np.float32)
-        Ms.append(M)
-
-    return Ms
-
-
-def gen_perspective_tran_M_seamless_paste_v6(size, affine_num=2):
-    h, w = size[0], size[1]
-    Ms = []
-    p_list = [2, 5, 8]
-    if affine_num == 1:
-        p_list_select = random.sample(p_list, 1)
-    else:
-        p_list_select = random.sample(p_list, affine_num // 2)
-    for i in p_list_select:
-        m_src = np.array([[0, 0], [w, 0], [w, h]], dtype=np.float32)
-        m_dst = np.array([[0, 0], [w - i, i], [w - i, h - i]], dtype=np.float32)
-        M = cv2.getAffineTransform(m_src, m_dst)
-        Ms.append(M)
-
-    for j in p_list_select:
-        m_src = np.array([[0, 0], [0, h], [w, 0]], dtype=np.float32)
-        m_dst = np.array([[j, j], [j, h - j], [w, 0]], dtype=np.float32)
-        M = cv2.getAffineTransform(m_src, m_dst)
-        Ms.append(M)
-
-    return Ms
-
-
-def write_yolo_label_seamless_paste_v6(labels_save_path, final_yolo_bbxes, bg_img_name, i, random_obj_num, cls=0, rename_add_str="lock_20230327", affine_type="affine_type"):
-    lbl_save_abs_path = labels_save_path + "/{}_affine_{}_obj_{}_{}_{}.txt".format(bg_img_name, i, random_obj_num, rename_add_str, affine_type)
-    with open(lbl_save_abs_path, "w", encoding="utf-8") as fw:
-        for bb in final_yolo_bbxes:
-            txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bb]) + "\n"
-            fw.write(txt_content)
-
-
-def timeit_seamless_paste_v6(func):
-    def wrapper(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_dir_name, object_path, save_path, obj_num, affine_num, threshold_min_thr, medianblur_k, pixel_thr, iou_thr, bbx_thr, cls, rename_add_str, random_scale_flag, adaptiveThreshold):
-        t1 = time.time()
-        func(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_dir_name, object_path, save_path, obj_num, affine_num, threshold_min_thr, medianblur_k, pixel_thr, iou_thr, bbx_thr, cls, rename_add_str, random_scale_flag, adaptiveThreshold)
-        t2 = time.time()
-        print(t2 - t1)
-
-    return wrapper
-
-
-@timeit_seamless_paste_v6
-def seamless_paste_main_thread_v6(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_dir_name, object_path, save_path, obj_num, affine_num, threshold_min_thr, medianblur_k, pixel_thr, iou_thr, bbx_thr, cls, rename_add_str, random_scale_flag, adaptiveThreshold):
-    bg_images_path = bg_path + "/{}".format(bg_img_dir_name)
-    bg_labels_path = bg_path + "/{}".format(bg_lbl_dir_name)
-    bg_list = os.listdir(bg_images_path)
-
-    images_save_path = save_path + "/images"
-    labels_save_path = save_path + "/labels"
-    os.makedirs(images_save_path, exist_ok=True)
-    os.makedirs(labels_save_path, exist_ok=True)
-
-    object_list = sorted(os.listdir(object_path))
-
-    for bg in tqdm(bg_list_i):
-        try:
-            bg_abs_path = bg_images_path + "/{}".format(bg)
-            bg_img_name = os.path.splitext(bg)[0]
-            bg_lbl_abs_path = bg_labels_path + "/{}.txt".format(bg_img_name)
-            bg_lbl_data = open(bg_lbl_abs_path, "r", encoding="utf-8")
-            bg_lbl_data_lines = bg_lbl_data.readlines()
-            bg_lbl_data.close()
-
-            bg_cv2img = cv2.imread(bg_abs_path)
-            bg_cv2img_cp = bg_cv2img.copy()
-            bg_cv2img_cp2 = bg_cv2img.copy()
-            bg_size = bg_cv2img.shape[:2]
-
-            random_obj_num = np.random.randint(1, obj_num + 1)  # paste random (less than obj_num(including)) objects
-            object_random_sample = random.sample(object_list, random_obj_num)
-
-            translate_Ms = gen_translate_M_seamless_paste_v6(affine_num)
-            rotate_Ms = gen_rotate_M_seamless_paste_v6(affine_num)
-
-            # ========================================= translate =========================================
-            affine_type = "translate"
-            for idx in range(affine_num):
-                pasted_bg_img = None
-                final_yolo_bbxes = []
-                bg_cv2img_for_paste = bg_cv2img_cp2
-
-                obj_img_names = ""
-                for o in object_random_sample:
-                    o_abs_path = object_path + "/{}".format(o)
-                    obj_img_name = os.path.splitext(o)[0]
-                    obj_img_names += obj_img_name + "_"
-                    cv2img = cv2.imread(o_abs_path)
-                    img_size = cv2img.shape[:2]
-
-                    # perspective_Ms = gen_perspective_tran_M_seamless_paste(img_size, affine_num)
-
-                    out = cv2.warpAffine(cv2img, translate_Ms[idx], img_size[::-1])
-                    out_gray = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
-                    # ret, thresh = cv2.threshold(out_gray, threshold_min_thr, 255, cv2.THRESH_BINARY)
-                    ret, thresh = thresh_img(out_gray, threshold_min_thr=threshold_min_thr, adaptiveThreshold=adaptiveThreshold)
-                    thresh_filtered = cv2.medianBlur(thresh, medianblur_k)
-                    cnts, hierarchy = cv2.findContours(thresh_filtered, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-                    sortedcnts = sorted(cnts, key=lambda x: cv2.contourArea(x), reverse=True)
-                    x_, y_, w_, h_ = cv2.boundingRect(sortedcnts[0])
-                    bbx = []
-                    if w_ > pixel_thr and h_ > pixel_thr:
-                        bbx.append([x_, y_, w_, h_])
-
-                    # print("img_size, out_size, [x_, y_, w_, h_]: {} {} {}".format(img_size, out.shape[:2], [x_, y_, w_, h_]))
-                    # cv2.rectangle(cv2img, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_cv2img.jpg".format(images_save_path, bg_img_name, obj_img_name), cv2img)
-                    # cv2.rectangle(out, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_affineout.jpg".format(images_save_path, bg_img_name, obj_img_name), out)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh_filtered.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh_filtered)
-
-                    # gen random pos --> bbx
-                    poses = []
-
-                    while True:
-                        paste_k_pos = (np.random.randint(0, (bg_size[1] - img_size[1])), np.random.randint(0, (bg_size[0] - img_size[0])))
-                        paste_k_VOC_bbx = (paste_k_pos[0], paste_k_pos[1], paste_k_pos[0] + img_size[1], paste_k_pos[1] + img_size[0])
-                        for l in bg_lbl_data_lines:
-                            gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
-                            # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
-                            iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
-
-                            if iou < iou_thr:
-                                poses.append(paste_k_VOC_bbx)
-
-                        if len(poses) >= 1:
-                            break
-
-                    select_one_pos = random.sample(poses, 1)
-                    thresh_3c = cv2.merge([thresh, thresh, thresh])
-                    bg_mask1 = np.zeros((select_one_pos[0][1], bg_size[1], 3), dtype=np.uint8)
-                    bg_mask2 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), select_one_pos[0][0], 3), dtype=np.uint8)
-                    bg_mask4 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1] - select_one_pos[0][0] - (select_one_pos[0][2] - select_one_pos[0][0]), 3), dtype=np.uint8)
-                    bg_mask5 = np.zeros((bg_size[0] - select_one_pos[0][1] - (select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1], 3), dtype=np.uint8)
-
-                    bg_mask_mid = np.hstack((bg_mask2, thresh_3c, bg_mask4))
-                    bg_mask = np.vstack((bg_mask1, bg_mask_mid, bg_mask5))
-
-                    object_formed_mid = np.hstack((bg_mask2, out, bg_mask4))
-                    object_formed = np.vstack((bg_mask1, object_formed_mid, bg_mask5))
-
-                    bg_cv2img_for_paste = bg_cv2img_for_paste.copy()
-                    object_area = np.where((bg_mask[:, :, 0] >= pixel_thr) & (bg_mask[:, :, 1] >= pixel_thr) & (bg_mask[:, :, 2] >= pixel_thr))
-                    for x_b, y_b in zip(object_area[1], object_area[0]):
-                        try:
-                            bg_cv2img_for_paste[y_b, x_b] = (0, 0, 0)
-                        except Exception as Error:
-                            print(Error)
-
-                    pasted_bg_img = bg_cv2img_for_paste + object_formed
-
-                    # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
-
-                    final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
-                    assert final_yolo_bbx[0] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[1] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[2] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[3] > 0, "bbx should > 0!"
-
-                    # assert h_ >= img_size[0] * bbx_thr, "May have some problems!"
-                    # assert w_ >= img_size[1] * bbx_thr, "May have some problems!"
-
-                    final_yolo_bbxes.append(final_yolo_bbx)
-
-                    bg_cv2img_for_paste = pasted_bg_img
-
-                # # bg_cv2img = pasted_bg_img
-                # if random_obj_num >= 2:
-
-                assert len(final_yolo_bbxes) == random_obj_num, "bbx length should be same as random_obj_num!"
-
-                # remove overlapped bbx through iou
-                overlap_flag = False
-                for bi in range(len(final_yolo_bbxes)):
-                    for bj in range(bi + 1, len(final_yolo_bbxes)):
-                        # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
-                        # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
-
-                        iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
-                        if iou_bi_bj > 0:
-                            overlap_flag = True
-                            break
-
-                if overlap_flag:
-                    print("There are some bbxes overlapped!")
-                    continue
-
-                # write image and label
-                cv2.imwrite("{}/{}_affine_{}_obj_{}_{}_{}.jpg".format(images_save_path, bg_img_name, idx, random_obj_num, rename_add_str, affine_type), pasted_bg_img)
-                write_yolo_label_seamless_paste_v6(labels_save_path, final_yolo_bbxes, bg_img_name, idx, random_obj_num, cls=cls, rename_add_str=rename_add_str, affine_type=affine_type)
-
-            # =========================================    rotate    =========================================
-            affine_type = "rotate"
-            for idx in range(affine_num):
-                pasted_bg_img = None
-                final_yolo_bbxes = []
-                bg_cv2img_for_paste = bg_cv2img_cp2
-
-                obj_img_names = ""
-                for o in object_random_sample:
-                    o_abs_path = object_path + "/{}".format(o)
-                    obj_img_name = os.path.splitext(o)[0]
-                    obj_img_names += obj_img_name + "_"
-                    cv2img = cv2.imread(o_abs_path)
-                    img_size = cv2img.shape[:2]
-
-                    # perspective_Ms = gen_perspective_tran_M_seamless_paste(img_size, affine_num)
-
-                    out = cv2.warpAffine(cv2img, rotate_Ms[idx], img_size[::-1])
-                    out_gray = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
-                    # ret, thresh = cv2.threshold(out_gray, threshold_min_thr, 255, cv2.THRESH_BINARY)
-                    ret, thresh = thresh_img(out_gray, threshold_min_thr=threshold_min_thr, adaptiveThreshold=adaptiveThreshold)
-                    thresh_filtered = cv2.medianBlur(thresh, medianblur_k)
-                    cnts, hierarchy = cv2.findContours(thresh_filtered, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-                    sortedcnts = sorted(cnts, key=lambda x: cv2.contourArea(x), reverse=True)
-                    x_, y_, w_, h_ = cv2.boundingRect(sortedcnts[0])
-                    bbx = []
-                    if w_ > pixel_thr and h_ > pixel_thr:
-                        bbx.append([x_, y_, w_, h_])
-
-                    # print("img_size, out_size, [x_, y_, w_, h_]: {} {} {}".format(img_size, out.shape[:2], [x_, y_, w_, h_]))
-                    # cv2.rectangle(cv2img, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_cv2img.jpg".format(images_save_path, bg_img_name, obj_img_name), cv2img)
-                    # cv2.rectangle(out, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_affineout.jpg".format(images_save_path, bg_img_name, obj_img_name), out)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh_filtered.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh_filtered)
-
-                    # gen random pos --> bbx
-                    poses = []
-
-                    while True:
-                        paste_k_pos = (np.random.randint(0, (bg_size[1] - img_size[1])), np.random.randint(0, (bg_size[0] - img_size[0])))
-                        paste_k_VOC_bbx = (paste_k_pos[0], paste_k_pos[1], paste_k_pos[0] + img_size[1], paste_k_pos[1] + img_size[0])
-                        for l in bg_lbl_data_lines:
-                            gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
-                            # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
-                            iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
-
-                            if iou < iou_thr:
-                                poses.append(paste_k_VOC_bbx)
-
-                        if len(poses) >= 1:
-                            break
-
-                    select_one_pos = random.sample(poses, 1)
-                    thresh_3c = cv2.merge([thresh, thresh, thresh])
-                    bg_mask1 = np.zeros((select_one_pos[0][1], bg_size[1], 3), dtype=np.uint8)
-                    bg_mask2 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), select_one_pos[0][0], 3), dtype=np.uint8)
-                    bg_mask4 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1] - select_one_pos[0][0] - (select_one_pos[0][2] - select_one_pos[0][0]), 3), dtype=np.uint8)
-                    bg_mask5 = np.zeros((bg_size[0] - select_one_pos[0][1] - (select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1], 3), dtype=np.uint8)
-
-                    bg_mask_mid = np.hstack((bg_mask2, thresh_3c, bg_mask4))
-                    bg_mask = np.vstack((bg_mask1, bg_mask_mid, bg_mask5))
-
-                    object_formed_mid = np.hstack((bg_mask2, out, bg_mask4))
-                    object_formed = np.vstack((bg_mask1, object_formed_mid, bg_mask5))
-
-                    bg_cv2img_for_paste = bg_cv2img_for_paste.copy()
-                    object_area = np.where((bg_mask[:, :, 0] >= pixel_thr) & (bg_mask[:, :, 1] >= pixel_thr) & (bg_mask[:, :, 2] >= pixel_thr))
-                    for x_b, y_b in zip(object_area[1], object_area[0]):
-                        try:
-                            bg_cv2img_for_paste[y_b, x_b] = (0, 0, 0)
-                        except Exception as Error:
-                            print(Error)
-
-                    pasted_bg_img = bg_cv2img_for_paste + object_formed
-
-                    # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
-
-                    final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
-                    assert final_yolo_bbx[0] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[1] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[2] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[3] > 0, "bbx should > 0!"
-
-                    # assert h_ >= img_size[0] * bbx_thr, "May have some problems!"
-                    # assert w_ >= img_size[1] * bbx_thr, "May have some problems!"
-
-                    final_yolo_bbxes.append(final_yolo_bbx)
-
-                    bg_cv2img_for_paste = pasted_bg_img
-
-                # # bg_cv2img = pasted_bg_img
-                # if random_obj_num >= 2:
-
-                assert len(final_yolo_bbxes) == random_obj_num, "bbx length should be same as random_obj_num!"
-
-                # remove overlapped bbx through iou
-                overlap_flag = False
-                for bi in range(len(final_yolo_bbxes)):
-                    for bj in range(bi + 1, len(final_yolo_bbxes)):
-                        # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
-                        # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
-
-                        iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
-                        if iou_bi_bj > 0:
-                            overlap_flag = True
-                            break
-
-                if overlap_flag:
-                    print("There are some bbxes overlapped!")
-                    continue
-
-                # write image and label
-                cv2.imwrite("{}/{}_affine_{}_obj_{}_{}_{}.jpg".format(images_save_path, bg_img_name, idx, random_obj_num, rename_add_str, affine_type), pasted_bg_img)
-                write_yolo_label_seamless_paste_v6(labels_save_path, final_yolo_bbxes, bg_img_name, idx, random_obj_num, cls=cls, rename_add_str=rename_add_str, affine_type=affine_type)
-
-            # =========================================  perspective =========================================
-            affine_type = "perspective"
-            for idx in range(affine_num):
-                pasted_bg_img = None
-                final_yolo_bbxes = []
-                bg_cv2img_for_paste = bg_cv2img_cp2
-
-                obj_img_names = ""
-                for o in object_random_sample:
-                    o_abs_path = object_path + "/{}".format(o)
-                    obj_img_name = os.path.splitext(o)[0]
-                    obj_img_names += obj_img_name + "_"
-                    cv2img = cv2.imread(o_abs_path)
-                    img_size = cv2img.shape[:2]
-
-                    perspective_Ms = gen_perspective_tran_M_seamless_paste_v6(img_size, 1)
-
-                    out = cv2.warpAffine(cv2img, perspective_Ms[idx], img_size[::-1])
-                    out_gray = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
-                    # ret, thresh = cv2.threshold(out_gray, threshold_min_thr, 255, cv2.THRESH_BINARY)
-                    ret, thresh = thresh_img(out_gray, threshold_min_thr=threshold_min_thr, adaptiveThreshold=adaptiveThreshold)
-                    thresh_filtered = cv2.medianBlur(thresh, medianblur_k)
-                    cnts, hierarchy = cv2.findContours(thresh_filtered, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-                    sortedcnts = sorted(cnts, key=lambda x: cv2.contourArea(x), reverse=True)
-                    x_, y_, w_, h_ = cv2.boundingRect(sortedcnts[0])
-                    bbx = []
-                    if w_ > pixel_thr and h_ > pixel_thr:
-                        bbx.append([x_, y_, w_, h_])
-
-                    # print("img_size, out_size, [x_, y_, w_, h_]: {} {} {}".format(img_size, out.shape[:2], [x_, y_, w_, h_]))
-                    # cv2.rectangle(cv2img, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_cv2img.jpg".format(images_save_path, bg_img_name, obj_img_name), cv2img)
-                    # cv2.rectangle(out, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_affineout.jpg".format(images_save_path, bg_img_name, obj_img_name), out)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh_filtered.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh_filtered)
-
-                    # gen random pos --> bbx
-                    poses = []
-
-                    while True:
-                        paste_k_pos = (np.random.randint(0, (bg_size[1] - img_size[1])), np.random.randint(0, (bg_size[0] - img_size[0])))
-                        paste_k_VOC_bbx = (paste_k_pos[0], paste_k_pos[1], paste_k_pos[0] + img_size[1], paste_k_pos[1] + img_size[0])
-                        for l in bg_lbl_data_lines:
-                            gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
-                            # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
-                            iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
-
-                            if iou < iou_thr:
-                                poses.append(paste_k_VOC_bbx)
-
-                        if len(poses) >= 1:
-                            break
-
-                    select_one_pos = random.sample(poses, 1)
-                    thresh_3c = cv2.merge([thresh, thresh, thresh])
-                    bg_mask1 = np.zeros((select_one_pos[0][1], bg_size[1], 3), dtype=np.uint8)
-                    bg_mask2 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), select_one_pos[0][0], 3), dtype=np.uint8)
-                    bg_mask4 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1] - select_one_pos[0][0] - (select_one_pos[0][2] - select_one_pos[0][0]), 3), dtype=np.uint8)
-                    bg_mask5 = np.zeros((bg_size[0] - select_one_pos[0][1] - (select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1], 3), dtype=np.uint8)
-
-                    bg_mask_mid = np.hstack((bg_mask2, thresh_3c, bg_mask4))
-                    bg_mask = np.vstack((bg_mask1, bg_mask_mid, bg_mask5))
-
-                    object_formed_mid = np.hstack((bg_mask2, out, bg_mask4))
-                    object_formed = np.vstack((bg_mask1, object_formed_mid, bg_mask5))
-
-                    bg_cv2img_for_paste = bg_cv2img_for_paste.copy()
-                    object_area = np.where((bg_mask[:, :, 0] >= pixel_thr) & (bg_mask[:, :, 1] >= pixel_thr) & (bg_mask[:, :, 2] >= pixel_thr))
-                    for x_b, y_b in zip(object_area[1], object_area[0]):
-                        try:
-                            bg_cv2img_for_paste[y_b, x_b] = (0, 0, 0)
-                        except Exception as Error:
-                            print(Error)
-
-                    pasted_bg_img = bg_cv2img_for_paste + object_formed
-
-                    # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
-
-                    final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
-                    assert final_yolo_bbx[0] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[1] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[2] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[3] > 0, "bbx should > 0!"
-
-                    # assert h_ >= img_size[0] * bbx_thr, "May have some problems!"
-                    # assert w_ >= img_size[1] * bbx_thr, "May have some problems!"
-
-                    final_yolo_bbxes.append(final_yolo_bbx)
-
-                    bg_cv2img_for_paste = pasted_bg_img
-
-                # # bg_cv2img = pasted_bg_img
-                # if random_obj_num >= 2:
-
-                assert len(final_yolo_bbxes) == random_obj_num, "bbx length should be same as random_obj_num!"
-
-                # remove overlapped bbx through iou
-                overlap_flag = False
-                for bi in range(len(final_yolo_bbxes)):
-                    for bj in range(bi + 1, len(final_yolo_bbxes)):
-                        # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
-                        # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
-
-                        iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
-                        if iou_bi_bj > 0:
-                            overlap_flag = True
-                            break
-
-                if overlap_flag:
-                    print("There are some bbxes overlapped!")
-                    continue
-
-                # write image and label
-                cv2.imwrite("{}/{}_affine_{}_obj_{}_{}_{}.jpg".format(images_save_path, bg_img_name, idx, random_obj_num, rename_add_str, affine_type), pasted_bg_img)
-                write_yolo_label_seamless_paste_v6(labels_save_path, final_yolo_bbxes, bg_img_name, idx, random_obj_num, cls=cls, rename_add_str=rename_add_str, affine_type=affine_type)
-
-            # ========================================= random scale =========================================
-            affine_type = "random_scale"
-            for idx in range(affine_num):
-                pasted_bg_img = None
-                final_yolo_bbxes = []
-                bg_cv2img_for_paste = bg_cv2img_cp2
-
-                obj_img_names = ""
-                for o in object_random_sample:
-                    o_abs_path = object_path + "/{}".format(o)
-                    obj_img_name = os.path.splitext(o)[0]
-                    obj_img_names += obj_img_name + "_"
-                    cv2img = cv2.imread(o_abs_path)
-                    img_size = cv2img.shape[:2]
-
-                    # perspective_Ms = gen_perspective_tran_M_seamless_paste(img_size, 1)
-                    #
-                    # out = cv2.warpAffine(cv2img, perspective_Ms[idx], img_size[::-1])
-                    # out_gray = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
-                    # ret, thresh = cv2.threshold(out_gray, threshold_min_thr, 255, cv2.THRESH_BINARY)
-                    # thresh_filtered = cv2.medianBlur(thresh, medianblur_k)
-                    # cnts, hierarchy = cv2.findContours(thresh_filtered, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-                    cv2img = np.asarray(cv2img)[:, :, ::-1]
-                    scale_cut_size = [1.2, 1.4, 1.6, 1.8, 2, 2.5, 5, 6, 7, 8, 10, 12, 15]
-                    if random_scale_flag == "small_images":
-                        scale_cut_size = scale_cut_size[:int(len(scale_cut_size) / 2)]
-                    elif random_scale_flag == "big_images":
-                        scale_cut_size = scale_cut_size[:int(len(scale_cut_size) * 2 / 3)]
-                    scale_cut_size_choose = random.sample(scale_cut_size, 1)
-
-                    target_size = (int(img_size[1] / scale_cut_size_choose[0]), int(img_size[0] / scale_cut_size_choose[0]))
-                    scale_img = cv2.resize(cv2img, target_size)
-                    scale_pil_img = Image.fromarray(np.uint8(scale_img))
-                    new_img = Image.new("RGB", img_size[::-1], (0, 0, 0))
-                    pos = (np.random.randint(0, (img_size[1] - target_size[0])), np.random.randint(0, (img_size[0] - target_size[1])))
-                    new_img.paste(scale_pil_img, pos)
-
-                    new_img_cv2 = np.asarray(new_img)[:, :, ::-1]
-                    out_gray = cv2.cvtColor(new_img_cv2, cv2.COLOR_BGR2GRAY)
-                    # ret, thresh = cv2.threshold(out_gray, threshold_min_thr, 255, cv2.THRESH_BINARY)
-                    ret, thresh = thresh_img(out_gray, threshold_min_thr=threshold_min_thr, adaptiveThreshold=adaptiveThreshold)
-                    thresh_filtered = cv2.medianBlur(thresh, medianblur_k)
-                    cnts, hierarchy = cv2.findContours(thresh_filtered, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-                    sortedcnts = sorted(cnts, key=lambda x: cv2.contourArea(x), reverse=True)
-                    x_, y_, w_, h_ = cv2.boundingRect(sortedcnts[0])
-                    bbx = []
-                    if w_ > pixel_thr and h_ > pixel_thr:
-                        bbx.append([x_, y_, w_, h_])
-
-                    # print("img_size, out_size, [x_, y_, w_, h_]: {} {} {}".format(img_size, out.shape[:2], [x_, y_, w_, h_]))
-                    # cv2.rectangle(cv2img, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_cv2img.jpg".format(images_save_path, bg_img_name, obj_img_name), cv2img)
-                    # cv2.rectangle(out, (x_, y_), (x_ + w_, y_ + h_), (255, 255, 0))
-                    # cv2.imwrite("{}/bg_{}_obj_{}_affineout.jpg".format(images_save_path, bg_img_name, obj_img_name), out)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh)
-                    # cv2.imwrite("{}/bg_{}_obj_{}_thresh_filtered.jpg".format(images_save_path, bg_img_name, obj_img_name), thresh_filtered)
-
-                    # gen random pos --> bbx
-                    poses = []
-
-                    while True:
-                        paste_k_pos = (np.random.randint(0, (bg_size[1] - img_size[1])), np.random.randint(0, (bg_size[0] - img_size[0])))
-                        paste_k_VOC_bbx = (paste_k_pos[0], paste_k_pos[1], paste_k_pos[0] + img_size[1], paste_k_pos[1] + img_size[0])
-                        for l in bg_lbl_data_lines:
-                            gb_yolo_bbx = list(map(float, l.strip().split(" ")[1:]))
-                            # gb_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, gb_yolo_bbx)
-                            gb_VOC_bbx = bbox_yolo_to_voc(bg_size, gb_yolo_bbx)
-                            iou = cal_iou(paste_k_VOC_bbx, gb_VOC_bbx)
-
-                            if iou < iou_thr:
-                                poses.append(paste_k_VOC_bbx)
-
-                        if len(poses) >= 1:
-                            break
-
-                    select_one_pos = random.sample(poses, 1)
-                    thresh_3c = cv2.merge([thresh, thresh, thresh])
-                    bg_mask1 = np.zeros((select_one_pos[0][1], bg_size[1], 3), dtype=np.uint8)
-                    bg_mask2 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), select_one_pos[0][0], 3), dtype=np.uint8)
-                    bg_mask4 = np.zeros(((select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1] - select_one_pos[0][0] - (select_one_pos[0][2] - select_one_pos[0][0]), 3), dtype=np.uint8)
-                    bg_mask5 = np.zeros((bg_size[0] - select_one_pos[0][1] - (select_one_pos[0][3] - select_one_pos[0][1]), bg_size[1], 3), dtype=np.uint8)
-
-                    bg_mask_mid = np.hstack((bg_mask2, thresh_3c, bg_mask4))
-                    bg_mask = np.vstack((bg_mask1, bg_mask_mid, bg_mask5))
-
-                    object_formed_mid = np.hstack((bg_mask2, new_img_cv2, bg_mask4))
-                    object_formed = np.vstack((bg_mask1, object_formed_mid, bg_mask5))
-
-                    bg_cv2img_for_paste = bg_cv2img_for_paste.copy()
-                    object_area = np.where((bg_mask[:, :, 0] >= pixel_thr) & (bg_mask[:, :, 1] >= pixel_thr) & (bg_mask[:, :, 2] >= pixel_thr))
-                    for x_b, y_b in zip(object_area[1], object_area[0]):
-                        try:
-                            bg_cv2img_for_paste[y_b, x_b] = (0, 0, 0)
-                        except Exception as Error:
-                            print(Error)
-
-                    pasted_bg_img = bg_cv2img_for_paste + object_formed
-
-                    # cv2.rectangle(pasted_bg_img, (select_one_pos[0][0], select_one_pos[0][1]), (select_one_pos[0][2], select_one_pos[0][3]), (255, 0, 255), 5)
-
-                    final_VOC_bbx = [select_one_pos[0][0] + x_, select_one_pos[0][1] + y_, select_one_pos[0][0] + x_ + w_, select_one_pos[0][1] + y_ + h_]
-                    final_yolo_bbx = bbox_voc_to_yolo(bg_size, final_VOC_bbx)
-                    assert final_yolo_bbx[0] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[1] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[2] > 0, "bbx should > 0!"
-                    assert final_yolo_bbx[3] > 0, "bbx should > 0!"
-
-                    # assert h_ >= img_size[0] * bbx_thr, "May have some problems!"
-                    # assert w_ >= img_size[1] * bbx_thr, "May have some problems!"
-
-                    final_yolo_bbxes.append(final_yolo_bbx)
-
-                    bg_cv2img_for_paste = pasted_bg_img
-
-                # # bg_cv2img = pasted_bg_img
-                # if random_obj_num >= 2:
-
-                assert len(final_yolo_bbxes) == random_obj_num, "bbx length should be same as random_obj_num!"
-
-                # remove overlapped bbx through iou
-                overlap_flag = False
-                for bi in range(len(final_yolo_bbxes)):
-                    for bj in range(bi + 1, len(final_yolo_bbxes)):
-                        # bi_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bi])
-                        # bj_VOC_bbx = convert_bbx_yolo_to_VOC(bg_size, final_yolo_bbxes[bj])
-                        bi_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bi])
-                        bj_VOC_bbx = bbox_yolo_to_voc(bg_size, final_yolo_bbxes[bj])
-
-                        iou_bi_bj = cal_iou(bi_VOC_bbx, bj_VOC_bbx)
-                        if iou_bi_bj > 0:
-                            overlap_flag = True
-                            break
-
-                if overlap_flag:
-                    print("There are some bbxes overlapped!")
-                    continue
-
-                # write image and label
-                cv2.imwrite("{}/{}_affine_{}_obj_{}_{}_{}.jpg".format(images_save_path, bg_img_name, idx, random_obj_num, rename_add_str, affine_type), pasted_bg_img)
-                write_yolo_label_seamless_paste_v6(labels_save_path, final_yolo_bbxes, bg_img_name, idx, random_obj_num, cls=cls, rename_add_str=rename_add_str, affine_type=affine_type)
-
-        except Exception as Error:
-            print("Line: {} Error: {}".format(Error.__traceback__.tb_lineno, Error))
-
-
-def seamless_paste_main_v6(bg_path, bg_img_dir_name, bg_lbl_dir_name, object_path, save_path, obj_num=2, affine_num=2, threshold_min_thr=10, medianblur_k=5, pixel_thr=10, iou_thr=0.05, bbx_thr=0.80, cls=0, rename_add_str="exit_light_20230411", random_scale_flag="small_images", adaptiveThreshold=True):
-    bg_images_path = bg_path + "/{}".format(bg_img_dir_name)
-    bg_labels_path = bg_path + "/{}".format(bg_lbl_dir_name)
-
-    bg_list = os.listdir(bg_images_path)
-
-    len_ = len(bg_list)
-    bg_lists = []
-    split_n = 8
-    for j in range(split_n):
-        bg_lists.append(bg_list[int(len_ * (j / split_n)):int(len_ * ((j + 1) / split_n))])
-
-    t_list = []
-    for i in range(split_n):
-        bg_list_i = bg_lists[i]
-        t = threading.Thread(target=seamless_paste_main_thread_v6, args=(bg_list_i, bg_path, bg_img_dir_name, bg_lbl_dir_name, object_path, save_path, obj_num, affine_num, threshold_min_thr, medianblur_k, pixel_thr, iou_thr, bbx_thr, cls, rename_add_str, random_scale_flag, adaptiveThreshold,))
-        t_list.append(t)
-
-    for t in t_list:
-        t.start()
-    for t in t_list:
-        t.join()
-
-# ======================================================================================================================================
-# ============================= Paste object like opencv seamless clone for det aug data multi thread v6 ===============================
-# ======================================================================================================================================
 
 def remove_yolo_label_specific_class(data_path, rm_cls=(1, 2,)):
     curr_labels_path = data_path + "/labels"
@@ -10676,8 +7418,8 @@ def convert_WiderPerson_to_yolo_format(data_path):
         lbl_abs_path = lbl_path + "/{}".format(lbl)
         lbl_new_path = save_path + "/{}".format(lbl)
         img_abs_path = img_path + "/{}.jpg".format(f_name)
-        cv2img = cv2.imread(img_abs_path)
-        img_shape = cv2img.shape[:2]
+        img = cv2.imread(img_abs_path)
+        img_shape = img.shape[:2]
 
         orig_lbl = open(lbl_abs_path, "r", encoding="utf-8")
         new_lbl = open(lbl_new_path, "w", encoding="utf-8")
@@ -10706,7 +7448,11 @@ def convert_TinyPerson_to_yolo_format(data_path):
             save_path = data_path + "/yolo_format/{}/labels_{}".format(dt, d)
             os.makedirs(save_path, exist_ok=True)
 
-            json_data = get_json_data(data_path, dt, d)
+            json_data = None
+            if not d:
+                json_data = json.load(open(data_path + "/annotations/tiny_set_{}.json".format(dt), "r", encoding="utf-8"))
+            else:
+                json_data = json.load(open(data_path + "/annotations/tiny_set_{}_with_dense.json".format(dt), "r", encoding="utf-8"))
 
             images = json_data["images"]
             categories = json_data["categories"]
@@ -10791,8 +7537,8 @@ def convert_AI_TOD_to_yolo_format(data_path):
             lbl_abs_path = d_lbl_path + "/{}.txt".format(img_name)
             lbl_dst_path = save_lbl_path + "/{}.txt".format(img_name)
 
-            cv2img = cv2.imread(img_abs_path)
-            img_shape = cv2img.shape[:2]
+            img = cv2.imread(img_abs_path)
+            img_shape = img.shape[:2]
 
             txt_fo = open(lbl_abs_path, "r", encoding="utf-8")
             txt_data = txt_fo.readlines()
@@ -10816,8 +7562,8 @@ def vis_coco_pose_dataset():
     img_path = "/home/zengyifan/wujiahu/data/000.Open_Dataset/coco/train2017/000000000036.jpg"
     label_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/coco_kpts/labels/train2017/000000000036.txt"
 
-    cv2img = cv2.imread(img_path)
-    imgsz = cv2img.shape[:2]
+    img = cv2.imread(img_path)
+    imgsz = img.shape[:2]
 
     with open(label_path, "r", encoding="utf-8") as fo:
         lines = fo.readlines()
@@ -10827,7 +7573,7 @@ def vis_coco_pose_dataset():
             bbx = list(map(float, l[1:5]))
             # bbx_voc = convert_bbx_yolo_to_VOC(imgsz, bbx)
             bbx_voc = bbox_yolo_to_voc(imgsz, bbx)
-            cv2.rectangle(cv2img, (bbx_voc[0], bbx_voc[1]), (bbx_voc[2], bbx_voc[3]), (255, 255, 0))
+            cv2.rectangle(img, (bbx_voc[0], bbx_voc[1]), (bbx_voc[2], bbx_voc[3]), (255, 255, 0))
 
             points = np.asarray(list(map(float, l[5:]))).reshape(-1, 3)
             points_x = points[:, 0] * imgsz[1]
@@ -10835,9 +7581,9 @@ def vis_coco_pose_dataset():
             for i in range(points_x.shape[0]):
                 if points_x[i] == 0 and points_y[i] == 0:
                     continue
-                cv2.circle(cv2img, (int(round(points_x[i])), int(round(points_y[i]))), 3, (255, 0, 255), 2)
+                cv2.circle(img, (int(round(points_x[i])), int(round(points_y[i]))), 3, (255, 0, 255), 2)
 
-    cv2.imshow("test", cv2img)
+    cv2.imshow("test", img)
     cv2.waitKey(0)
 
 
@@ -10884,9 +7630,11 @@ def create_labels_via_yolo_pose(data_path, cls=2):
 
     for f in tqdm(file_list):
         f_abs_path = data_path + "/{}".format(f)
-        base_name, file_name, suffix = get_baseName_fileName_suffix(f_abs_path)
-        cv2img = cv2.imread(f_abs_path)
-        imgsz = cv2img.shape[:2]
+        base_name = get_base_name(f_abs_path)
+        file_name = os.path.splitext(base_name)[0]
+        suffix = os.path.splitext(base_name)[1]
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
         bboxes = []
 
         results = model(f_abs_path)
@@ -10895,7 +7643,7 @@ def create_labels_via_yolo_pose(data_path, cls=2):
             kpt_np = keypoints.xy.cpu().numpy()
             for pi in kpt_np:
                 # for k in pi[:5]:
-                # cv2.circle(cv2img, (int(k[0]), int(k[1])), 2, (255, 0, 255))
+                # cv2.circle(img, (int(k[0]), int(k[1])), 2, (255, 0, 255))
                 if len(pi[:5]) < 5: continue
                 bbx, area = get_bbx(pi[:5], imgsz, r=0.68)
                 if area < 500:
@@ -10977,7 +7725,7 @@ def convert_seg_0_255_to_0_n(image, c="3"):
     dst = None
     if c == 1:
         dst = np.zeros((image.shape[:2]), dtype=np.int32)
-        dst[red] = 1
+        dst[target] = 1
     elif c == 3:
         dst = np.zeros(image.shape, dtype=np.int32)
         dst[target] = (1, 1, 1)

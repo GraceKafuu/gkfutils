@@ -1172,7 +1172,7 @@ def compress(img, random=False, p=1, quality=(25, 90)):
         return img_decode
     
 
-def exposure(img, random=False, p=1):
+def exposure(img, random=False, p=1, rect=(50, 50, 100, 100)):
     from PIL import ImageDraw
     if random:
         if np.random.random() <= p:
@@ -1196,28 +1196,24 @@ def exposure(img, random=False, p=1):
             return img
     else:
         h, w = img.shape[:2]
-        x0 = random.randint(0, w)
-        y0 = random.randint(0, h)
-        x1 = random.randint(x0, w)
-        y1 = random.randint(y0, h)
-        transparent_area = (x0, y0, x1, y1)
         mask = Image.new('L', (w, h), color=255)
         draw = ImageDraw.Draw(mask)
         mask = np.array(mask)
         if len(img.shape) == 3:
             mask = mask[:, :, np.newaxis]
             mask = np.concatenate([mask, mask, mask], axis=2)
-        draw.rectangle(transparent_area, fill=random.randint(150, 255))
+        draw.rectangle(rect, fill=random.randint(150, 255))
         reflection_result = img + (255 - mask)
         reflection_result = np.clip(reflection_result, 0, 255)
         return reflection_result
 
 
-def change_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
+def change_resolution(img, random=False, p=1, r=(0.5, 0.95)):
     if random:
+        assert isinstance(r, tuple), "If random=True, r should be tuple!"
         if np.random.random() <= p:
             w, h = img.size
-            rate = np.random.random() * (max_rate - min_rate) + min_rate
+            rate = np.random.random() * (r[1] - r[0]) + r[0]
             w2 = int(w * rate)
             h2 = int(h * rate)
             img = img.resize((w2, h2))
@@ -1226,20 +1222,21 @@ def change_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
         else:
             return img
     else:
+        assert isinstance(r, float), "If random=False, r should be float!"
         w, h = img.size
-        rate = np.random.random() * (max_rate - min_rate) + min_rate
-        w2 = int(w * rate)
-        h2 = int(h * rate)
+        w2 = int(w * r)
+        h2 = int(h * r)
         img = img.resize((w2, h2))
         img = img.resize((w, h))
         return img
 
 
-def stretch(img, random=False, p=1, min_rate=0.8, max_rate=1.2):
+def stretch(img, random=False, p=1, r=(0.8, 1.2)):
     if random:
+        assert isinstance(r, tuple), "If random=True, r should be tuple!"
         if np.random.random() <= p:
             w, h = img.size
-            rate = np.random.random() * (max_rate - min_rate) + min_rate
+            rate = np.random.random() * (r[1] - r[0]) + r[0]
             w2 = int(w * rate)
             h2 = int(h * rate)
             if np.random.random() < p:
@@ -1250,10 +1247,10 @@ def stretch(img, random=False, p=1, min_rate=0.8, max_rate=1.2):
         else:
             return img
     else:
+        assert isinstance(r, float), "If random=False, r should be float!"
         w, h = img.size
-        rate = np.random.random() * (max_rate - min_rate) + min_rate
-        w2 = int(w * rate)
-        h2 = int(h * rate)
+        w2 = int(w * r)
+        h2 = int(h * r)
         if np.random.random() < p:
             img = cv2.resize(img, (w2, h))
         else:
@@ -1261,16 +1258,18 @@ def stretch(img, random=False, p=1, min_rate=0.8, max_rate=1.2):
         return img
 
 
-def crop(img, random=False, p=1, crop_size=(128, 128), rect=(0, 0, 100, 200)):
+def crop(img, random=False, p=1, fix_size=False, crop_size=(128, 128), rect=(0, 0, 100, 200)):
+    # crop_size: [H, W]
     if random:
         if np.random.random() <= p:
-            # crop_size: [H, W]
             imgsz = img.shape[:2]
             assert crop_size[0] >= 0 and crop_size[0] <= imgsz[0], "crop_size[0] < 0 or crop_size[0] > imgsz[0]"
             assert crop_size[1] >= 0 and crop_size[1] <= imgsz[1], "crop_size[1] < 0 or crop_size[1] > imgsz[1]"
 
             x = np.random.randint(0, imgsz[1])
             y = np.random.randint(0, imgsz[0])
+            if not fix_size:
+                crop_size = (np.random.randint(1, crop_size[0]), np.random.randint(1, crop_size[1]))
 
             try:
                 cropped_img = img[y:(y + crop_size[0]), x:(x + crop_size[1])]
@@ -1282,12 +1281,10 @@ def crop(img, random=False, p=1, crop_size=(128, 128), rect=(0, 0, 100, 200)):
         else:
             return img
     else:
-        # crop_size: [H, W]
         imgsz = img.shape[:2]
         assert rect[0] >= 0 and rect[0] <= imgsz[1], "rect[0] >= 0 and rect[0] <= imgsz[1]"
         assert rect[1] >= 0 and rect[1] <= imgsz[0], "rect[1] >= 0 and rect[1] <= imgsz[0]"
-
-        cropped_img = img[y:(y + crop_size[0]), x:(x + crop_size[1])]
+        cropped_img = img[rect[1]:rect[3], rect[0]:rect[2]]
         
         return cropped_img
 
@@ -1352,27 +1349,31 @@ def squeeze(img, random=False, p=1, degree=11):
         return new_data
     
 
-def make_haha_mirror_effect(img, random=False, p=1, degree=4):
+def make_haha_mirror_effect(img, random=False, p=1, center=(50, 50), r=40, degree=4):
     if random:
+        assert isinstance(r, tuple), "If random=False, r should be tuple!"
+        assert isinstance(degree, tuple), "If random=False, degree should be tuple!"
+
         if np.random.random() <= p:
             height, width, n = img.shape
-            center_x = width / 2
-            center_y = height / 2
-            randius = 40 * degree  # 直径
+            center = (np.random.randint(0, width), np.random.randint(0, height))
+            r = np.random.randint(r[0], r[1])
+            degree = np.random.randint(degree[0], degree[1])
+            randius = r * degree  # 直径
             real_randius = int(randius / 2)  # 半径
             new_data = img.copy()
             for i in range(width):
                 for j in range(height):
-                    tx = i - center_x
-                    ty = j - center_y
+                    tx = i - center[0]
+                    ty = j - center[1]
                     distance = tx ** 2 + tx ** 2
                     # 为了保证选择的像素是图片上的像素
                     if distance < randius ** 2:
                         new_x = tx / 2
                         new_y = ty / 2
                         # 图片的每个像素的坐标按照原来distance 之后的distance（real_randius**2）占比放大即可
-                        new_x = int(new_x * math.sqrt(distance) / real_randius + center_x)
-                        new_y = int(new_y * math.sqrt(distance) / real_randius + center_y)
+                        new_x = int(new_x * math.sqrt(distance) / real_randius + center[0])
+                        new_y = int(new_y * math.sqrt(distance) / real_randius + center[1])
                         # 当不超过new_data 的边界时候就可赋值
                         if new_x < width and new_y < height:
                             new_data[j][i][0] = img[new_y][new_x][0]
@@ -1382,24 +1383,25 @@ def make_haha_mirror_effect(img, random=False, p=1, degree=4):
         else:
             return img
     else:
+        assert isinstance(r, int), "If random=False, r should be int!"
+        assert isinstance(degree, int), "If random=False, degree should be int!"
+
         height, width, n = img.shape
-        center_x = width / 2
-        center_y = height / 2
-        randius = 40 * degree  # 直径
+        randius = r * degree  # 直径
         real_randius = int(randius / 2)  # 半径
         new_data = img.copy()
         for i in range(width):
             for j in range(height):
-                tx = i - center_x
-                ty = j - center_y
+                tx = i - center[0]
+                ty = j - center[1]
                 distance = tx ** 2 + tx ** 2
                 # 为了保证选择的像素是图片上的像素
                 if distance < randius ** 2:
                     new_x = tx / 2
                     new_y = ty / 2
                     # 图片的每个像素的坐标按照原来distance 之后的distance（real_randius**2）占比放大即可
-                    new_x = int(new_x * math.sqrt(distance) / real_randius + center_x)
-                    new_y = int(new_y * math.sqrt(distance) / real_randius + center_y)
+                    new_x = int(new_x * math.sqrt(distance) / real_randius + center[0])
+                    new_y = int(new_y * math.sqrt(distance) / real_randius + center[1])
                     # 当不超过new_data 的边界时候就可赋值
                     if new_x < width and new_y < height:
                         new_data[j][i][0] = img[new_y][new_x][0]
@@ -1410,7 +1412,9 @@ def make_haha_mirror_effect(img, random=False, p=1, degree=4):
     
 def warp_img(img, random=False, p=1, degree=4):
     if random:
+        assert isinstance(degree, tuple), "If random=False, degree should be tuple!"
         if np.random.random() <= p:
+            degree = np.random.randint(degree[0], degree[1])
             height, width, channels = img.shape
             new_data = np.zeros([height, width, 3], np.uint8)  # null img
             for j in range(width):
@@ -1428,6 +1432,7 @@ def warp_img(img, random=False, p=1, degree=4):
         else:
             return img
     else:
+        assert isinstance(degree, int), "If random=False, degree should be int!"
         height, width, channels = img.shape
         new_data = np.zeros([height, width, 3], np.uint8)  # null img
         for j in range(width):
@@ -1473,24 +1478,21 @@ def make_mask(img, random=False, p=1, max_size=(256, 256), rect=(0, 0, 100, 200)
         return img
 
     
-def enhance_gray_value(img, random=False, p=1, min_gray=0, max_gray=255):
+def enhance_gray_value(img, random=False, p=1, gray_range=(0, 255)):
+    """
+    灰度变换, 通过将像素值映射到新的范围来增强图像的灰度
+    """
     if random:
         if np.random.random() <= p:
-            """
-            灰度变换, 通过将像素值映射到新的范围来增强图像的灰度
-            """
-            img = cv2.convertScaleAbs(img, alpha=(max_gray - min_gray) / 255, beta=min_gray)
+            img = cv2.convertScaleAbs(img, alpha=(gray_range[1] - gray_range[0]) / 255, beta=gray_range[0])
             return img
         else:
             return img
     else:
-        """
-        灰度变换, 通过将像素值映射到新的范围来增强图像的灰度
-        """
-        img = cv2.convertScaleAbs(img, alpha=(max_gray - min_gray) / 255, beta=min_gray)
+        img = cv2.convertScaleAbs(img, alpha=(gray_range[1] - gray_range[0]) / 255, beta=gray_range[0])
         return img
+    
 
-        
 def homomorphic_filter(img, random=False, p=1):
     if random:
         if np.random.random() <= p:
@@ -1538,31 +1540,28 @@ def homomorphic_filter(img, random=False, p=1):
 
 
 def contrast_stretch(img, random=False, p=1, alpha=0, beta=1):
+    """
+    对比拉伸
+    """
     if random:
         if np.random.random() <= p:
-            """
-            对比拉伸
-            """
             norm_img1 = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
             norm_img = (255 * norm_img1).astype(np.uint8)
             return norm_img
         else:
             return img
     else:
-        """
-        对比拉伸
-        """
         norm_img1 = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
         norm_img = (255 * norm_img1).astype(np.uint8)
         return norm_img
 
 
 def log_transformation(img, random=False, p=1):
+    """
+    对数变换
+    """
     if random:
         if np.random.random() <= p:
-            """
-            对数变换
-            """
             c = 255 / np.log(1 + np.max(img))
             log_image = c * (np.log(img + 1))
             # Specify the data type so that
@@ -1572,9 +1571,6 @@ def log_transformation(img, random=False, p=1):
         else:
             return img
     else:
-        """
-        对数变换
-        """
         c = 255 / np.log(1 + np.max(img))
         log_image = c * (np.log(img + 1))
         # Specify the data type so that

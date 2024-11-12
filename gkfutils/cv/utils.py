@@ -1155,6 +1155,7 @@ def make_rain_effect(img, random=False, p=1, m=0, length=(10, 80), angle=(-45, 4
 
 def compress(img, random=False, p=1, quality=(25, 90)):
     if random:
+        assert isinstance(quality, tuple), "If random=True, quality should be tuple!"
         if np.random.random() <= p:
             q = random.randint(quality[0], quality[1])
             param = [int(cv2.IMWRITE_JPEG_QUALITY), q]
@@ -1164,6 +1165,7 @@ def compress(img, random=False, p=1, quality=(25, 90)):
         else:
             return img
     else:
+        assert isinstance(quality, int), "If random=False, quality should be int!"
         param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
         img_encode = cv2.imencode('.jpeg', img, param)
         img_decode = cv2.imdecode(img_encode[1], cv2.IMREAD_COLOR)

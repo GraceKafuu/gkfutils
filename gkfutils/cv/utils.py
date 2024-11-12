@@ -14,11 +14,11 @@ Description:
 
 """
 
-from ..utils import (
-    get_file_list, get_base_name,
-    get_dir_name, make_save_path,
-    is_all_chinese, is_all_digits
-)
+# from ..utils import (
+#     get_file_list, get_base_name,
+#     get_dir_name, make_save_path,
+#     is_all_chinese, is_all_digits
+# )
 
 
 import os
@@ -60,6 +60,116 @@ import pyclipper
 from shapely.geometry import Polygon
 
 
+def get_file_list(data_path: str, abspath=False) -> list:
+    file_list = []
+    list_ = sorted(os.listdir(data_path))
+    for f in list_:
+        f_path = data_path + "/{}".format(f)
+        if os.path.isfile(f_path):
+            if abspath:
+                file_list.append(f_path)
+            else:
+                file_list.append(f)
+    return file_list
+
+
+def get_dir_list(data_path: str, abspath=False):
+    dir_list = []
+    list_ = sorted(os.listdir(data_path))
+    for f in list_:
+        f_path = data_path + "/{}".format(f)
+        if os.path.isdir(f_path):
+            if abspath:
+                dir_list.append(f_path)
+            else:
+                dir_list.append(f)
+    return dir_list
+
+
+def get_dir_file_list(data_path: str, abspath=False):
+    list_ = sorted(os.listdir(data_path))
+    if abspath:
+        list_new = []
+        for f in list_:
+            f_path = data_path + "/{}".format(f)
+            list_new.append(f_path)
+        return list_new
+    else:
+        return list_
+
+
+def get_dir_name(data_path: str):
+    assert os.path.isdir(data_path), "Error: {} is not a dir!".format(data_path)
+    dir_name = os.path.basename(data_path)
+    return dir_name
+
+
+def get_file_name(data_path: str):
+    assert os.path.isfile(data_path), "Error: {} is not a file!".format(data_path)
+    base_name = os.path.basename(data_path)
+    return base_name
+
+
+def get_base_name(data_path: str):
+    base_name = os.path.basename(data_path)
+    return base_name
+
+
+def get_file_suffix(data_path: str):
+    assert os.path.isfile(data_path), "Error: {} is not a file!".format(data_path)
+    base_name = os.path.basename(data_path)
+    file_name = os.path.splitext(base_name)[0]
+    suffix = os.path.splitext(base_name)[1]
+    return suffix
+
+
+def make_save_path(data_path: str, relative=".", add_str="results"):
+    base_name = get_base_name(data_path)
+    if relative == ".":
+        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_{}".format(base_name, add_str)
+    elif relative == "..":
+        save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_{}".format(base_name, add_str)
+    elif relative == "...":
+        save_path = os.path.abspath(os.path.join(data_path, "../../..")) + "/{}_{}".format(base_name, add_str)
+    else:
+        print("relative should be . or .. or ...")
+        raise ValueError
+    os.makedirs(save_path, exist_ok=True)
+    return save_path
+
+
+def save_file_path_to_txt(data_path: str, abspath=True):
+    assert type(data_path) == str, "{} should be str!".format(data_path)
+    dirname = os.path.basename(data_path)
+    data_list = sorted(os.listdir(data_path))
+    txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
+    with open(txt_save_path, 'w', encoding='utf-8') as fw:
+        for f in data_list:
+            if abspath:
+                f_abs_path = data_path + "/{}".format(f)
+                fw.write("{}\n".format(f_abs_path))
+            else:
+                fw.write("{}\n".format(f))
+
+    print("Success! --> {}".format(txt_save_path))
+
+
+def is_all_digits(string):
+    pattern = r'^\d+$'
+    if re.match(pattern, string):
+        return True
+    else:
+        return False
+
+
+def is_all_chinese(string):
+    pattern = '[\u4e00-\u9fa5]+'
+    if re.match(pattern, string) and len(string) == len(set(string)):
+        return True
+    else:
+        return False
+    
+
 # Image Processing
 def cv2pil(image):
     assert isinstance(image, np.ndarray), f'Input image type is not cv2 and is {type(image)}!'
@@ -86,17 +196,18 @@ def pil2cv(image):
 def rotate(img, random=False, p=1, algorithm="pil", center=(50, 50), angle=(-45, 45), scale=1, expand=True) -> np.ndarray:
     if random:
         if np.random.random() <= p:
+            assert isinstance(angle, tuple), "if random=True, angle is tuple."
             angle = np.random.randint(angle[0], angle[1] + 1)
-            scale = np.random.randint(75, 126) * 0.01
             if algorithm == "cv2":
+                assert isinstance(scale, tuple), "if random=True and algorithm='cv2', scale is tuple."
+                scale = np.random.uniform(scale[0], scale[1] + 1e-6)
                 if isinstance(img, PIL.Image.Image):
                     img = np.asarray(img)
-
                 imgsz = img.shape[:2]
                 x = np.random.randint(0, imgsz[1])
                 y = np.random.randint(0, imgsz[0])
                 center = np.random.randint(x, y)
-                M = cv2.getROtationMatrix2D(center, angle, scale)
+                M = cv2.getRotationMatrix2D(center, angle, scale)
                 img = cv2.warpAffine(img, M, imgsz[::-1])
             else:
                 if isinstance(img, np.ndarray):
@@ -108,15 +219,13 @@ def rotate(img, random=False, p=1, algorithm="pil", center=(50, 50), angle=(-45,
         else:
             return img
     else:
-        assert isinstance(center, tuple), "if random=False, center is a fix arg."
-        assert isinstance(angle, int), "if random=False, angle is a fix arg."
-        assert isinstance(scale, int), "if random=False, scale is a fix arg."
-
+        assert isinstance(angle, int), "if random=False, angle is int."
         if algorithm == "cv2":
+            assert isinstance(scale, float), "if random=False, scale is float."
             if isinstance(img, PIL.Image.Image):
                 img = np.asarray(img)
             imgsz = img.shape[:2]
-            M = cv2.getROtationMatrix2D(center, angle, scale)
+            M = cv2.getRotationMatrix2D(center, angle, scale)
             img = cv2.warpAffine(img, M, imgsz[::-1])
         else:
             if isinstance(img, np.ndarray):
@@ -137,7 +246,8 @@ def flip(img, random=False, p=1, m=0):
 
     if random:
         if np.random.random() <= p:
-            d = np.random.choice(m)
+            ms = [-1, 0, 1]
+            m = np.random.choice(ms)
             img = cv2.flip(img, m)
             return img
         else:
@@ -149,31 +259,42 @@ def flip(img, random=False, p=1, m=0):
 
 def scale(img, random=False, p=1, fx=0.5, fy=0.5):
     if random:
+        assert isinstance(fx, tuple), "if random=True, fx is tuple."
+        assert isinstance(fy, tuple), "if random=True, fy is tuple."
+        assert fx[0] > 0 and fx[1] > fx[0], "fx[0] > 0 and fx[1] > fx[0]."
+        assert fy[0] > 0 and fy[1] > fy[0], "fy[0] > 0 and fy[1] > fy[0]."
         if np.random.random() <= p:
-            fx = np.random.randint(5, 20) * 0.1
-            fy = np.random.randint(5, 20) * 0.1
+            fx = np.random.uniform(fx[0], fx[1] + 1e-6)
+            fy = np.random.uniform(fy[0], fy[1] + 1e-6)
             img = cv2.resize(img, None, fx=fx, fy=fy)
             return img
         else:
             return img
     else:
+        assert isinstance(fx, float), "if random=False, fx is float."
+        assert isinstance(fy, float), "if random=False, fy is float."
+        assert fx > 0 and fy > 0, "fx > 0 and fy > 0."
         img = cv2.resize(img, None, fx=fx, fy=fy)
         return img
 
     
-def resize(img, random=False, p=1, dsz=(1920, 1080)):
+def resize(img, random=False, p=1, dsz=(1920, 1080), r=(0.01, 2.0), interpolation=cv2.INTER_LINEAR):
     if random:
+        assert isinstance(r, tuple), "if random=True, r is tuple."
         if np.random.random() <= p:
             imgsz = img.shape[:2]
-            rx = np.random.uniform(0.5, 2.0)
-            ry = np.random.uniform(0.5, 2.0)
+            rx = np.random.uniform(r[0], r[1])
+            ry = np.random.uniform(r[0], r[1])
             dsz = (int(imgsz[1] * rx), int(imgsz[0] * ry))
-            img = cv2.resize(img, dsz)
+            if dsz[0] <= 0: dsz[0] = 1
+            if dsz[1] <= 0: dsz[1] = 1
+            img = cv2.resize(img, dsz, interpolation=interpolation)
             return img
         else:
             return img
     else:
-        img = cv2.resize(img, dsz)
+        assert isinstance(dsz, tuple), "if random=False, dsz is tuple."
+        img = cv2.resize(img, dsz, interpolation=interpolation)
         return img
 
 
@@ -213,8 +334,9 @@ def equalize_hist(img, random=False, p=1, m=0):
 
 def change_brightness(img, random=False, p=1, value=30):
     if random:
+        assert isinstance(value, tuple), "if random=True, value is tuple."
         if np.random.random() <= p:
-            brightness_value = np.random.randint(-value, value + 1)
+            brightness_value = np.random.randint(value[0], value[1] + 1)
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             h, s, v = cv2.split(hsv)
             v = cv2.add(v, brightness_value)
@@ -226,6 +348,7 @@ def change_brightness(img, random=False, p=1, value=30):
         else:
             return img
     else:
+        assert isinstance(value, int), "if random=False, value is int."
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         v = cv2.add(v, value)
@@ -259,19 +382,20 @@ def change_brightness_opencv_official(img, alpha=1.0, beta=0):
     return new_image
 
 
-def gamma_correction(img, random=False, p=1, value=(4, 17)):
+def gamma_correction(img, random=False, p=1, value=(0.4, 1.7)):
     if random:
+        assert isinstance(value, tuple), "If random=True, value should be tuple!"
         if np.random.random() <= p:
-            gamma_value = 0.1 * np.random.randint(value[0], value[1])
+            value = np.random.uniform(value[0], value[1])
             lookUpTable = np.empty((1, 256), np.uint8)
             for i in range(256):
-                lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma_value) * 255.0, 0, 255)
+                lookUpTable[0, i] = np.clip(pow(i / 255.0, value) * 255.0, 0, 255)
             img = cv2.LUT(img, lookUpTable)
             return img
         else:
             return img
     else:
-        assert isinstance(value, int), "If random=False, value should be int!"
+        assert isinstance(value, float), "If random=False, value should be float!"
         lookUpTable = np.empty((1, 256), np.uint8)
         for i in range(256):
             lookUpTable[0, i] = np.clip(pow(i / 255.0, value) * 255.0, 0, 255)
@@ -370,7 +494,7 @@ def gamma_correction_auto(img, method=2):
         return None
     
 
-def gaussian_noise(img, random=False, p=1, mean=0, var=0.5):
+def gaussian_noise(img, random=False, p=1, mean=0, var=0.25):
     """
     Examples
         # --------
@@ -405,10 +529,10 @@ def gaussian_noise(img, random=False, p=1, mean=0, var=0.5):
 
     """
     # 生成高斯噪声
+    assert var >= 0.1 and var <= 100, "var >= 0.1 and var <= 100!"
     if random:
         if np.random.random() <= p:
-            mean = np.random.randint(0, 256)
-            var = np.random.randint(0, var) * 0.1
+            var = np.random.uniform(0.1, var)
             mu, sigma = mean, var ** 0.5
             gaussian = np.random.normal(mu, sigma, img.shape).astype('uint8')
             img = cv2.add(img, gaussian)
@@ -444,10 +568,12 @@ def sp_noise(img, random=False, p=1, salt_p=0.01, pepper_p=0.01):
     """
     salt and pepper noise
     """
+    assert salt_p >= 0 and salt_p <= 1, "salt_p >= 0 and salt_p <= 1!"
+    assert pepper_p >= 0 and pepper_p <= 1, "salt_p >= 0 and salt_p <= 1!"
     if random:
         if np.random.random() <= p:
-            salt_p = np.random.uniform(0.01, salt_p + 1e-6)
-            pepper_p = np.random.uniform(0.01, pepper_p + 1e-6)
+            salt_p = np.random.uniform(0.0, salt_p)
+            pepper_p = np.random.uniform(0.0, pepper_p)
 
             noisy_image = np.copy(img)
             total_pixels = img.shape[0] * img.shape[1]  # 计算图像的总像素数
@@ -480,11 +606,12 @@ def sp_noise(img, random=False, p=1, salt_p=0.01, pepper_p=0.01):
 
 def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 200), light_strength=150):
     if random:
+        assert isinstance(effect_r, tuple), "If random=True, effect_r should be tuple!"
         if np.random.random() <= p:
             imgsz = img.shape[:2]
             center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
             effectR = np.random.randint(effect_r[0], effect_r[1])
-            lightStrength = np.random.randint(light_strength // 4, light_strength)
+            lightStrength = np.random.randint(0, light_strength)
 
             dst = np.zeros(shape=img.shape, dtype=np.uint8)
 
@@ -506,6 +633,7 @@ def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 
         else:
             return img
     else:
+        assert isinstance(effect_r, int), "If random=False, effect_r should be int!"
         imgsz = img.shape[:2]
         dst = np.zeros(shape=img.shape, dtype=np.uint8)
 
@@ -558,6 +686,7 @@ def color_distortion(img, random=False, p=1, value=(-50, 50)):
             
     """
     if random:
+        assert isinstance(value, tuple), "If random=True, value should be tuple!"
         if np.random.random() <= p:
             hue_v = np.random.randint(value[0], value[1])
             hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
@@ -568,6 +697,7 @@ def color_distortion(img, random=False, p=1, value=(-50, 50)):
         else:
             return img
     else:
+        assert isinstance(value, int), "If random=False, value should be int!"
         hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
         hsv_image[:, :, 0] = (hsv_image[:, :, 0] + value) % 180  # 在Hue通道上增加30
         hsv_image = np.clip(hsv_image, 0, 255)
@@ -575,18 +705,20 @@ def color_distortion(img, random=False, p=1, value=(-50, 50)):
         return img
 
 
-def change_contrast_and_brightness(img, random=False, p=1, alpha=1.1, beta=30):
-    # """使用公式f(x)=α.g(x)+β"""
-    # #α调节对比度，β调节亮度
-    # 
+def change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=30):
+    """
+    # 使用公式f(x)=α.g(x)+β, α调节对比度, β调节亮度
+    # 小心使用
     # TODO: PIL format
     # con = ImageEnhance.Contrast(img)
     # res = con.enhance(random.uniform(lower, upper))
     # 
     # bri = ImageEnhance.Brightness(img)
     # res = bri.enhance(random.uniform(lower, upper))
-
+    """
+    assert alpha >= 0 and alpha <= 1, "alpha >= 0 and alpha <= 1"
     if random:
+        # 容易变黑图，不太建议使用这个
         if np.random.random() <= p:
             alpha = np.random.uniform(0, alpha)
             beta = np.random.uniform(-beta, beta + 1)
@@ -615,7 +747,8 @@ def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
     if random:
         if np.random.random() <= p:
             clipLimit = np.random.randint(0, 40 + 1)
-            tileGridSize = np.random.randint(np.random.randint(4, 16 + 1), np.random.randint(4, 16 + 1))
+            tgs = np.random.choice([4, 8, 16, 32])
+            tileGridSize = (tgs, tgs)
             if m == 0:
                 img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
                 clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
@@ -688,16 +821,16 @@ def gaussian_blur(img, random=False, p=1, k=3):
     if random:
         if np.random.random() <= p:
             h, w, _ = img.shape
-            ks = [3, 5, 7, 9, 11, 13, 15]
+            ks = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27]
             if h > 16 and w > 16:
                 if h <= 128 and w <= 128:
-                    k = np.random.choice(ks[:2])
-                elif h <= 256 and w <= 156:
-                    k = np.random.choice(ks[:4])
+                    k = np.random.choice(ks[:3])
+                elif h <= 256 and w <= 256:
+                    k = np.random.choice(ks[:8])
                 elif h <= 512 and w <= 512:
-                    k = np.random.choice(ks[:5])
+                    k = np.random.choice(ks[:11])
                 else:
-                    k = np.random.choice(ks)
+                    k = np.random.choice(ks[5:])
                 img = cv2.GaussianBlur(img, (k, k), 1)
 
             return img
@@ -709,75 +842,66 @@ def gaussian_blur(img, random=False, p=1, k=3):
         return img
 
 
-def motion_blur(img, random=False, p=1, angle=30, k=3):
+def motion_blur(img, random=False, p=1, k=3, angle=30):
+    """
+    假如用于增强OCR数据, 则k不宜太大!
+    """
     if random:
         if np.random.random() <= p:
-            angle = random.uniform(-angle, angle + 1)
-            rows, cols, _ = img.shape
-            affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-            dst = cv2.warpAffine(img, affine_mat, (cols, rows))
+            angle = np.random.randint(-180, 181)
+            imgsz = img.shape[:2]
+            # ks = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27]
+            # ks = [3, 5, 7, 9, 11, 13, 15, 17]
+            ks = [3, 5, 7, 9]
+            if imgsz[0] > 16 and imgsz[1] > 16:
+                if imgsz[0] <= 128 and imgsz[1] <= 128:
+                    k = np.random.choice(ks[:3])
+                elif imgsz[0] <= 256 and imgsz[1] <= 256:
+                    k = np.random.choice(ks[:8])
+                elif imgsz[0] <= 512 and imgsz[1] <= 512:
+                    k = np.random.choice(ks[:11])
+                else:
+                    k = np.random.choice(ks)
 
-            k = np.random.randint(1, k)
-            kernel = np.zeros((k, k), np.float32)
-            h = (k - 1) // 2
-            for i in range(k):
-                kernel[h][i] = 1.0 / float(k)
-
-            blur_img = cv2.filter2D(dst, -1, kernel)
-            rows, cols, _ = blur_img.shape
-            affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-            out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-
-            return out_img
+            kernel = np.zeros((k, k), dtype=np.float32)
+            kernel[(k - 1) // 2, :] = np.ones(k, dtype=np.float32)
+            m =  cv2.getRotationMatrix2D((k / 2, k / 2), angle, 1.0)
+            kernel = cv2.warpAffine(kernel, m, (k, k))
+            kernel = kernel * (1.0 / np.sum(kernel))
+            img = cv2.filter2D(img, -1, kernel)
+            return img
         else:
             return img
     else:
-        angle = random.uniform(-angle, angle + 1)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-
-        kernel = np.zeros((k, k), np.float32)
-        h = (k - 1) // 2
-        for i in range(k):
-            kernel[h][i] = 1.0 / float(k)
-
-        blur_img = cv2.filter2D(dst, -1, kernel)
-        rows, cols, _ = blur_img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-
-        return out_img
+        kernel = np.zeros((k, k), dtype=np.float32)
+        kernel[(k - 1) // 2, :] = np.ones(k, dtype=np.float32)
+        m =  cv2.getRotationMatrix2D((k / 2, k / 2), angle, 1.0)
+        kernel = cv2.warpAffine(kernel, m, (k, k))
+        kernel = kernel * (1.0 / np.sum(kernel))
+        img = cv2.filter2D(img, -1, kernel)
+        
+        return img
 
 
-def median_blur(img, random=False, p=1, angle=30):
+def median_blur(img, random=False, p=1, k=3):
     if random:
         if np.random.random() <= p:
-            angle = random.uniform(-angle, angle + 1)
-            rows, cols, _ = img.shape
-            affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-            dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-            k = np.random.randint(1, k)
-            blur_img = cv2.medianBlur(dst, k)
-            rows, cols, _ = blur_img.shape
-            affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-            out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-            return out_img
+            ks = [3, 5, 7, 9]
+            k = np.random.choice(ks)
+            img = cv2.medianBlur(img, k)
+            return img
         else:
             return img
     else:
-        angle = random.uniform(-angle, angle + 1)
-        rows, cols, _ = img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-        dst = cv2.warpAffine(img, affine_mat, (cols, rows))
-        blur_img = cv2.medianBlur(dst, k)
-        rows, cols, _ = blur_img.shape
-        affine_mat = cv2.getRotationMatrix2D((cols / 2, rows / 2), 360.0 - angle, 1)
-        out_img = cv2.warpAffine(blur_img, affine_mat, (cols, rows))
-        return out_img
+        img = cv2.medianBlur(img, k)
+
+        return img
 
 
-def transperent_overlay(img, random=False, p=1, max_h_r=1.0, max_w_r=0.25):
+def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=1.0, max_w_r=0.25):
+    """
+    rect: [x1, y1, x2, y2]
+    """
     if random:
         if np.random.random() <= p:
             imgsz = img.shape
@@ -789,8 +913,8 @@ def transperent_overlay(img, random=False, p=1, max_h_r=1.0, max_w_r=0.25):
 
             x = np.random.randint(0, max(imgsz[1] - max_w, 1))
             y = np.random.randint(0, max(imgsz[0] - max_h, 1))
-            rect_width = np.random.randint(0, max(max_w, 1))
-            rect_height = np.random.randint(0, max(max_h, 1))
+            bw = np.random.randint(0, max(max_w, 1))
+            bh = np.random.randint(0, max(max_h, 1))
             color = [np.random.randint(0, 256) for _ in range(3)]
 
             if imgsz[2] < 4:
@@ -799,7 +923,7 @@ def transperent_overlay(img, random=False, p=1, max_h_r=1.0, max_w_r=0.25):
             # 创建一个与图片大小相同的覆盖层
             # overlay = img.copy()
             overlay = np.ones(shape=img.shape, dtype=np.uint8)
-            cv2.rectangle(overlay, (x, y), (x + rect_width, y + rect_height), color, -1)
+            cv2.rectangle(overlay, (x, y), (x + bw, y + bh), color, -1)
             img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
 
             # Convert the image back to the original number of channels
@@ -811,15 +935,7 @@ def transperent_overlay(img, random=False, p=1, max_h_r=1.0, max_w_r=0.25):
     else:
         imgsz = img.shape
         orig_c = imgsz[2]
-        max_h = int(imgsz[0] * max_h_r)
-        max_w = int(imgsz[1] * max_w_r)
-
         alpha = 0.1 * np.random.randint(1, 5)
-
-        x = np.random.randint(0, max(imgsz[1] - max_w, 1))
-        y = np.random.randint(0, max(imgsz[0] - max_h, 1))
-        rect_width = np.random.randint(0, max(max_w, 1))
-        rect_height = np.random.randint(0, max(max_h, 1))
         color = [np.random.randint(0, 256) for _ in range(3)]
 
         if imgsz[2] < 4:
@@ -828,7 +944,9 @@ def transperent_overlay(img, random=False, p=1, max_h_r=1.0, max_w_r=0.25):
         # 创建一个与图片大小相同的覆盖层
         # overlay = img.copy()
         overlay = np.ones(shape=img.shape, dtype=np.uint8)
-        cv2.rectangle(overlay, (x, y), (x + rect_width, y + rect_height), color, -1)
+        x1, y1 = rect[0], rect[1]
+        x2, y2 = rect[2], rect[3]
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
         img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
 
         # Convert the image back to the original number of channels
@@ -841,6 +959,7 @@ def dilation_erosion(img, random=False, p=1, flag="dilate", scale=(6, 8)):
     """
     dilate, erode
     """
+    assert flag in ["dilate", "erode"], 'flag should be one of ["dilate", "erode"]!'
     if random:
         if np.random.random() <= p:
             imgsz = img.shape[:2]
@@ -924,7 +1043,7 @@ def rain_blur(noise, length=10, angle=0, w=1):
     '''
 
     # 这里由于对角阵自带45度的倾斜，逆时针为正，所以加了-45度的误差，保证开始为正
-    trans = cv2.getRotationMatrix2D((length / 2, length / 2), angle - 45, 1 - length / 100.0)
+    trans = cv2.getRotationMatrix2D((length / 2, length / 2), angle + 45, 1 - length / 100.0)
     dig = np.diag(np.ones(length))  # 生成对焦矩阵
     k = cv2.warpAffine(dig, trans, (length, length))  # 生成模糊核
     k = cv2.GaussianBlur(k, (w, w), 0)  # 高斯模糊这个旋转后的对角核，使得雨有宽度
@@ -992,14 +1111,18 @@ def add_rain(rain, img, alpha=0.9):
     return result
 
 
-def make_rain_effect(img, random=False, p=1, m=0):
+def make_rain_effect(img, random=False, p=1, m=0, length=(10, 80), angle=(-45, 46), noise=(100, 500)):
     assert m in [0, 1], "m should be one of [0, 1]!"
     if random:
+        assert isinstance(length, tuple), "If random=True, length should be tuple!"
+        assert isinstance(angle, tuple), "If random=True, angle should be tuple!"
+        assert isinstance(noise, tuple), "If random=True, noise should be tuple!"
         if np.random.random() <= p:
-            rain_length = np.random.randint(10, 80)
-            rain_angle = np.random.randint(-45, 46)
+            rain_length = np.random.randint(length[0], length[1] + 1)
+            rain_angle = np.random.randint(angle[0], angle[1] + 1)
+            noise_value = np.random.randint(noise[0], noise[1] + 1)
             rain_w = np.random.choice([1, 3, 5])
-            noise = rain_noise(img, value=500)
+            noise = rain_noise(img, value=noise_value)
             rain = rain_blur(noise, length=rain_length, angle=rain_angle, w=rain_w)
 
             if m == 0:
@@ -1012,11 +1135,13 @@ def make_rain_effect(img, random=False, p=1, m=0):
         else:
             return img
     else:
-        rain_length = np.random.randint(10, 80)
-        rain_angle = np.random.randint(-45, 46)
+        assert isinstance(length, int), "If random=False, length should be int!"
+        assert isinstance(angle, int), "If random=False, length should be int!"
+        assert isinstance(noise, int), "If random=False, length should be int!"
+
         rain_w = np.random.choice([1, 3, 5])
-        noise = rain_noise(img, value=500)
-        rain = rain_blur(noise, length=rain_length, angle=rain_angle, w=rain_w)
+        noise = rain_noise(img, value=noise)
+        rain = rain_blur(noise, length=length, angle=angle, w=rain_w)
 
         if m == 0:
             rain_beta = 0.1 * np.random.randint(4, 8)
@@ -1045,7 +1170,7 @@ def compress(img, random=False, p=1, quality=(25, 90)):
         return img_decode
     
 
-def random_exposure(img, random=False, p=1):
+def exposure(img, random=False, p=1):
     from PIL import ImageDraw
     if random:
         if np.random.random() <= p:
@@ -1086,7 +1211,7 @@ def random_exposure(img, random=False, p=1):
         return reflection_result
 
 
-def random_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
+def change_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
     if random:
         if np.random.random() <= p:
             w, h = img.size
@@ -1108,7 +1233,7 @@ def random_resolution(img, random=False, p=1, min_rate=0.5, max_rate=0.95):
         return img
 
 
-def random_stretch(img, random=False, p=1, min_rate=0.8, max_rate=1.2):
+def stretch(img, random=False, p=1, min_rate=0.8, max_rate=1.2):
     if random:
         if np.random.random() <= p:
             w, h = img.size
@@ -1584,47 +1709,47 @@ def write_labelbee_det_json(bbx, size):
     return json_
 
 
-def yolo_to_labelbee(data_path):
-    img_path = data_path + "/images"
-    txt_path = data_path + "/labels"
-    json_path = data_path + "/jsons"
-    os.makedirs(json_path, exist_ok=True)
+# def yolo_to_labelbee(data_path):
+#     img_path = data_path + "/images"
+#     txt_path = data_path + "/labels"
+#     json_path = data_path + "/jsons"
+#     os.makedirs(json_path, exist_ok=True)
 
-    txt_list = sorted(os.listdir(txt_path))
+#     txt_list = sorted(os.listdir(txt_path))
 
-    for t in tqdm(txt_list):
-        base_name = os.path.splitext(t)[0]
-        txt_abs_path = txt_path + "/{}".format(t)
-        try:
-            img_abs_path, json_abs_path, size = get_img_json_path_and_size(img_path, json_path, base_name)
+#     for t in tqdm(txt_list):
+#         base_name = os.path.splitext(t)[0]
+#         txt_abs_path = txt_path + "/{}".format(t)
+#         try:
+#             img_abs_path, json_abs_path, size = get_img_json_path_and_size(img_path, json_path, base_name)
 
-            bbx_for_json = []
-            with open(txt_abs_path, "r", encoding="utf-8") as fo:
-                lines = fo.readlines()
-                for l in lines:
-                    l_ = l.strip().split(" ")
-                    # bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
-                    # VOC_bbx = convert_bbx_yolo_to_VOC(size, bbx_)
-                    bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
-                    VOC_bbx = bbox_yolo_to_voc(size, bbx_)
-                    VOC_bbx = list(VOC_bbx)
+#             bbx_for_json = []
+#             with open(txt_abs_path, "r", encoding="utf-8") as fo:
+#                 lines = fo.readlines()
+#                 for l in lines:
+#                     l_ = l.strip().split(" ")
+#                     # bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
+#                     # VOC_bbx = convert_bbx_yolo_to_VOC(size, bbx_)
+#                     bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
+#                     VOC_bbx = bbox_yolo_to_voc(size, bbx_)
+#                     VOC_bbx = list(VOC_bbx)
 
-                    w_, h_ = VOC_bbx[2] - VOC_bbx[0], VOC_bbx[3] - VOC_bbx[1]
-                    if w_ < 3 or h_ < 3:
-                        print("img_abs_path: ", img_abs_path)
-                        print("txt_abs_path: ", txt_abs_path)
+#                     w_, h_ = VOC_bbx[2] - VOC_bbx[0], VOC_bbx[3] - VOC_bbx[1]
+#                     if w_ < 3 or h_ < 3:
+#                         print("img_abs_path: ", img_abs_path)
+#                         print("txt_abs_path: ", txt_abs_path)
 
-                    VOC_bbx.append(int(l_[0]) + 1)
-                    bbx_for_json.append(VOC_bbx)
+#                     VOC_bbx.append(int(l_[0]) + 1)
+#                     bbx_for_json.append(VOC_bbx)
 
-            with open(json_abs_path, "w", encoding="utf-8") as jfw:
-                jfw.write(json.dumps(write_labelbee_det_json(bbx_for_json, size)))
+#             with open(json_abs_path, "w", encoding="utf-8") as jfw:
+#                 jfw.write(json.dumps(write_labelbee_det_json(bbx_for_json, size)))
 
-            # print("labelbee json saved to --> {}".format(json_abs_path))
+#             # print("labelbee json saved to --> {}".format(json_abs_path))
 
-        except Exception as Error:
-            print(Error)
-            print("txt_abs_path: ", txt_abs_path)
+#         except Exception as Error:
+#             print(Error)
+#             print("txt_abs_path: ", txt_abs_path)
 
 
 def convert_annotation(img_name, data_path, classes):
@@ -1845,77 +1970,77 @@ def write_one(doc, root, label, value):
     root.appendChild(doc.createElement(label)).appendChild(doc.createTextNode(value))
 
 
-def yolo_to_voc(args):
-    # TODO: rewrite and check
-    from xml.dom import minidom
+# def yolo_to_voc(args):
+#     # TODO: rewrite and check
+#     from xml.dom import minidom
 
-    input_file_record_path = args.input_file_record_path
-    input_label_checker_path = args.input_label_checker_path
-    input_xml_file_path = args.input_xml_file_path
-    output_folder_path = args.output_folder_path
+#     input_file_record_path = args.input_file_record_path
+#     input_label_checker_path = args.input_label_checker_path
+#     input_xml_file_path = args.input_xml_file_path
+#     output_folder_path = args.output_folder_path
 
-    text_list = get_file_list(input_file_record_path)
-    label_list = get_label_list(input_label_checker_path)
-    content_dict = generate_dict(text_list, label_list)
+#     text_list = get_file_list(input_file_record_path)
+#     label_list = get_label_list(input_label_checker_path)
+#     content_dict = generate_dict(text_list, label_list)
 
-    for key in content_dict.keys():
-        file_name = key
-        doc = minidom.Document()
-        annotationlist = doc.createElement('annotation')
-        doc.appendChild(annotationlist)
+#     for key in content_dict.keys():
+#         file_name = key
+#         doc = minidom.Document()
+#         annotationlist = doc.createElement('annotation')
+#         doc.appendChild(annotationlist)
 
-        # folder = doc.createElement('folder')
-        # annotationlist.appendChild(folder)
-        # folder_name = doc.createTextNode(sys.argv[0].strip().split('/')[-2])
-        # folder.appendChild(folder_name)
+#         # folder = doc.createElement('folder')
+#         # annotationlist.appendChild(folder)
+#         # folder_name = doc.createTextNode(sys.argv[0].strip().split('/')[-2])
+#         # folder.appendChild(folder_name)
 
-        annotationlist.appendChild(doc.createElement('filename')).appendChild(doc.createTextNode(sys.argv[0]))
+#         annotationlist.appendChild(doc.createElement('filename')).appendChild(doc.createTextNode(sys.argv[0]))
 
-        xml_size = minidom.parse(os.path.join(input_xml_file_path, '{}.xml'.format(file_name)))
-        width_value = xml_size.getElementsByTagName('width')
-        width_value = width_value[0].firstChild.data
-        height_value = xml_size.getElementsByTagName('height')
-        height_value = height_value[0].firstChild.data
-        depth_value = xml_size.getElementsByTagName('depth')
-        depth_value = depth_value[0].firstChild.data
+#         xml_size = minidom.parse(os.path.join(input_xml_file_path, '{}.xml'.format(file_name)))
+#         width_value = xml_size.getElementsByTagName('width')
+#         width_value = width_value[0].firstChild.data
+#         height_value = xml_size.getElementsByTagName('height')
+#         height_value = height_value[0].firstChild.data
+#         depth_value = xml_size.getElementsByTagName('depth')
+#         depth_value = depth_value[0].firstChild.data
 
-        size = doc.createElement('size')
-        annotationlist.appendChild(size)
-        write_one(doc, size, 'width', width_value)
-        write_one(doc, size, 'height', height_value)
-        write_one(doc, size, 'depth', depth_value)
+#         size = doc.createElement('size')
+#         annotationlist.appendChild(size)
+#         write_one(doc, size, 'width', width_value)
+#         write_one(doc, size, 'height', height_value)
+#         write_one(doc, size, 'depth', depth_value)
 
-        for i in range(len(content_dict[key])):
-            x_min = content_dict[key][i][0]
-            y_min = content_dict[key][i][1]
-            x_max = content_dict[key][i][2]
-            y_max = content_dict[key][i][3]
-            label = content_dict[key][i][4]
+#         for i in range(len(content_dict[key])):
+#             x_min = content_dict[key][i][0]
+#             y_min = content_dict[key][i][1]
+#             x_max = content_dict[key][i][2]
+#             y_max = content_dict[key][i][3]
+#             label = content_dict[key][i][4]
 
-            objectlist = doc.createElement('object')
-            annotationlist.appendChild(objectlist)
-            write_one(doc, objectlist, 'name', label)
-            write_one(doc, objectlist, 'difficult', '0')
-            write_one(doc, objectlist, 'truncated', '0')
+#             objectlist = doc.createElement('object')
+#             annotationlist.appendChild(objectlist)
+#             write_one(doc, objectlist, 'name', label)
+#             write_one(doc, objectlist, 'difficult', '0')
+#             write_one(doc, objectlist, 'truncated', '0')
 
-            bndbox = doc.createElement('bndbox')
-            objectlist.appendChild(bndbox)
-            write_one(doc, bndbox, 'xmin', x_min)
-            write_one(doc, bndbox, 'ymin', y_min)
-            write_one(doc, bndbox, 'xmax', x_max)
-            write_one(doc, bndbox, 'ymax', y_max)
+#             bndbox = doc.createElement('bndbox')
+#             objectlist.appendChild(bndbox)
+#             write_one(doc, bndbox, 'xmin', x_min)
+#             write_one(doc, bndbox, 'ymin', y_min)
+#             write_one(doc, bndbox, 'xmax', x_max)
+#             write_one(doc, bndbox, 'ymax', y_max)
 
-            segmentation = doc.createElement('segmentation')
-            objectlist.appendChild(segmentation)
-            write_point(doc, segmentation, 'x', 'y', x_min, y_min)
-            write_point(doc, segmentation, 'x', 'y', x_max, y_min)
-            write_point(doc, segmentation, 'x', 'y', x_max, y_max)
-            write_point(doc, segmentation, 'x', 'y', x_min, y_max)
+#             segmentation = doc.createElement('segmentation')
+#             objectlist.appendChild(segmentation)
+#             write_point(doc, segmentation, 'x', 'y', x_min, y_min)
+#             write_point(doc, segmentation, 'x', 'y', x_max, y_min)
+#             write_point(doc, segmentation, 'x', 'y', x_max, y_max)
+#             write_point(doc, segmentation, 'x', 'y', x_min, y_max)
 
-            if not os.path.exists(output_folder_path):
-                os.makedirs(output_folder_path)
-            with open(os.path.join(output_folder_path, '{}.xml').format(file_name), 'w', encoding='UTF-8') as fh:
-                doc.writexml(fh, indent='', addindent='\t', newl='\n', encoding='UTF-8')
+#             if not os.path.exists(output_folder_path):
+#                 os.makedirs(output_folder_path)
+#             with open(os.path.join(output_folder_path, '{}.xml').format(file_name), 'w', encoding='UTF-8') as fh:
+#                 doc.writexml(fh, indent='', addindent='\t', newl='\n', encoding='UTF-8')
 
 
 def labelbee_kpt_to_yolo(data_path, copy_image=True):
@@ -4952,20 +5077,6 @@ def softmax(x):
     return ex / np.sum(ex)
 
 
-def median_blur(img, k=3):
-    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    dst = cv2.medianBlur(img, k)
-    return dst
-
-
-def clahe(img, clipLimit=40):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(8, 8))
-    dst1 = clahe.apply(gray)
-    dst = cv2.merge([dst1, dst1, dst1])
-    return dst
-
-
 def contain_chinese(string):
     pattern = r'[\u4e00-\u9fff]'
     return re.search(pattern, string) is not None
@@ -6171,61 +6282,61 @@ def crop_img_via_labelbee_kpt_json(data_path):
             print(Error)
 
 
-def labelbee_kpt_to_labelme_kpt(data_path):
-    import labelme
+# def labelbee_kpt_to_labelme_kpt(data_path):
+#     import labelme
 
-    save_path = make_save_path(data_path, "labelme_format")
-    img_save_path = save_path + "/images"
-    json_save_path = save_path + "/jsons"
-    os.makedirs(img_save_path, exist_ok=True)
-    os.makedirs(json_save_path, exist_ok=True)
+#     save_path = make_save_path(data_path, "labelme_format")
+#     img_save_path = save_path + "/images"
+#     json_save_path = save_path + "/jsons"
+#     os.makedirs(img_save_path, exist_ok=True)
+#     os.makedirs(json_save_path, exist_ok=True)
 
-    images_path = data_path + "/images"
-    jsons_path = data_path + "/jsons"
-    file_list = get_file_list(jsons_path)
-    for f in tqdm(file_list):
-        try:
-            img_name = os.path.splitext(f)[0]
-            fname = os.path.splitext(img_name)[0]
-            f_abs_path = jsons_path + "/{}".format(f)
-            img_abs_path = images_path + "/{}.jpg".format(fname)
-            img = cv2.imread(img_abs_path)
-            imgsz = img.shape[:2]
+#     images_path = data_path + "/images"
+#     jsons_path = data_path + "/jsons"
+#     file_list = get_file_list(jsons_path)
+#     for f in tqdm(file_list):
+#         try:
+#             img_name = os.path.splitext(f)[0]
+#             fname = os.path.splitext(img_name)[0]
+#             f_abs_path = jsons_path + "/{}".format(f)
+#             img_abs_path = images_path + "/{}.jpg".format(fname)
+#             img = cv2.imread(img_abs_path)
+#             imgsz = img.shape[:2]
 
-            with open(f_abs_path, "r") as fr:
-                src_data = json.load(fr)
-            assert len(src_data["step_1"]["result"]) == 4, "N points should == 4!"
+#             with open(f_abs_path, "r") as fr:
+#                 src_data = json.load(fr)
+#             assert len(src_data["step_1"]["result"]) == 4, "N points should == 4!"
 
-            p1 = (src_data["step_1"]["result"][0]["x"], src_data["step_1"]["result"][0]["y"])
-            p2 = (src_data["step_1"]["result"][1]["x"], src_data["step_1"]["result"][1]["y"])
-            p3 = (src_data["step_1"]["result"][2]["x"], src_data["step_1"]["result"][2]["y"])
-            p4 = (src_data["step_1"]["result"][3]["x"], src_data["step_1"]["result"][3]["y"])
+#             p1 = (src_data["step_1"]["result"][0]["x"], src_data["step_1"]["result"][0]["y"])
+#             p2 = (src_data["step_1"]["result"][1]["x"], src_data["step_1"]["result"][1]["y"])
+#             p3 = (src_data["step_1"]["result"][2]["x"], src_data["step_1"]["result"][2]["y"])
+#             p4 = (src_data["step_1"]["result"][3]["x"], src_data["step_1"]["result"][3]["y"])
 
-            shapes_data = []
-            shapes_data.append({"label": "ul", "points": [[p1[0], p1[1]]], "group_id": None, "shape_type": "point", "flags": {}})
-            shapes_data.append({"label": "ur", "points": [[p2[0], p2[1]]], "group_id": None, "shape_type": "point", "flags": {}})
-            shapes_data.append({"label": "br", "points": [[p3[0], p3[1]]], "group_id": None, "shape_type": "point", "flags": {}})
-            shapes_data.append({"label": "bl", "points": [[p4[0], p4[1]]], "group_id": None, "shape_type": "point", "flags": {}})
+#             shapes_data = []
+#             shapes_data.append({"label": "ul", "points": [[p1[0], p1[1]]], "group_id": None, "shape_type": "point", "flags": {}})
+#             shapes_data.append({"label": "ur", "points": [[p2[0], p2[1]]], "group_id": None, "shape_type": "point", "flags": {}})
+#             shapes_data.append({"label": "br", "points": [[p3[0], p3[1]]], "group_id": None, "shape_type": "point", "flags": {}})
+#             shapes_data.append({"label": "bl", "points": [[p4[0], p4[1]]], "group_id": None, "shape_type": "point", "flags": {}})
 
-            json_labelme = {}
-            json_labelme["version"] = "4.5.9"
-            json_labelme["flags"] = eval("{}")
-            json_labelme["shapes"] = shapes_data
-            json_labelme["imagePath"] = img_name
-            json_labelme["imageData"] = labelme.utils.img_arr_to_b64(img).strip()
-            json_labelme["imageHeight"] = imgsz[0]
-            json_labelme["imageWidth"] = imgsz[1]
+#             json_labelme = {}
+#             json_labelme["version"] = "4.5.9"
+#             json_labelme["flags"] = eval("{}")
+#             json_labelme["shapes"] = shapes_data
+#             json_labelme["imagePath"] = img_name
+#             json_labelme["imageData"] = labelme.utils.img_arr_to_b64(img).strip()
+#             json_labelme["imageHeight"] = imgsz[0]
+#             json_labelme["imageWidth"] = imgsz[1]
 
-            json_dst_path = json_save_path + "/{}.json".format(fname)
-            with open(json_dst_path, 'w') as fw:
-                json.dump(json_labelme, fw, indent=2)
+#             json_dst_path = json_save_path + "/{}.json".format(fname)
+#             with open(json_dst_path, 'w') as fw:
+#                 json.dump(json_labelme, fw, indent=2)
 
-            img_src_path = images_path + "/{}.jpg".format(fname)
-            img_dst_path = img_save_path + "/{}.jpg".format(fname)
-            shutil.copy(img_src_path, img_dst_path)
+#             img_src_path = images_path + "/{}.jpg".format(fname)
+#             img_dst_path = img_save_path + "/{}.jpg".format(fname)
+#             shutil.copy(img_src_path, img_dst_path)
 
-        except Exception as Error:
-            print(Error)
+#         except Exception as Error:
+#             print(Error)
 
 
 def aug_points(pts, n=10, imgsz=None, r=0.05):
@@ -6245,97 +6356,97 @@ def aug_points(pts, n=10, imgsz=None, r=0.05):
     return ptsnew
 
 
-def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
-    import labelme
+# def labelbee_kpt_to_labelme_kpt_multi_points(data_path):
+#     import labelme
 
-    save_path = make_save_path(data_path, "labelme_format")
-    img_save_path = save_path + "/images"
-    json_save_path = save_path + "/jsons"
-    os.makedirs(img_save_path, exist_ok=True)
-    os.makedirs(json_save_path, exist_ok=True)
+#     save_path = make_save_path(data_path, "labelme_format")
+#     img_save_path = save_path + "/images"
+#     json_save_path = save_path + "/jsons"
+#     os.makedirs(img_save_path, exist_ok=True)
+#     os.makedirs(json_save_path, exist_ok=True)
 
-    images_path = data_path + "/images"
-    jsons_path = data_path + "/jsons"
-    file_list = get_file_list(jsons_path)
-    for f in tqdm(file_list):
-        try:
-            img_name = os.path.splitext(f)[0]
-            fname = os.path.splitext(img_name)[0]
-            f_abs_path = jsons_path + "/{}".format(f)
-            img_abs_path = images_path + "/{}.jpeg".format(fname)
-            img = cv2.imread(img_abs_path)
-            imgsz = img.shape[:2]
+#     images_path = data_path + "/images"
+#     jsons_path = data_path + "/jsons"
+#     file_list = get_file_list(jsons_path)
+#     for f in tqdm(file_list):
+#         try:
+#             img_name = os.path.splitext(f)[0]
+#             fname = os.path.splitext(img_name)[0]
+#             f_abs_path = jsons_path + "/{}".format(f)
+#             img_abs_path = images_path + "/{}.jpeg".format(fname)
+#             img = cv2.imread(img_abs_path)
+#             imgsz = img.shape[:2]
 
-            with open(f_abs_path, "r") as fr:
-                src_data = json.load(fr)
-            assert len(src_data["step_1"]["result"]) != 0 and len(src_data["step_1"]["result"]) % 4 == 0, "N points should % 4 == 0 and != 0!"
+#             with open(f_abs_path, "r") as fr:
+#                 src_data = json.load(fr)
+#             assert len(src_data["step_1"]["result"]) != 0 and len(src_data["step_1"]["result"]) % 4 == 0, "N points should % 4 == 0 and != 0!"
 
-            pts = []
-            ni = 0
-            for i in range(0, len(src_data["step_1"]["result"]), 4):
-                if src_data["step_1"]["result"][i + 0]["attribute"] == "1":
-                    p1 = [src_data["step_1"]["result"][i + 0]["x"], src_data["step_1"]["result"][i + 0]["y"]]
-                if src_data["step_1"]["result"][i + 1]["attribute"] == "2":
-                    p2 = [src_data["step_1"]["result"][i + 1]["x"], src_data["step_1"]["result"][i + 1]["y"]]
-                if src_data["step_1"]["result"][i + 2]["attribute"] == "3":
-                    p3 = [src_data["step_1"]["result"][i + 2]["x"], src_data["step_1"]["result"][i + 2]["y"]]
-                if src_data["step_1"]["result"][i + 3]["attribute"] == "4":
-                    p4 = [src_data["step_1"]["result"][i + 3]["x"], src_data["step_1"]["result"][i + 3]["y"]]
+#             pts = []
+#             ni = 0
+#             for i in range(0, len(src_data["step_1"]["result"]), 4):
+#                 if src_data["step_1"]["result"][i + 0]["attribute"] == "1":
+#                     p1 = [src_data["step_1"]["result"][i + 0]["x"], src_data["step_1"]["result"][i + 0]["y"]]
+#                 if src_data["step_1"]["result"][i + 1]["attribute"] == "2":
+#                     p2 = [src_data["step_1"]["result"][i + 1]["x"], src_data["step_1"]["result"][i + 1]["y"]]
+#                 if src_data["step_1"]["result"][i + 2]["attribute"] == "3":
+#                     p3 = [src_data["step_1"]["result"][i + 2]["x"], src_data["step_1"]["result"][i + 2]["y"]]
+#                 if src_data["step_1"]["result"][i + 3]["attribute"] == "4":
+#                     p4 = [src_data["step_1"]["result"][i + 3]["x"], src_data["step_1"]["result"][i + 3]["y"]]
 
-                pts.append([p1, p2, p3, p4])
+#                 pts.append([p1, p2, p3, p4])
 
-                pt = [p1, p2, p3, p4]
-                pt_copy = copy.deepcopy(pt)
-                augNum = 3
-                x1, x2 = round(min(p1[0], p4[0])), round(max(p2[0], p3[0]))
-                y1, y2 = round(min(p1[1], p2[1])), round(max(p3[1], p4[1]))
-                cropped_base = img[y1:y2, x1:x2]
-                basesz = cropped_base.shape[:2]
-                # ptsnew = aug_points(pt, n=10, imgsz=basesz, r=0.25)
-                # # ptsnew = list(set(ptsnew))
+#                 pt = [p1, p2, p3, p4]
+#                 pt_copy = copy.deepcopy(pt)
+#                 augNum = 3
+#                 x1, x2 = round(min(p1[0], p4[0])), round(max(p2[0], p3[0]))
+#                 y1, y2 = round(min(p1[1], p2[1])), round(max(p3[1], p4[1]))
+#                 cropped_base = img[y1:y2, x1:x2]
+#                 basesz = cropped_base.shape[:2]
+#                 # ptsnew = aug_points(pt, n=10, imgsz=basesz, r=0.25)
+#                 # # ptsnew = list(set(ptsnew))
 
-                ni += 1
+#                 ni += 1
 
-                ptsnew = []
-                for i in range(augNum):
-                    r_ = 0.01 * np.random.randint(10, 16)
-                    pt_ = expand_kpt(basesz, pt, r=r_)
-                    pt_cp = copy.deepcopy(pt_)
-                    ptsnew.append(pt_cp)
+#                 ptsnew = []
+#                 for i in range(augNum):
+#                     r_ = 0.01 * np.random.randint(10, 16)
+#                     pt_ = expand_kpt(basesz, pt, r=r_)
+#                     pt_cp = copy.deepcopy(pt_)
+#                     ptsnew.append(pt_cp)
 
-                # pt_ = expand_kpt(basesz, pt, r=0.10)
+#                 # pt_ = expand_kpt(basesz, pt, r=0.10)
 
-                for idx, pi in enumerate(ptsnew):
-                    # for idx, pi in enumerate([pt]):
-                    ix1, ix2 = round(min(pi[0][0], pi[3][0])), round(max(pi[1][0], pi[2][0]))
-                    iy1, iy2 = round(min(pi[0][1], pi[1][1])), round(max(pi[2][1], pi[3][1]))
-                    cropped = img[iy1:iy2, ix1:ix2]
-                    croppedsz = cropped.shape[:2]
+#                 for idx, pi in enumerate(ptsnew):
+#                     # for idx, pi in enumerate([pt]):
+#                     ix1, ix2 = round(min(pi[0][0], pi[3][0])), round(max(pi[1][0], pi[2][0]))
+#                     iy1, iy2 = round(min(pi[0][1], pi[1][1])), round(max(pi[2][1], pi[3][1]))
+#                     cropped = img[iy1:iy2, ix1:ix2]
+#                     croppedsz = cropped.shape[:2]
 
-                    shapes_data = []
-                    shapes_data.append({"label": "ul", "points": [[pt_copy[0][0] - ix1, pt_copy[0][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
-                    shapes_data.append({"label": "ur", "points": [[pt_copy[1][0] - ix1, pt_copy[1][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
-                    shapes_data.append({"label": "br", "points": [[pt_copy[2][0] - ix1, pt_copy[2][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
-                    shapes_data.append({"label": "bl", "points": [[pt_copy[3][0] - ix1, pt_copy[3][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
+#                     shapes_data = []
+#                     shapes_data.append({"label": "ul", "points": [[pt_copy[0][0] - ix1, pt_copy[0][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
+#                     shapes_data.append({"label": "ur", "points": [[pt_copy[1][0] - ix1, pt_copy[1][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
+#                     shapes_data.append({"label": "br", "points": [[pt_copy[2][0] - ix1, pt_copy[2][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
+#                     shapes_data.append({"label": "bl", "points": [[pt_copy[3][0] - ix1, pt_copy[3][1] - iy1]], "group_id": None, "shape_type": "point", "flags": {}})
 
-                    json_labelme = {}
-                    json_labelme["version"] = "4.5.9"
-                    json_labelme["flags"] = eval("{}")
-                    json_labelme["shapes"] = shapes_data
-                    json_labelme["imagePath"] = fname + "_{}_{}.jpg".format(ni, idx)
-                    json_labelme["imageData"] = labelme.utils.img_arr_to_b64(cropped).strip()
-                    json_labelme["imageHeight"] = croppedsz[0]
-                    json_labelme["imageWidth"] = croppedsz[1]
+#                     json_labelme = {}
+#                     json_labelme["version"] = "4.5.9"
+#                     json_labelme["flags"] = eval("{}")
+#                     json_labelme["shapes"] = shapes_data
+#                     json_labelme["imagePath"] = fname + "_{}_{}.jpg".format(ni, idx)
+#                     json_labelme["imageData"] = labelme.utils.img_arr_to_b64(cropped).strip()
+#                     json_labelme["imageHeight"] = croppedsz[0]
+#                     json_labelme["imageWidth"] = croppedsz[1]
 
-                    json_dst_path = json_save_path + "/{}_{}_{}.json".format(fname, ni, idx)
-                    with open(json_dst_path, 'w') as fw:
-                        json.dump(json_labelme, fw, indent=2)
+#                     json_dst_path = json_save_path + "/{}_{}_{}.json".format(fname, ni, idx)
+#                     with open(json_dst_path, 'w') as fw:
+#                         json.dump(json_labelme, fw, indent=2)
 
-                    img_dst_path = img_save_path + "/{}_{}_{}.jpg".format(fname, ni, idx)
-                    cv2.imwrite(img_dst_path, cropped)
+#                     img_dst_path = img_save_path + "/{}_{}_{}.jpg".format(fname, ni, idx)
+#                     cv2.imwrite(img_dst_path, cropped)
 
-        except Exception as Error:
-            print(Error)
+#         except Exception as Error:
+#             print(Error)
 
 
 def expand_kpt(imgsz, pts, r):

@@ -39,20 +39,27 @@ def timestamp_to_strftime(timestamp: float):
         strftime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         return strftime
     else:
-        assert type(timestamp) == float, "Error: timestamp should be float!"
+        assert type(timestamp) == float, "timestamp should be float!"
         strftime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
         return strftime
 
 
 def strftime_to_timestamp(strftime: str):
-    # strftime = "2024-11-06 12:00:00"
-    assert strftime is not None or strftime != "", "Error: strftime is empty!"
+    """
+    strftime = "2024-11-06 12:00:00"
+    """
+    assert strftime is not None or strftime != "", "strftime is empty!"
     struct_time = time.strptime(strftime, "%Y-%m-%d %H:%M:%S")
     timestamp = time.mktime(struct_time)
     return timestamp
 
 
 def get_date_time(mode=0):
+    """
+    0: %Y-%m-%d %H:%M:%S
+    1: %Y %m %d %H:%M:%S
+    2: %Y/%m/%d %H:%M:%S
+    """
     if mode == 0:
         datetime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         return datetime
@@ -180,16 +187,11 @@ def rename_files(data_path, use_orig_name=False, new_name_prefix="", zeros_num=7
             new_name = "{}_{:0{}d}{}".format(orig_name, i + start_num, zeros_num, file_ends)
             os.rename(img_abs_path, data_path + "/" + new_name)
         else:
-            new_name = "{}_{:0{}d}{}".format(new_name_prefix, i + start_num, zeros_num, file_ends)
+            if new_name_prefix is None or new_name_prefix == "":
+                new_name = "{:0{}d}{}".format(i + start_num, zeros_num, file_ends)
+            else:
+                new_name = "{}_{:0{}d}{}".format(new_name_prefix, i + start_num, zeros_num, file_ends)
             os.rename(img_abs_path, data_path + "/" + new_name)
-                
-                    
-def rename_files_add_str_before_filename(data_path, add_str=""):
-    data_list = sorted(os.listdir(data_path))
-    for i in range(len(data_list)):
-        img_abs_path = data_path + "/" + data_list[i]
-        new_name = data_path + "/{}_{}".format(add_str, data_list[i])
-        os.rename(img_abs_path, new_name)
 
 
 def untar_many_files(data_path):

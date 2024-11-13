@@ -60,6 +60,7 @@ import pyclipper
 from shapely.geometry import Polygon
 
 
+# Base utils ===================================================
 def get_file_list(data_path: str, abspath=False) -> list:
     file_list = []
     list_ = sorted(os.listdir(data_path))
@@ -179,7 +180,7 @@ def is_all_chinese(string):
         return False
     
 
-# Image Processing
+# Image processing utils ===================================================
 def cv2pil(image):
     assert isinstance(image, np.ndarray), f'Input image type is not cv2 and is {type(image)}!'
     if len(image.shape) == 2:
@@ -246,9 +247,9 @@ def rotate(img, random=False, p=1, algorithm="pil", center=(50, 50), angle=(-45,
 
 def flip(img, random=False, p=1, m=0):
     """
-    0：垂直翻转（沿x轴翻转）
-    1：水平翻转（沿y轴翻转）
-    -1：同时在水平和垂直方向翻转
+    0:垂直翻转(沿x轴翻转)
+    1:水平翻转(沿y轴翻转)
+    -1:同时在水平和垂直方向翻转
 
     """
     assert m in [-1, 0, 1], "m(flip direction) should be one of [-1, 0, 1]"
@@ -770,7 +771,7 @@ def contrast_stretch(img, random=False, p=1, alpha=0, beta=1):
 def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
     """
     直方图适应均衡化
-    该函数包含以下参数：
+    该函数包含以下参数:
     clipLimit: 用于控制直方图均衡化的局部对比度,值越高,越容易出现失真和噪声。建议值为2-4,若使用默认值0则表示自动计算。
     tileGridSize: 表示每个块的大小,推荐16x16。
     tileGridSize.width: 块的宽度。
@@ -1010,9 +1011,9 @@ def rain_blur(noise, length=10, angle=0, w=1):
     将噪声加上运动模糊,模仿雨滴
 
     >>>输入
-    noise：输入噪声图,shape = img.shape[0:2]
+    noise:输入噪声图,shape = img.shape[0:2]
     length: 对角矩阵大小,表示雨滴的长度
-    angle： 倾斜的角度,逆时针为正
+    angle: 倾斜的角度,逆时针为正
     w:      雨滴大小
 
     >>>输出带模糊的噪声
@@ -1057,7 +1058,7 @@ def alpha_rain(rain, img, beta=0.8):
     rain_result[:, :, 0] = rain_result[:, :, 0] * (255 - rain[:, :, 0]) / 255.0 + beta * rain[:, :, 0]
     rain_result[:, :, 1] = rain_result[:, :, 1] * (255 - rain[:, :, 0]) / 255 + beta * rain[:, :, 0]
     rain_result[:, :, 2] = rain_result[:, :, 2] * (255 - rain[:, :, 0]) / 255 + beta * rain[:, :, 0]
-    # 对每个通道先保留雨滴噪声图对应的黑色（透明）部分,再叠加白色的雨滴噪声部分（有比例因子）
+    # 对每个通道先保留雨滴噪声图对应的黑色(透明)部分,再叠加白色的雨滴噪声部分(有比例因子)
 
     """
     cv2.imshow('rain_effct_result', rain_result)
@@ -1069,7 +1070,7 @@ def alpha_rain(rain, img, beta=0.8):
 
 def add_rain(rain, img, alpha=0.9):
     # 输入雨滴噪声和图像
-    # alpha：原图比例因子
+    # alpha:原图比例因子
     # 显示下雨效果
 
     # chage rain into  3-dimenis
@@ -1456,7 +1457,7 @@ def make_haha_mirror_effect(img, random=False, p=1, center=(50, 50), r=40, degre
                     if distance < randius ** 2:
                         new_x = tx / 2
                         new_y = ty / 2
-                        # 图片的每个像素的坐标按照原来distance 之后的distance（real_randius**2）占比放大即可
+                        # 图片的每个像素的坐标按照原来distance 之后的distance(real_randius**2)占比放大即可
                         new_x = int(new_x * math.sqrt(distance) / real_randius + center[0])
                         new_y = int(new_y * math.sqrt(distance) / real_randius + center[1])
                         # 当不超过new_data 的边界时候就可赋值
@@ -1484,7 +1485,7 @@ def make_haha_mirror_effect(img, random=False, p=1, center=(50, 50), r=40, degre
                 if distance < randius ** 2:
                     new_x = tx / 2
                     new_y = ty / 2
-                    # 图片的每个像素的坐标按照原来distance 之后的distance（real_randius**2）占比放大即可
+                    # 图片的每个像素的坐标按照原来distance 之后的distance(real_randius**2)占比放大即可
                     new_x = int(new_x * math.sqrt(distance) / real_randius + center[0])
                     new_y = int(new_y * math.sqrt(distance) / real_randius + center[1])
                     # 当不超过new_data 的边界时候就可赋值
@@ -1668,7 +1669,8 @@ def resize_images(data_path, size=(1920, 1080)):
         cv2.imwrite("{}/{}.jpg".format(save_path, img_name), resz_img)
 
 
-# -----------------------------------------------------------------------------
+# Object detection utils ===================================================
+
 def bbox_voc_to_yolo(size, box):
     """
     VOC --> YOLO
@@ -3770,14 +3772,6 @@ def convert_to_gray_image(data_path):
         cv2.imwrite("{}/{}".format(save_path, i), img)
 
 
-def crop_one_image(img_path, crop_area):
-    img = cv2.imread(img_path)
-    par_path = os.path.abspath(os.path.join(img_path, "../.."))
-    img_name = os.path.splitext(os.path.basename(img_path))[0]
-    cropped = img[crop_area[0]:crop_area[1], crop_area[2]:crop_area[3]]
-    cv2.imwrite("{}/{}_cropped.jpg".format(par_path, img_name), cropped)
-
-
 def create_pure_images(save_path, size=(1080, 1920), max_pixel_value=20, save_num=1000, p=0.8):
     os.makedirs(save_path, exist_ok=True)
     colors = [[0, 0, 0],
@@ -4430,14 +4424,6 @@ def onehot(label, depth, device=None):
     return onehot
 
 
-def apply_clahe(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(3, (4, 4))
-    dst = clahe.apply(gray)
-
-    return dst
-
-
 def bmp2jpg(bmp_abs_path):
     base_name = os.path.basename(bmp_abs_path)
     save_name = base_name.replace(".bmp", ".jpg")
@@ -4724,19 +4710,6 @@ def color_identify(data_path):
             img_dst_path = unsure_path + "/{}".format(img)
             shutil.copy(img_abs_path, img_dst_path)
             print("{}: {} --> {}".format("ON", img_abs_path, img_dst_path))
-
-
-def rotate_image_90(img_path):
-    dir_name = os.path.basename(img_path)
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_rotated".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    img_list = sorted(os.listdir(img_path))
-    for img in img_list:
-        img_abs_path = img_path + "/{}".format(img)
-        img = cv2.imread(img_abs_path)
-        img90 = np.rot90(img, 1)
-        cv2.imwrite("{}/{}".format(save_path, img), img90)
     
 
 def cal_images_mean_height_width(data_path):
@@ -4760,7 +4733,7 @@ def cal_images_mean_height_width(data_path):
     return h_mean, w_mean
 
 
-# OCR
+# OCR ===================================================
 class SegDetectorRepresenter():
     def __init__(self, thresh=0.3, box_thresh=0.7, max_candidates=1000, unclip_ratio=1.5):
         self.min_size = 3
@@ -5107,6 +5080,7 @@ def cal_hw(b):
     h = int(round(abs(MAX_Y - MIN_Y)))
     w = int(round(abs(MAX_X - MIN_X)))
     return (h, w)
+
 
 def get_new_boxes(boxes, rhw, r=0.12):
     boxes_orig = []
@@ -6228,6 +6202,7 @@ def seamless_clone_test(save_path):
 
 
 def convert_baidu_chinese_ocr_dataset_to_custom_dataset_format(data_path):
+    # labels = "０１２３４５６７８９"
     train_images_path = data_path + "/train_images"
     train_list_path = data_path + "/train.list"
     img_list = sorted(os.listdir(train_images_path))
@@ -6258,10 +6233,6 @@ def convert_baidu_chinese_ocr_dataset_to_custom_dataset_format(data_path):
 
             except Exception as Error:
                 print(Error)
-
-
-# labels = "０１２３４５６７８９"
-
 
 
 # KPT
@@ -6504,85 +6475,6 @@ def aug_points(pts, n=10, imgsz=None, r=0.05):
 
 #         except Exception as Error:
 #             print(Error)
-
-
-def expand_kpt(imgsz, pts, r):
-    minSide = min(imgsz[0], imgsz[1])
-    if minSide > 400:
-        minSide = minSide / 5
-    elif minSide > 300:
-        minSide = minSide / 4
-    elif minSide > 200:
-        minSide = minSide / 3
-    elif minSide > 100:
-        minSide = minSide / 2
-    else:
-        minSide = minSide
-
-    expandP = round(minSide * r)
-    expandP_half = round(minSide * r / 2)
-    expandP_quarter = round(minSide * r / 4)
-    expandP_one_sixth = round(minSide * r / 6)
-    expandP_one_eighth = round(minSide * r / 8)
-
-    for i in range(len(pts)):
-        if (pts[i][0] - expandP >= 0):
-            if (i == 0 or i == 3):
-                pts[i][0] = pts[i][0] - expandP
-            else:
-                pts[i][0] = pts[i][0] + expandP
-        elif (pts[i][0] - expandP_half >= 0):
-            if (i == 0 or i == 3):
-                pts[i][0] = pts[i][0] - expandP_half
-            else:
-                pts[i][0] = pts[i][0] + expandP_half
-        elif (pts[i][0] - expandP_quarter >= 0):
-            if (i == 0 or i == 3):
-                pts[i][0] = pts[i][0] - expandP_quarter
-            else:
-                pts[i][0] = pts[i][0] + expandP_quarter
-        elif (pts[i][0] - expandP_one_sixth >= 0):
-            if (i == 0 or i == 3):
-                pts[i][0] = pts[i][0] - expandP_one_sixth
-            else:
-                pts[i][0] = pts[i][0] + expandP_one_sixth
-        elif (pts[i][0] - expandP_one_eighth >= 0):
-            if (i == 0 or i == 3):
-                pts[i][0] = pts[i][0] - expandP_one_eighth
-            else:
-                pts[i][0] = pts[i][0] + expandP_one_eighth
-        else:
-            pts[i][0] = pts[i][0]
-
-        if (pts[i][1] - expandP >= 0):
-            if (i == 0 or i == 1):
-                pts[i][1] = pts[i][1] - expandP
-            else:
-                pts[i][1] = pts[i][1] + expandP
-        elif (pts[i][1] - expandP_half >= 0):
-            if (i == 0 or i == 1):
-                pts[i][1] = pts[i][1] - expandP_half
-            else:
-                pts[i][1] = pts[i][1] + expandP_half
-        elif (pts[i][1] - expandP_quarter >= 0):
-            if (i == 0 or i == 1):
-                pts[i][1] = pts[i][1] - expandP_quarter
-            else:
-                pts[i][1] = pts[i][1] + expandP_quarter
-        elif (pts[i][1] - expandP_one_sixth >= 0):
-            if (i == 0 or i == 1):
-                pts[i][1] = pts[i][1] - expandP_one_sixth
-            else:
-                pts[i][1] = pts[i][1] + expandP_one_sixth
-        elif (pts[i][1] - expandP_one_eighth >= 0):
-            if (i == 0 or i == 1):
-                pts[i][1] = pts[i][1] - expandP_one_eighth
-            else:
-                pts[i][1] = pts[i][1] + expandP_one_eighth
-        else:
-            pts[i][1] = pts[i][1]
-
-    return pts
 
 
 def crop_img_via_labelme_json(data_path, r=0.10):
@@ -7844,7 +7736,7 @@ def change_xml(root, image_id, new_target):
     tree.write(os.path.join(root, str(image_id) + "_aug" + '.xml'))
 
 
-# SEG
+# SEG 
 def convert_seg_0_255_to_0_n(image, c="3"):
     """
     根据实际进行修改

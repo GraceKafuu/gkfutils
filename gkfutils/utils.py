@@ -160,22 +160,6 @@ def make_save_path(data_path: str, relative=".", add_str="results"):
     return save_path
 
 
-def save_file_path_to_txt(data_path: str, abspath=True):
-    assert type(data_path) == str, "{} should be str!".format(data_path)
-    dirname = os.path.basename(data_path)
-    data_list = sorted(os.listdir(data_path))
-    txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
-    with open(txt_save_path, 'w', encoding='utf-8') as fw:
-        for f in data_list:
-            if abspath:
-                f_abs_path = data_path + "/{}".format(f)
-                fw.write("{}\n".format(f_abs_path))
-            else:
-                fw.write("{}\n".format(f))
-
-    print("Success! --> {}".format(txt_save_path))
-
-
 def rename_files(data_path, use_orig_name=False, new_name_prefix="", zeros_num=7, start_num=0):
     data_list = sorted(os.listdir(data_path))
     length= len(data_list)
@@ -192,6 +176,23 @@ def rename_files(data_path, use_orig_name=False, new_name_prefix="", zeros_num=7
             else:
                 new_name = "{}_{:0{}d}{}".format(new_name_prefix, i + start_num, zeros_num, file_ends)
             os.rename(img_abs_path, data_path + "/" + new_name)
+
+
+def save_file_path_to_txt(data_path: str, abspath=True):
+    assert type(data_path) == str, "{} should be str!".format(data_path)
+    dirname = os.path.basename(data_path)
+    data_list = sorted(os.listdir(data_path))
+    txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
+    with open(txt_save_path, 'w', encoding='utf-8') as fw:
+        for f in data_list:
+            if abspath:
+                f_abs_path = data_path + "/{}".format(f)
+                f_abs_path = f_abs_path.replace("\\", "/")
+                fw.write("{}\n".format(f_abs_path))
+            else:
+                fw.write("{}\n".format(f))
+
+    print("Success! --> {}".format(txt_save_path))
 
 
 def untar_many_files(data_path):

@@ -122,10 +122,27 @@ if __name__ == '__main__':
     #         f_dst_path = save_path + "/{}_{}.jpg".format(fname, i)
     #         cv2.imwrite(f_dst_path, res)
 
-    
+    # for i in range(10):
+    #     color = get_color(specific_color=True)
+    #     print(color, type(color))
 
 
+    # img_path = "./data/images/3.jpg"
+    # dst_path = img_path.replace(".jpg", "_res.jpg")
+    img_path = "./data/images/long.png"
+    dst_path = img_path.replace(".png", "_res.png")
+    img = cv2.imread(img_path)
+    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # cv2.imwrite(dst_path, res)
 
+    res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    if isinstance(res, list):
+        for i in range(len(res)):
+            cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
+    else:
+        cv2.imwrite(dst_path, res)
 
 
 

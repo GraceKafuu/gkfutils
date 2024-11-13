@@ -523,7 +523,7 @@ def median_filter_1d(res_list, k=15):
     return new_res
 
 
-def gaussian2D(shape, sigma=1):
+def gaussian_2d(shape, sigma=1):
     m, n = [(ss - 1.) / 2. for ss in shape]
     y, x = np.ogrid[-m:m + 1, -n:n + 1]
 
@@ -535,7 +535,7 @@ def gaussian2D(shape, sigma=1):
 
 def draw_umich_gaussian(heatmap, center, radius, k=1):
     diameter = 2 * radius + 1
-    gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
+    gaussian = gaussian_2d((diameter, diameter), sigma=diameter / 6)
     # 一个圆对应内切正方形的高斯分布
 
     x, y = int(center[0]), int(center[1])
@@ -606,7 +606,31 @@ def move_same_file(data_path):
             shutil.move(f_src_path, f_dst_path)
 
 
+def get_sub_dir_file_list(base_path):
+    """
+    :param base_path:
+    :return: file abs path
+    """
+    all_files = []
+    dir_list = sorted(os.listdir(base_path))
+    for d in dir_list:
+        d_abs_path = base_path + "/{}".format(d)
+        file_list = sorted(os.listdir(d_abs_path))
+        for f in file_list:
+            f_abs_path = d_abs_path + "/{}".format(f)
+            all_files.append(f_abs_path)
 
+    return all_files
+
+
+def get_sub_dir_list(base_path):
+    all_dirs = []
+    dir_list = sorted(os.listdir(base_path))
+    for d in dir_list:
+        d_abs_path = base_path + "/{}".format(d)
+        all_dirs.append(d_abs_path)
+
+    return all_dirs
 
 
 
@@ -1219,33 +1243,6 @@ def copy_n_times(data_path, n=10, save_path="current", print_flag=True):
                     print("{} --> {}".format(f_abs_path, f_dst_path))
 
 
-def get_sub_dir_file_list(base_path):
-    """
-    :param base_path:
-    :return: file abs path
-    """
-    all_files = []
-    dir_list = sorted(os.listdir(base_path))
-    for d in dir_list:
-        d_abs_path = base_path + "/{}".format(d)
-        file_list = sorted(os.listdir(d_abs_path))
-        for f in file_list:
-            f_abs_path = d_abs_path + "/{}".format(f)
-            all_files.append(f_abs_path)
-
-    return all_files
-
-
-def get_sub_dir_list(base_path):
-    all_dirs = []
-    dir_list = sorted(os.listdir(base_path))
-    for d in dir_list:
-        d_abs_path = base_path + "/{}".format(d)
-        all_dirs.append(d_abs_path)
-
-    return all_dirs
-
-
 def copy_file_according_txt(txt_path="", save_path=""):
     os.makedirs(save_path, exist_ok=True)
 
@@ -1726,7 +1723,7 @@ def LogInit(prex):
     return log
 
 
-class ImProgressBar(object):
+class ImgProgressBar(object):
     def __init__(self, total_iter, bar_len=50):
         self.total_iter = total_iter
         self.bar_len = bar_len

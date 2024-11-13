@@ -4074,43 +4074,41 @@ def stack_images(data_path):
                     cv2.imwrite("{}/{}_{}_stack={}.png".format(save_path, i, 10 - j, i + 1), stack)
 
 
-def crop_images(data_path):
-    dir_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_cropped".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
+def get_color(specific_color=True):
+    """
+    specific_color: type -> bool, tuple, list
+    if tuple or list: specific_color = ((c1), (c2), ...)
+    """
+    color0 = tuple(np.random.randint(0, 256, 3))
 
-    data_list = sorted(os.listdir(data_path))
-    for f in tqdm(data_list):
-        f_abs_path = data_path + "/{}".format(f)
-        img = cv2.imread(f_abs_path)
-        imgsz = img.shape[:2]
-        # cropped = img[212:imgsz[0], :]
-        cropped = img[0:165, :]
-        cv2.imwrite("{}/{}".format(save_path, f), cropped)
+    if isinstance(specific_color, bool):
+        color1 = (0, 0, 0)
+        color2 = (114, 114, 114)
+        color3 = (255, 255, 255)
+        colors = [color0, color1, color2, color3]
 
-
-def get_color(specific=True):
-    global color
-    color1 = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-
-    if specific:
-        color2, color3, color4 = (0, 0, 0), (114, 114, 114), (255, 255, 255)
-        color_rdm = np.random.rand()
-        if color_rdm <= 0.85:
-            color = color1
-        elif color_rdm > 0.85 and color_rdm <= 0.90:
-            color = color2
-        elif color_rdm > 0.90 and color_rdm <= 0.95:
-            color = color3
-        else:
-            color = color4
+        if specific_color:
+            color = random.sample(colors, 1)[0]
+            return color
+        return color0
+    elif isinstance(specific_color, tuple):
+        colors = []
+        for c in specific_color:
+            colors.append(c)
+        color = random.sample(colors, 1)[0]
+        return color
+    elif isinstance(specific_color, list):
+        colors = []
+        for c in specific_color:
+            colors.append(tuple(c))
+        color = random.sample(colors, 1)[0]
+        return color
     else:
-        color = color1
+        print("specific_color should be bool or tuple or list!")
+        raise ValueError
 
-    return color
 
-
-def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific=True):
+def make_border_base(im, random=True, new_shape=(64, 256), r1=0.75, specific_color=True):
     """
     :param im:
     :param new_shape: (H, W)
@@ -4119,7 +4117,7 @@ def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific=True):
     :param sliding_window:
     :return:
     """
-    color = get_color(specific=specific)
+    color = get_color(specific_color=specific_color)
 
     shape = im.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -4139,40 +4137,31 @@ def makeBorder_base(im, new_shape=(64, 256), r1=0.75, specific=True):
     new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
     ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
 
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
-    else:
+    if random:
         rdmh = np.random.random()
         rmdw = np.random.random()
         top = int(round(ph * rdmh))
         bottom = ph - top
         left = int(round(pw * rmdw))
         right = pw - left
+    else:
+        top = ph // 2
+        bottom = ph - top
+        left = pw // 2
+        right = pw - left
 
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
+    if shape != new_unpad_size:
+        im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
 
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        else:
-            im = cv2.resize(im, new_shape[::-1])
+    if im.shape[1] <= new_shape[1]:
+        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    else:
+        im = cv2.resize(im, new_shape[::-1])
 
     return im
 
 
-def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, r2=0.25, specific=True):
+def sliding_window_crop(img, random=True, cropsz=(64, 256), gap=(0, 128), makeBorder=True, r1=0, r2=0.25, specific=True):
     cropped_imgs = []
     imgsz = img.shape[:2]
 
@@ -4182,7 +4171,7 @@ def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True,
             if i + cropsz[1] > imgsz[1]:
                 cp_img = img[0:imgsz[0], i:imgsz[1]]
                 if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                    cp_img = make_border_base(cp_img, random=random, new_shape=cropsz, r1=r1, specific=specific)
                 cropped_imgs.append(cp_img)
                 break
             else:
@@ -4194,7 +4183,7 @@ def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True,
             if j + cropsz[0] > imgsz[0]:
                 cp_img = img[j:imgsz[0], 0:imgsz[1]]
                 if makeBorder:
-                    cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                    cp_img = make_border_base(cp_img, random=random, new_shape=cropsz, r1=r1, specific=specific)
                 cropped_imgs.append(cp_img)
                 break
             else:
@@ -4209,7 +4198,7 @@ def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True,
                     if i + cropsz[1] > imgsz[1]:
                         cp_img = img[j:imgsz[0], i:imgsz[1]]
                         if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                            cp_img = make_border_base(cp_img, random=random, new_shape=cropsz, r1=r1, specific=specific)
                         cropped_imgs.append(cp_img)
                         break
                     else:
@@ -4222,7 +4211,7 @@ def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True,
                     if i + cropsz[1] > imgsz[1]:
                         cp_img = img[j:j + cropsz[0], i:imgsz[1]]
                         if makeBorder:
-                            cp_img = makeBorder_base(cp_img, new_shape=cropsz, r1=r1, specific=specific)
+                            cp_img = make_border_base(cp_img, random=random, new_shape=cropsz, r1=r1, specific=specific)
                         cropped_imgs.append(cp_img)
                         break
                     else:
@@ -4232,7 +4221,7 @@ def sliding_window_crop_v2(img, cropsz=(64, 256), gap=(0, 128), makeBorder=True,
     return cropped_imgs
 
 
-def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=False, specific=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
+def make_border_v7(im, random=True, new_shape=(64, 256), r1=0.75, r2=0.25, ocr_infer=False, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_makeBorder=True):
     """
     :param im:
     :param new_shape: (H, W)
@@ -4241,7 +4230,7 @@ def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=Fals
     :param sliding_window:
     :return:
     """
-    color = get_color(specific=specific)
+    color = get_color(specific_color=specific_color)
 
     shape = im.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -4261,82 +4250,24 @@ def makeBorder_v6(im, new_shape=(64, 256), r1=0.75, r2=0.25, sliding_window=Fals
     new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
     ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
 
-    rdm = np.random.random()
-    if rdm > 0.5:
-        top = ph // 2
-        bottom = ph - top
-        left = pw // 2
-        right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-    else:
+    if random:
         rdmh = np.random.random()
         rmdw = np.random.random()
         top = int(round(ph * rdmh))
         bottom = ph - top
         left = int(round(pw * rmdw))
         right = pw - left
-
-        if shape != new_unpad_size:
-            im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
-
-        if im.shape[1] <= new_shape[1]:
-            im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-        elif (im.shape[1] > new_shape[1]) and (im.shape[1] <= (new_shape[1] + int(round(new_shape[1] * r2)))):
-            im = cv2.resize(im, new_shape[::-1])
-        else:  # TODO sliding window: 2023.09.27 Done
-            if sliding_window:
-                final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
-                return final_imgs
-            else:
-                im = cv2.resize(im, new_shape[::-1])
-
-    return im
-
-
-def makeBorder_inference(im, new_shape=(64, 256), r1=0, r2=0.25, sliding_window=False, color=(0, 0, 0), gap_r=(0, 7 / 8), last_img_makeBorder=True):
-    """
-    :param im:
-    :param new_shape: (H, W)
-    :param r1:
-    :param r2:
-    :param sliding_window:
-    :return:
-    """
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape * 4)
-
-    # if im is too small(shape[0] < new_shape[0] * 0.75), first pad H, then calculate r.
-    if shape[0] < new_shape[0] * r1:
-        padh = new_shape[0] - shape[0]
-        padh1 = padh // 2
-        padh2 = padh - padh1
-        im = cv2.copyMakeBorder(im, padh1, padh2, 0, 0, cv2.BORDER_CONSTANT, value=color)  # add border
-
-    shape = im.shape[:2]  # current shape [height, width]
-    r = new_shape[0] / shape[0]
-
-    # Compute padding
-    new_unpad_size = (int(round(shape[0] * r)), int(round(shape[1] * r)))
-    ph, pw = new_shape[0] - new_unpad_size[0], new_shape[1] - new_unpad_size[1]  # wh padding
-
-    top = ph // 2
-    bottom = ph - top
-    left = 0
-    right = pw - left
+    else:
+        if ocr_infer:
+            top = ph // 2
+            bottom = ph - top
+            left = 0
+            right = pw - left
+        else:
+            top = ph // 2
+            bottom = ph - top
+            left = pw // 2
+            right = pw - left
 
     if shape != new_unpad_size:
         im = cv2.resize(im, new_unpad_size[::-1], interpolation=cv2.INTER_LINEAR)
@@ -4347,13 +4278,13 @@ def makeBorder_inference(im, new_shape=(64, 256), r1=0, r2=0.25, sliding_window=
         im = cv2.resize(im, new_shape[::-1])
     else:  # TODO sliding window: 2023.09.27 Done
         if sliding_window:
-            final_imgs = sliding_window_crop_v2(im, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder, r1=r1)
+            final_imgs = sliding_window_crop(im, random=random, cropsz=new_shape, gap=(int(gap_r[0] * 0), int(gap_r[1] * new_shape[1])), makeBorder=last_img_makeBorder)
             return final_imgs
         else:
             im = cv2.resize(im, new_shape[::-1])
 
     return im
-
+        
 
 def sample_asym(magnitude, size=None):
     return np.random.beta(1, 4, size) * magnitude

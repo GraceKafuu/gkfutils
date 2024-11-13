@@ -104,27 +104,36 @@ def get_dir_file_list(data_path: str, abspath=False):
         return list_
 
 
-def get_dir_name(data_path: str):
-    assert os.path.isdir(data_path), "Error: {} is not a dir!".format(data_path)
-    dir_name = os.path.basename(data_path)
-    return dir_name
-
-
-def get_file_name(data_path: str):
-    assert os.path.isfile(data_path), "Error: {} is not a file!".format(data_path)
-    base_name = os.path.basename(data_path)
-    return base_name
-
-
 def get_base_name(data_path: str):
     base_name = os.path.basename(data_path)
     return base_name
 
 
-def get_file_suffix(data_path: str):
-    assert os.path.isfile(data_path), "Error: {} is not a file!".format(data_path)
+def get_dir_name(data_path: str):
+    assert os.path.isdir(data_path), "{} is not a dir!".format(data_path)
+    dir_name = os.path.basename(data_path)
+    return dir_name
+
+
+def get_file_name(data_path: str):
+    """
+    without suffix
+    """
+    assert os.path.isfile(data_path), "{} is not a file!".format(data_path)
     base_name = os.path.basename(data_path)
     file_name = os.path.splitext(base_name)[0]
+    return file_name
+
+
+def get_file_name_with_suffix(data_path: str):
+    assert os.path.isfile(data_path), "{} is not a file!".format(data_path)
+    base_name = os.path.basename(data_path)
+    return base_name
+
+
+def get_suffix(data_path: str):
+    assert os.path.isfile(data_path), "{} is not a file!".format(data_path)
+    base_name = os.path.basename(data_path)
     suffix = os.path.splitext(base_name)[1]
     return suffix
 

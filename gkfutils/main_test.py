@@ -33,6 +33,8 @@ import shutil
 import numpy as np
 from tqdm import tqdm
 from PIL import Image
+import inspect
+import importlib
 
 
 def main_test_1():
@@ -190,49 +192,25 @@ def main_test_4():
 
 
 if __name__ == '__main__':
-    main_test_1()
-    main_test_2()
-    main_test_3()
+    # main_test_1()
+    # main_test_2()
+    # main_test_3()
+
+    
+
+    
+    current_file = inspect.getfile(inspect.currentframe())
+    current_dir = os.path.dirname(current_file)
+    os.chdir(current_dir)
+    module = importlib.import_module(os.path.basename(current_file)[:-3])
+    
+    # 列出模块中的所有函数
+    functions = [func for func in dir(module) if callable(getattr(module, func))]
+    print(functions)
     
 
 
     
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

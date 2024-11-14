@@ -7,6 +7,11 @@ if __name__ == '__main__':
     # gkfutils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", use_orig_name=False, new_name_prefix="Test", zeros_num=20, start_num=0)
     # gkfutils.save_file_path_to_txt(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", abspath=True)
 
+
+
+
+
+
     
     # gkfutils.cv.utils.extract_one_gif_frames(gif_path="")
     # gkfutils.cv.utils.extract_one_video_frames(video_path="", gap=5)

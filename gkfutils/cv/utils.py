@@ -746,7 +746,7 @@ def change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=30):
             alpha = np.random.uniform(alpha[0], alpha[1])
             beta = np.random.randint(beta[0], beta[1] + 1)
             blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-            img = cv2.addWeighted(img, alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
+            img = cv2.addWeighted(np.uint8(img), alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
             return img
         else:
             return img
@@ -755,7 +755,7 @@ def change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=30):
         assert isinstance(beta, int), "If random=False, beta should be int!"
         assert alpha >= 0 and alpha <= 1, "alpha >= 0 and alpha <= 1"
         blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-        img = cv2.addWeighted(img, alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
+        img = cv2.addWeighted(np.uint8(img), alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
         return img
 
 
@@ -1157,7 +1157,7 @@ def add_rain(rain, img, alpha=0.9):
     rain = np.repeat(rain, 3, 2)
 
     # 加权合成新图
-    result = cv2.addWeighted(img, alpha, np.uint8(rain), 1 - alpha, 1)
+    result = cv2.addWeighted(np.uint8(img), alpha, np.uint8(rain), 1 - alpha, 1)
 
     """
     cv2.imshow('rain_effect', result)
@@ -1416,7 +1416,7 @@ def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=
             # overlay = img.copy()
             overlay = np.ones(shape=img.shape, dtype=np.uint8)
             cv2.rectangle(overlay, (x, y), (x + bw, y + bh), color, -1)
-            img = cv2.addWeighted(overlay, alpha, np.uint8(img), 1 - alpha, 0)
+            img = cv2.addWeighted(np.uint8(overlay), alpha, np.uint8(img), 1 - alpha, 0)
 
             # Convert the image back to the original number of channels
             if orig_c != img.shape[2]:
@@ -1439,7 +1439,7 @@ def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=
         x1, y1 = rect[0], rect[1]
         x2, y2 = rect[2], rect[3]
         cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-        img = cv2.addWeighted(overlay, alpha, np.uint8(img), 1 - alpha, 0)
+        img = cv2.addWeighted(np.uint8(overlay), alpha, np.uint8(img), 1 - alpha, 0)
 
         # Convert the image back to the original number of channels
         if orig_c != img.shape[2]:
@@ -4442,9 +4442,9 @@ def blend_mask(image, mask, alpha=0.5, cmap='jet', color='b', color_alpha=1.0):
     basic_color = np.tile(basic_color, [image.shape[0], image.shape[1], 1])
     basic_color = basic_color.astype(dtype=np.uint8)
     # blend with basic color
-    blended_img = cv2.addWeighted(image, color_alpha, np.uint8(basic_color), 1 - color_alpha, 0)
+    blended_img = cv2.addWeighted(np.uint8(image), color_alpha, np.uint8(basic_color), 1 - color_alpha, 0)
     # blend with mask
-    blended_img = cv2.addWeighted(blended_img, alpha, np.uint8(mask), 1 - alpha, 0)
+    blended_img = cv2.addWeighted(np.uint8(blended_img), alpha, np.uint8(mask), 1 - alpha, 0)
 
     return blended_img
 

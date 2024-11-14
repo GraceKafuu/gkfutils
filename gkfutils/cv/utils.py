@@ -541,8 +541,8 @@ def gaussian_noise(img, random=False, p=1, mean=0, var=0.25):
             mean = np.random.randint(mean[0], mean[1])
             var = np.random.uniform(var[0], var[1])
             mu, sigma = mean, var ** 0.5
-            gaussian = np.random.normal(mu, sigma, img.shape).astype('uint8')
-            img = cv2.add(img, gaussian)
+            gaussian = np.random.normal(mu, sigma, img.shape)
+            img = cv2.add(np.uint8(img), np.uint8(gaussian))
             return img
         else:
             return img
@@ -550,8 +550,8 @@ def gaussian_noise(img, random=False, p=1, mean=0, var=0.25):
         assert isinstance(mean, int), "If random=False, mean should be int!"
         assert isinstance(var, float), "If random=False, var should be float!"
         mu, sigma = mean, var ** 0.5
-        gaussian = np.random.normal(mu, sigma, img.shape).astype('uint8')
-        img = cv2.add(img, gaussian)
+        gaussian = np.random.normal(mu, sigma, img.shape)
+        img = cv2.add(np.uint8(img), np.uint8(gaussian))
         return img
 
 
@@ -562,8 +562,8 @@ def poisson_noise(img, random=False, p=1, n=2):
             vals = len(np.unique(img))
             n = np.random.randint(n[0], n[1])
             vals = n ** np.ceil(np.log2(vals))
-            poisson = (np.random.poisson(img * vals) / float(vals)).astype('uint8')
-            img = cv2.add(img, poisson)
+            poisson = np.random.poisson(img * vals) / float(vals)
+            img = cv2.add(np.uint8(img), np.uint8(poisson))
             return img
         else:
             return img
@@ -571,8 +571,8 @@ def poisson_noise(img, random=False, p=1, n=2):
         assert isinstance(n, int), "If random=False, n should be int!"
         vals = len(np.unique(img))
         vals = n ** np.ceil(np.log2(vals))
-        poisson = (np.random.poisson(img * vals) / float(vals)).astype('uint8')
-        img = cv2.add(img, poisson)
+        poisson = np.random.poisson(img * vals) / float(vals)
+        img = cv2.add(np.uint8(img), np.uint8(poisson))
         return img
 
 

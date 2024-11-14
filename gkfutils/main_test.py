@@ -35,118 +35,49 @@ from tqdm import tqdm
 from PIL import Image
 
 
-if __name__ == '__main__':
-    # img_path = "./data/images/0.jpg"
-    # dst_path = img_path.replace(".jpg", "_res.jpg")
-    # img = cv2.imread(img_path)
-    # # res = rotate(img, random=False, p=1, algorithm=algorithm, center=(100, 100), angle=angle, scale=1, expand=expand)
-    # # res = flip(img, random=False, p=1, m=-1)
-    # # res = scale(img, random=False, p=1, fx=0.0, fy=0.5)
-    # # res = resize(img, random=False, p=1, dsz=(1920, 1080), interpolation=cv2.INTER_LINEAR)
-    # # res = equalize_hist(img, random=False, p=1, m=1)
-    # # res = change_brightness(img, random=False, p=1, value=100)
-    # # res = gamma_correction(img, random=False, p=1, value=1.3)
-    # # res = gaussian_noise(img, random=False, p=1, mean=0, var=0.1)
-    # # res = poisson_noise(img, random=False, p=1)
-    # # res = sp_noise(img, random=False, p=1, salt_p=0.0, pepper_p=0.001)
-    # # res = make_sunlight_effect(img, random=False, p=1, center=(200, 200), effect_r=70, light_strength=170)
-    # # res = color_distortion(img, random=False, p=1, value=-50)
-    # # res = change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=90)
-    # # res = clahe(img, random=False, p=1, m=1, clipLimit=2.0, tileGridSize=(8, 8))
-    # # res = change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5)
-    # # res = gaussian_blur(img, random=False, p=1, k=5)
-    # # res = motion_blur(img, random=False, p=1, k=15, angle=90)
-    # # res = median_blur(img, random=False, p=1, k=3)
-    # # res = transperent_overlay(img, random=False, p=1, rect=(50, 50, 80, 100))
-    # # res = dilation_erosion(img, random=False, p=1, flag="erode", scale=(6, 8))
-    # # res = make_rain_effect(img, random=False, p=1, m=1, length=20, angle=75, noise=500)
-    # # res = compress(img, random=False, p=1, quality=80)
-    # # res = exposure(img, random=False, p=1, rect=(100, 150, 200, 180))
-    # # res = change_definition(img, random=False, p=1, r=0.5)
-    # # res = stretch(img, random=False, p=1, r=0.5)
-    # # res = crop(img, random=False, p=1, rect=(0, 0, 100, 200))
-    # # res = make_mask(img, random=False, p=1, rect=(0, 0, 100, 200), color=(255, 0, 255))
-    # # res = squeeze(img, random=False, p=1, degree=20)
-    # # res = make_haha_mirror_effect(img, random=False, p=1, center=(150, 150), r=10, degree=20)
-    # # res = warp_img(img, random=False, p=1, degree=10)
-    # # res = enhance_gray_value(img, random=False, p=1, gray_range=(0, 255))
-    # # res = homomorphic_filter(img, random=False, p=1)
-    # # res = contrast_stretch(img, random=False, p=1, alpha=0.25, beta=0.75)
-    # # res = log_transformation(img, random=False, p=1)
-    # res = translate(img, random=False, p=1, tx=-20, ty=30, border_color=(114, 0, 114), dstsz=None)
-    # cv2.imwrite(dst_path, res)
-
-    # img_path = "./data/images/0.jpg"
-    # dst_path = img_path.replace(".jpg", "_res.jpg")
-    # if os.path.exists(dst_path): os.remove(dst_path)
-    # shutil.rmtree("./data/images_results")
-    # data_path = "./data/images"
-    # save_path = make_save_path(data_path=data_path, relative=".", add_str="results")
-    # file_list = get_file_list(data_path)
-    # for f in file_list:
-    #     fname = os.path.splitext(f)[0]
-    #     f_abs_path = data_path + "/{}".format(f)
-    #     img = cv2.imread(f_abs_path)
-    #     for i in range(10):
-    #         # res = rotate(img, random=True, p=0.5, algorithm=algorithm, angle=(0, 360), expand=True)
-    #         # res = flip(img, random=True, p=0.5)
-    #         # res = scale(img, random=True, p=1, fx=(0.01, 2.0), fy=(0.01, 2.0))
-    #         # res = resize(img, random=True, p=1, r=(0.01, 2.0), interpolation=cv2.INTER_LINEAR)
-    #         # res = equalize_hist(img, random=True, p=0.5)
-    #         # res = change_brightness(img, random=True, p=1, value=(-100, 100))
-    #         # res = gamma_correction(img, random=True, p=1, value=(0.2, 1.8))
-    #         # res = gaussian_noise(img, random=True, p=1, mean=0, var=0.5)
-    #         # res = poisson_noise(img, random=True, p=1)
-    #         # res = sp_noise(img, random=True, p=1, salt_p=0.01, pepper_p=0.01)
-    #         # res = make_sunlight_effect(img, random=True, p=1, effect_r=(10, 80), light_strength=170)
-    #         # res = color_distortion(img, random=True, p=1, value=(-50, 50))
-    #         # res = change_contrast_and_brightness(img, random=True, p=1, alpha=1.0, beta=90)
-    #         # res = clahe(img, random=True, p=1, m=1)
-    #         # res = change_hsv(img, random=True, p=1, p=1, hgain=0.5, sgain=0.5, vgain=0.5)
-    #         # res = gaussian_blur(img, random=True, p=1)
-    #         # res = motion_blur(img, random=True, p=1)
-    #         # res = transperent_overlay(img, random=True, p=1, max_h_r=1.0, max_w_r=0.25)
-    #         # res = dilation_erosion(img, random=True, p=1, flag="erode")
-    #         # res = make_rain_effect(img, random=True, p=1, m=1, length=(10, 90), angle=(0, 180), noise=(100, 500))
-    #         # res = compress(img, random=True, p=1, quality=(25, 95))
-    #         # res = change_definition(img, random=True, p=1, r=(0.25, 0.95))
-    #         # res = stretch(img, random=True, p=1, r=(0.25, 0.95))
-    #         # res = crop(img, random=True, p=1, fix_size=False, crop_size=(256, 256), min_size=(64, 64))
-    #         # res = make_mask(img, random=True, p=1, fix_size=False, mask_size=(256, 256), min_size=(64, 64))
-    #         # res = squeeze(img, random=True, p=1, degree=(5, 25))
-    #         # res = make_haha_mirror_effect(img, random=True, p=1, r=(5, 50), degree=(5, 50))
-    #         # res = warp_img(img, random=True, p=1, degree=(5, 50))
-    #         # res = contrast_stretch(img, random=True, p=1, alpha=(0.25, 0.95), beta=(0.25, 0.95))
-    #         # res = log_transformation(img, random=True, p=1)
-    #         res = translate(img, random=True, p=1, tx=(-50, 50), ty=(-50, 50), dstsz=None)
-    #         f_dst_path = save_path + "/{}_{}.jpg".format(fname, i)
-    #         cv2.imwrite(f_dst_path, res)
-
-    # for i in range(10):
-    #     color = get_color(specific_color=True)
-    #     print(color, type(color))
+def main_test_1():
+    img_path = "./data/images/0.jpg"
+    dst_path = img_path.replace(".jpg", "_res.jpg")
+    img = cv2.imread(img_path)
+    # res = rotate(img, random=False, p=1, algorithm=algorithm, center=(100, 100), angle=angle, scale=1, expand=expand)
+    # res = flip(img, random=False, p=1, m=-1)
+    # res = scale(img, random=False, p=1, fx=0.0, fy=0.5)
+    # res = resize(img, random=False, p=1, dsz=(1920, 1080), interpolation=cv2.INTER_LINEAR)
+    # res = equalize_hist(img, random=False, p=1, m=1)
+    # res = change_brightness(img, random=False, p=1, value=100)
+    # res = gamma_correction(img, random=False, p=1, value=1.3)
+    # res = gaussian_noise(img, random=False, p=1, mean=0, var=0.1)
+    # res = poisson_noise(img, random=False, p=1)
+    # res = sp_noise(img, random=False, p=1, salt_p=0.0, pepper_p=0.001)
+    # res = make_sunlight_effect(img, random=False, p=1, center=(200, 200), effect_r=70, light_strength=170)
+    # res = color_distortion(img, random=False, p=1, value=-50)
+    # res = change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=90)
+    # res = clahe(img, random=False, p=1, m=1, clipLimit=2.0, tileGridSize=(8, 8))
+    # res = change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5)
+    # res = gaussian_blur(img, random=False, p=1, k=5)
+    # res = motion_blur(img, random=False, p=1, k=15, angle=90)
+    # res = median_blur(img, random=False, p=1, k=3)
+    # res = transperent_overlay(img, random=False, p=1, rect=(50, 50, 80, 100))
+    # res = dilation_erosion(img, random=False, p=1, flag="erode", scale=(6, 8))
+    # res = make_rain_effect(img, random=False, p=1, m=1, length=20, angle=75, noise=500)
+    # res = compress(img, random=False, p=1, quality=80)
+    # res = exposure(img, random=False, p=1, rect=(100, 150, 200, 180))
+    # res = change_definition(img, random=False, p=1, r=0.5)
+    # res = stretch(img, random=False, p=1, r=0.5)
+    # res = crop(img, random=False, p=1, rect=(0, 0, 100, 200))
+    # res = make_mask(img, random=False, p=1, rect=(0, 0, 100, 200), color=(255, 0, 255))
+    # res = squeeze(img, random=False, p=1, degree=20)
+    # res = make_haha_mirror_effect(img, random=False, p=1, center=(150, 150), r=10, degree=20)
+    # res = warp_img(img, random=False, p=1, degree=10)
+    # res = enhance_gray_value(img, random=False, p=1, gray_range=(0, 255))
+    # res = homomorphic_filter(img, random=False, p=1)
+    # res = contrast_stretch(img, random=False, p=1, alpha=0.25, beta=0.75)
+    # res = log_transformation(img, random=False, p=1)
+    res = translate(img, random=False, p=1, tx=-20, ty=30, border_color=(114, 0, 114), dstsz=None)
+    cv2.imwrite(dst_path, res)
 
 
-    # # img_path = "./data/images/3.jpg"
-    # # dst_path = img_path.replace(".jpg", "_res.jpg")
-    # img_path = "./data/images/long.png"
-    # dst_path = img_path.replace(".png", "_res.png")
-    # img = cv2.imread(img_path)
-    # # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # # cv2.imwrite(dst_path, res)
-
-    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # if isinstance(res, list):
-    #     for i in range(len(res)):
-    #         cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
-    # else:
-    #     cv2.imwrite(dst_path, res)
-
-
-
-
+def main_test_2():
     img_path = "./data/images/0.jpg"
     dst_path = img_path.replace(".jpg", "_res.jpg")
     if os.path.exists(dst_path): os.remove(dst_path)
@@ -161,6 +92,8 @@ if __name__ == '__main__':
         f_abs_path = data_path + "/{}".format(f)
         img = cv2.imread(f_abs_path)
         
+        img = dilate_erode(img, random=True, p=p, flag=np.random.choice(["dilate", "erode"]))
+
         rdm0 = np.random.choice(np.arange(2))
         if rdm0 == 0:
             img = scale(img, random=True, p=p, fx=(0.5, 1.5), fy=(0.5, 1.5))
@@ -173,7 +106,7 @@ if __name__ == '__main__':
         elif rdm1 == 1:
             img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
         elif rdm1 == 2:
-            img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.1, 1.0), beta=(-75, 75))
+            img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 75))
         elif rdm1 == 3:
             img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
         else:
@@ -229,6 +162,46 @@ if __name__ == '__main__':
 
         f_dst_path = save_path + "/{}.jpg".format(fname)
         cv2.imwrite(f_dst_path, img)
+
+
+def main_test_3():
+    # img_path = "./data/images/3.jpg"
+    # dst_path = img_path.replace(".jpg", "_res.jpg")
+    img_path = "./data/images/long.png"
+    dst_path = img_path.replace(".png", "_res.png")
+    img = cv2.imread(img_path)
+    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # cv2.imwrite(dst_path, res)
+
+    res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    if isinstance(res, list):
+        for i in range(len(res)):
+            cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
+    else:
+        cv2.imwrite(dst_path, res)
+
+
+def main_test_4():
+    pass
+
+
+
+
+if __name__ == '__main__':
+    main_test_1()
+    main_test_2()
+    main_test_3()
+    
+
+
+    
+
+
+
+
+    
 
 
 

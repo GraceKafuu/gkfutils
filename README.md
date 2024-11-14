@@ -21,11 +21,10 @@ print(gkfutils.__version__)
 
 # ==============================================================================
 # 1.生成一个txt文件，内容是路径下文件的绝对路径/相对路径。（路径下不包含子目录）
-gkfutils.utils.gen_file_list(data_path="", abspath=True)
+gkfutils.save_file_path_to_txt(data_path="", abspath=True)
 
 # 2.文件重命名
-rnf =  gkfutils.utils.RenameFiles()
-rnf.rename_files(data_path="", use_orig_name=False, new_name_prefix="rename_test", zeros_num=7, start_num=0)
+gkfutils.rename_files(data_path="", use_orig_name=False, new_name_prefix="rename_test", zeros_num=7, start_num=0)
 
 # ==============================================================================
 # 3.提取视频帧

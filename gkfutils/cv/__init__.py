@@ -3,8 +3,9 @@ from .utils import (
     equalize_hist, change_brightness, gamma_correction,
     gaussian_noise, poisson_noise, sp_noise,
     make_sunlight_effect, color_distortion, change_contrast_and_brightness,
-    contrast_stretch, clahe, change_hsv,
-    gaussian_blur, motion_blur, median_blur, dilation_erosion,
+    normalize, clahe, change_hsv,
+    gaussian_blur, motion_blur, median_blur,
+    dilate_erode, open_close_gradient, tophat_blackhat,
     make_rain_effect, compress, change_definition, stretch,
     crop, make_mask, transperent_overlay, log_transformation,
     translate
@@ -20,8 +21,9 @@ __all__ = [
     "equalize_hist", "change_brightness", "gamma_correction",
     "gaussian_noise", "poisson_noise", "sp_noise",
     "make_sunlight_effect", "color_distortion", "change_contrast_and_brightness",
-    "contrast_stretch", "clahe", "change_hsv",
-    "gaussian_blur", "motion_blur", "median_blur", "dilation_erosion",
+    "normalize", "clahe", "change_hsv",
+    "gaussian_blur", "motion_blur", "median_blur",
+    "dilate_erode", "open_close_gradient", "tophat_blackhat",
     "make_rain_effect", "compress", "change_definition", "stretch",
     "crop", "make_mask", "transperent_overlay", "log_transformation",
     "translate", "YOLOv5_ONNX", "YOLOv8_ONNX"

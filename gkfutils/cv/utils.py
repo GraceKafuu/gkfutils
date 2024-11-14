@@ -47,7 +47,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import PIL
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 import skimage
 import scipy
 import torch
@@ -204,6 +204,7 @@ def pil2cv(image):
 
 
 def rotate(img, random=False, p=1, algorithm="pil", center=(50, 50), angle=(-45, 45), scale=1, expand=True) -> np.ndarray:
+    assert algorithm in ["pil", "cv2"], 'algorithm in ["pil", "cv2"]!'
     if random:
         if np.random.random() <= p:
             assert isinstance(angle, tuple), "if random=True, angle is tuple."
@@ -245,7 +246,7 @@ def rotate(img, random=False, p=1, algorithm="pil", center=(50, 50), angle=(-45,
         return img
 
 
-def flip(img, random=False, p=1, m=0):
+def flip(img, random=False, p=1, m=np.random.choice([-1, 0, 1])):
     """
     0:垂直翻转(沿x轴翻转)
     1:水平翻转(沿y轴翻转)
@@ -256,8 +257,6 @@ def flip(img, random=False, p=1, m=0):
 
     if random:
         if np.random.random() <= p:
-            ms = [-1, 0, 1]
-            m = np.random.choice(ms)
             img = cv2.flip(img, m)
             return img
         else:
@@ -308,12 +307,10 @@ def resize(img, random=False, p=1, dsz=(1920, 1080), r=(0.01, 2.0), interpolatio
         return img
 
 
-def equalize_hist(img, random=False, p=1, m=0):
+def equalize_hist(img, random=False, p=1, m=np.random.choice([0, 1])):
     assert m in [0, 1], "m should be one of [0, 1]"
-
     if random:
         if np.random.random() <= p:
-            m = np.random.choice([0, 1])
             if m == 0:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 img = cv2.equalizeHist(img)
@@ -350,8 +347,7 @@ def change_brightness(img, random=False, p=1, value=30):
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             h, s, v = cv2.split(hsv)
             v = cv2.add(v, brightness_value)
-            v[v > 255] = 255
-            v[v < 0] = 0
+            np.clip(v, 0, 255)
             final_hsv = cv2.merge((h, s, v))
             img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
             return img
@@ -362,8 +358,7 @@ def change_brightness(img, random=False, p=1, value=30):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         v = cv2.add(v, value)
-        v[v > 255] = 255
-        v[v < 0] = 0
+        np.clip(v, 0, 255)
         final_hsv = cv2.merge((h, s, v))
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         
@@ -539,10 +534,12 @@ def gaussian_noise(img, random=False, p=1, mean=0, var=0.25):
 
     """
     # 生成高斯噪声
-    assert var >= 0.1 and var <= 100, "var >= 0.1 and var <= 100!"
     if random:
+        assert isinstance(mean, tuple), "If random=True, mean should be tuple!"
+        assert isinstance(var, tuple), "If random=True, var should be tuple!"
         if np.random.random() <= p:
-            var = np.random.uniform(0.1, var)
+            mean = np.random.randint(mean[0], mean[1])
+            var = np.random.uniform(var[0], var[1])
             mu, sigma = mean, var ** 0.5
             gaussian = np.random.normal(mu, sigma, img.shape).astype('uint8')
             img = cv2.add(img, gaussian)
@@ -550,25 +547,30 @@ def gaussian_noise(img, random=False, p=1, mean=0, var=0.25):
         else:
             return img
     else:
+        assert isinstance(mean, int), "If random=False, mean should be int!"
+        assert isinstance(var, float), "If random=False, var should be float!"
         mu, sigma = mean, var ** 0.5
         gaussian = np.random.normal(mu, sigma, img.shape).astype('uint8')
         img = cv2.add(img, gaussian)
         return img
 
 
-def poisson_noise(img, random=False, p=1):
+def poisson_noise(img, random=False, p=1, n=2):
     if random:
+        assert isinstance(n, tuple), "If random=False, n should be tuple!"
         if np.random.random() <= p:
             vals = len(np.unique(img))
-            vals = 2 ** np.ceil(np.log2(vals))
+            n = np.random.randint(n[0], n[1])
+            vals = n ** np.ceil(np.log2(vals))
             poisson = (np.random.poisson(img * vals) / float(vals)).astype('uint8')
             img = cv2.add(img, poisson)
             return img
         else:
             return img
     else:
+        assert isinstance(n, int), "If random=False, n should be int!"
         vals = len(np.unique(img))
-        vals = 2 ** np.ceil(np.log2(vals))
+        vals = n ** np.ceil(np.log2(vals))
         poisson = (np.random.poisson(img * vals) / float(vals)).astype('uint8')
         img = cv2.add(img, poisson)
         return img
@@ -578,12 +580,13 @@ def sp_noise(img, random=False, p=1, salt_p=0.01, pepper_p=0.01):
     """
     salt and pepper noise
     """
-    assert salt_p >= 0 and salt_p <= 1, "salt_p >= 0 and salt_p <= 1!"
-    assert pepper_p >= 0 and pepper_p <= 1, "salt_p >= 0 and salt_p <= 1!"
+    
     if random:
+        assert isinstance(salt_p, tuple), "If random=True, salt_p should be tuple!"
+        assert isinstance(pepper_p, tuple), "If random=True, pepper_p should be tuple!"
         if np.random.random() <= p:
-            salt_p = np.random.uniform(0.0, salt_p)
-            pepper_p = np.random.uniform(0.0, pepper_p)
+            salt_p = np.random.uniform(salt_p[0], salt_p[1])
+            pepper_p = np.random.uniform(pepper_p[0], pepper_p[1])
 
             noisy_image = np.copy(img)
             total_pixels = img.shape[0] * img.shape[1]  # 计算图像的总像素数
@@ -600,6 +603,11 @@ def sp_noise(img, random=False, p=1, salt_p=0.01, pepper_p=0.01):
         else:
             return img
     else:
+        assert isinstance(salt_p, float), "If random=False, salt_p should be float!"
+        assert isinstance(pepper_p, float), "If random=False, pepper_p should be float!"
+        assert salt_p >= 0 and salt_p <= 1, "salt_p >= 0 and salt_p <= 1!"
+        assert pepper_p >= 0 and pepper_p <= 1, "salt_p >= 0 and salt_p <= 1!"
+
         noisy_image = np.copy(img)
         total_pixels = img.shape[0] * img.shape[1]  # 计算图像的总像素数
 
@@ -614,14 +622,15 @@ def sp_noise(img, random=False, p=1, salt_p=0.01, pepper_p=0.01):
         return noisy_image
 
 
-def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 200), light_strength=150):
+def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 200), light_strength=(50, 150)):
     if random:
         assert isinstance(effect_r, tuple), "If random=True, effect_r should be tuple!"
+        assert isinstance(light_strength, tuple), "If random=True, light_strength should be tuple!"
         if np.random.random() <= p:
             imgsz = img.shape[:2]
             center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
             effectR = np.random.randint(effect_r[0], effect_r[1])
-            lightStrength = np.random.randint(0, light_strength)
+            lightStrength = np.random.randint(light_strength[0], light_strength[1])
 
             dst = np.zeros(shape=img.shape, dtype=np.uint8)
 
@@ -644,6 +653,8 @@ def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 
             return img
     else:
         assert isinstance(effect_r, int), "If random=False, effect_r should be int!"
+        assert isinstance(light_strength, int), "If random=False, light_strength should be int!"
+
         imgsz = img.shape[:2]
         dst = np.zeros(shape=img.shape, dtype=np.uint8)
 
@@ -726,45 +737,48 @@ def change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=30):
     # bri = ImageEnhance.Brightness(img)
     # res = bri.enhance(random.uniform(lower, upper))
     """
-    assert alpha >= 0 and alpha <= 1, "alpha >= 0 and alpha <= 1"
+    
     if random:
-        # 容易变黑图,不太建议使用这个
-        if np.random.random() <= p:
-            alpha = np.random.uniform(0, alpha)
-            beta = np.random.uniform(-beta, beta + 1)
-            blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-            img = cv2.addWeighted(img, alpha, blank, 1 - alpha, beta)  # 图像混合加权
-            return img
-        else:
-            return img
-    else:
-        blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-        img = cv2.addWeighted(img, alpha, blank, 1 - alpha, beta)  # 图像混合加权
-        return img
-
-
-def contrast_stretch(img, random=False, p=1, alpha=0, beta=1):
-    """
-    对比拉伸, 设置好alpha和beta效果比较理想
-    """
-    if random:
+        # alpha建议>= 0.1，不然容易变黑图
         assert isinstance(alpha, tuple), "If random=True, alpha should be tuple!"
         assert isinstance(beta, tuple), "If random=True, beta should be tuple!"
-        alpha = np.random.uniform(alpha[0], alpha[1])
-        beta = np.random.uniform(beta[0], beta[1])
-
         if np.random.random() <= p:
-            norm_img1 = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-            norm_img = (255 * norm_img1).astype(np.uint8)
-            return norm_img
+            alpha = np.random.uniform(alpha[0], alpha[1])
+            beta = np.random.randint(beta[0], beta[1] + 1)
+            blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
+            img = cv2.addWeighted(img, alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
+            return img
         else:
             return img
     else:
         assert isinstance(alpha, float), "If random=False, alpha should be float!"
-        assert isinstance(beta, float), "If random=False, beta should be float!"
+        assert isinstance(beta, int), "If random=False, beta should be int!"
+        assert alpha >= 0 and alpha <= 1, "alpha >= 0 and alpha <= 1"
+        blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
+        img = cv2.addWeighted(img, alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
+        return img
 
-        norm_img1 = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        norm_img = (255 * norm_img1).astype(np.uint8)
+
+def normalize(img, random=False, p=1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX):
+    """
+    """
+    assert norm_type == cv2.NORM_MINMAX or norm_type == cv2.NORM_L2, "norm_type: cv2.NORM_MINMAX or cv2.NORM_L2!"
+    if random:
+        if np.random.random() <= p:
+            if norm_type == cv2.NORM_MINMAX:
+                norm_img = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            else:
+                norm_img = cv2.normalize(img, None, norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
+            norm_img = (255 * norm_img).astype(np.uint8)
+            return norm_img
+        else:
+            return img
+    else:
+        if norm_type == cv2.NORM_MINMAX:
+            norm_img = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        else:
+            norm_img = cv2.normalize(img, None, norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
+        norm_img = (255 * norm_img).astype(np.uint8)
         return norm_img
 
 
@@ -780,9 +794,11 @@ def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
     """
     assert m in [0, 1], "m should be one of [0, 1]!"
     if random:
+        assert isinstance(clipLimit, tuple), "If random=True, clipLimit should be tuple!"
         if np.random.random() <= p:
-            clipLimit = np.random.randint(0, 40 + 1)
-            tgs = np.random.choice([4, 8, 16, 32])
+            clipLimit = np.random.randint(clipLimit[0], clipLimit[1] + 1)
+            tgs = np.random.randint(tileGridSize[0], tileGridSize[1] + 1)
+            # tgs = np.random.choice([4, 8, 16, 32])
             tileGridSize = (tgs, tgs)
             if m == 0:
                 img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
@@ -801,6 +817,7 @@ def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
         else:
             return img
     else:
+        assert isinstance(clipLimit, float), "If random=False, clipLimit should be float!"
         if m == 0:
             img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
             clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
@@ -820,6 +837,9 @@ def change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5):
     if random:
         if np.random.random() <= p:
             img = img.astype(np.uint8)
+            hgain = np.random.uniform(hgain[0], hgain[1])
+            sgain = np.random.uniform(sgain[0], sgain[1])
+            vgain = np.random.uniform(vgain[0], vgain[1])
             r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
             hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
             dtype = img.dtype  # uint8
@@ -856,24 +876,19 @@ def gaussian_blur(img, random=False, p=1, k=3):
     if random:
         if np.random.random() <= p:
             h, w, _ = img.shape
-            ks = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27]
+            ks = [3, 5, 7, 9]
             if h > 16 and w > 16:
                 if h <= 128 and w <= 128:
-                    k = np.random.choice(ks[:3])
-                elif h <= 256 and w <= 256:
-                    k = np.random.choice(ks[:8])
-                elif h <= 512 and w <= 512:
-                    k = np.random.choice(ks[:11])
+                    k = np.random.choice(ks[:2])
                 else:
-                    k = np.random.choice(ks[5:])
-                img = cv2.GaussianBlur(img, (k, k), 1)
+                    k = np.random.choice(ks)
+                img = cv2.GaussianBlur(img, (k, k), 0)
 
             return img
         else:
             return img
     else:
-        h, w, _ = img.shape
-        img = cv2.GaussianBlur(img, (k, k), 1)
+        img = cv2.GaussianBlur(img, (k, k), 0)
         return img
 
 
@@ -883,18 +898,12 @@ def motion_blur(img, random=False, p=1, k=3, angle=30):
     """
     if random:
         if np.random.random() <= p:
-            angle = np.random.randint(-180, 181)
+            angle = np.random.randint(angle[0], angle[1] + 1)
             imgsz = img.shape[:2]
-            # ks = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27]
-            # ks = [3, 5, 7, 9, 11, 13, 15, 17]
             ks = [3, 5, 7, 9]
             if imgsz[0] > 16 and imgsz[1] > 16:
                 if imgsz[0] <= 128 and imgsz[1] <= 128:
-                    k = np.random.choice(ks[:3])
-                elif imgsz[0] <= 256 and imgsz[1] <= 256:
-                    k = np.random.choice(ks[:8])
-                elif imgsz[0] <= 512 and imgsz[1] <= 512:
-                    k = np.random.choice(ks[:11])
+                    k = np.random.choice(ks[:2])
                 else:
                     k = np.random.choice(ks)
 
@@ -921,19 +930,24 @@ def motion_blur(img, random=False, p=1, k=3, angle=30):
 def median_blur(img, random=False, p=1, k=3):
     if random:
         if np.random.random() <= p:
+            imgsz = img.shape[:2]
             ks = [3, 5, 7, 9]
-            k = np.random.choice(ks)
-            img = cv2.medianBlur(img, k)
+            if imgsz[0] > 16 and imgsz[1] > 16:
+                if imgsz[0] <= 128 and imgsz[1] <= 128:
+                    k = np.random.choice(ks[:2])
+                else:
+                    k = np.random.choice(ks)
+                img = cv2.medianBlur(np.uint8(img), k)
             return img
         else:
             return img
     else:
-        img = cv2.medianBlur(img, k)
+        img = cv2.medianBlur(np.uint8(img), k)
 
         return img
 
 
-def dilation_erosion(img, random=False, p=1, flag="dilate", scale=(6, 8)):
+def dilate_erode(img, random=False, p=1, flag="dilate", k=(3, 3)):
     """
     dilate, erode
     """
@@ -941,22 +955,12 @@ def dilation_erosion(img, random=False, p=1, flag="dilate", scale=(6, 8)):
     if random:
         if np.random.random() <= p:
             imgsz = img.shape[:2]
-            if imgsz[0] > 1024:
-                scale = (10, 12)
-            elif imgsz[0] > 512:
-                scale = (8, 10)
-            elif imgsz[0] > 256:
-                scale = (6, 8)
-            elif imgsz[0] > 128:
-                scale = (4, 6)
-            elif imgsz[0] > 32:
-                scale = (2, 3)
+            if min(imgsz) > 512:
+                k = (5, 5)
             else:
-                return img
-
-            kernel = cv2.getStructuringElement(
-                cv2.MORPH_ELLIPSE, tuple(np.random.randint(scale[0], scale[1], 2))
-            )
+                k = (3, 3)
+            
+            kernel = np.ones(k, dtype=np.uint8)
             if flag == "dilate":
                 img = cv2.dilate(img, kernel, iterations=1)
             else:
@@ -965,15 +969,89 @@ def dilation_erosion(img, random=False, p=1, flag="dilate", scale=(6, 8)):
         else:
             return img
     else:
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, tuple(np.random.randint(scale[0], scale[1], 2))
-        )
+        # kernel = cv2.getStructuringElement(
+        #     cv2.MORPH_ELLIPSE, tuple(np.random.randint(scale[0], scale[1], 2))
+        # )
+
+        kernel = np.ones(k, dtype=np.uint8)
         if flag == "dilate":
             img = cv2.dilate(img, kernel, iterations=1)
         else:
             img = cv2.erode(img, kernel, iterations=1)
         return img
 
+
+def open_close_gradient(img, random=False, p=1, flag="open", k=(3, 3)):
+    """
+    open, close, gradient
+    """
+    assert flag in ["open", "close", "gradient"], 'flag should be one of ["open", "close", "gradient"]!'
+    if random:
+        if np.random.random() <= p:
+            imgsz = img.shape[:2]
+            if min(imgsz) > 512:
+                k = (5, 5)
+            else:
+                k = (3, 3)
+            
+            kernel = np.ones(k, dtype=np.uint8)
+            if flag == "open":
+                img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
+            elif flag == "close":
+                img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+            else:
+                img = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, kernel)
+            return img
+        else:
+            return img
+    else:
+        # kernel = cv2.getStructuringElement(
+        #     cv2.MORPH_ELLIPSE, tuple(np.random.randint(scale[0], scale[1], 2))
+        # )
+
+        kernel = np.ones(k, dtype=np.uint8)
+        if flag == "open":
+            img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
+        elif flag == "close":
+            img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+        else:
+            img = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, kernel)
+        return img
+    
+
+def tophat_blackhat(img, random=False, p=1, flag="tophat", k=(3, 3)):
+    """
+    tophat, blackhat
+    """
+    assert flag in ["tophat", "blackhat"], 'flag should be one of ["tophat", "blackhat"]!'
+    if random:
+        if np.random.random() <= p:
+            imgsz = img.shape[:2]
+            if min(imgsz) > 512:
+                k = (5, 5)
+            else:
+                k = (3, 3)
+            
+            kernel = np.ones(k, dtype=np.uint8)
+            if flag == "tophat":
+                img = cv2.morphologyEx(img, cv2.MORPH_TOPHAT, kernel)
+            else:
+                img = cv2.morphologyEx(img, cv2.MORPH_BLACKHAT, kernel)
+            return img
+        else:
+            return img
+    else:
+        # kernel = cv2.getStructuringElement(
+        #     cv2.MORPH_ELLIPSE, tuple(np.random.randint(scale[0], scale[1], 2))
+        # )
+
+        kernel = np.ones(k, dtype=np.uint8)
+        if flag == "tophat":
+            img = cv2.morphologyEx(img, cv2.MORPH_TOPHAT, kernel)
+        else:
+            img = cv2.morphologyEx(img, cv2.MORPH_BLACKHAT, kernel)
+        return img
+    
 
 # Rain effect --------------------------------------------------------------------------------
 def rain_noise(img, value=10):
@@ -1079,7 +1157,7 @@ def add_rain(rain, img, alpha=0.9):
     rain = np.repeat(rain, 3, 2)
 
     # 加权合成新图
-    result = cv2.addWeighted(img, alpha, rain, 1 - alpha, 1)
+    result = cv2.addWeighted(img, alpha, np.uint8(rain), 1 - alpha, 1)
 
     """
     cv2.imshow('rain_effect', result)
@@ -1288,12 +1366,14 @@ def make_mask(img, random=False, p=1, fix_size=False, mask_size=(256, 256), min_
             imgsz = imgcp.shape[:2]
 
             if not fix_size:
+                assert min_size[1] < mask_size[1], "min_size[1] < mask_size[1]"
+                assert min_size[0] < mask_size[0], "min_size[0] < mask_size[0]"
                 mask_size_x = np.random.randint(min_size[1], mask_size[1])
                 mask_size_y = np.random.randint(min_size[0], mask_size[0])
                 mask_size = (mask_size_x, mask_size_y)
 
-            mask_x = np.random.randint(0, imgsz[1] - mask_size[1])
-            mask_y = np.random.randint(0, imgsz[0] - mask_size[0])
+            mask_x = np.random.randint(0, max(imgsz[1] - mask_size[1], 1))
+            mask_y = np.random.randint(0, max(imgsz[0] - mask_size[0], 1))
 
             # 生成随机颜色的遮挡
             mask_color = np.random.randint(0, 256, (1, 1, 3))
@@ -1310,7 +1390,7 @@ def make_mask(img, random=False, p=1, fix_size=False, mask_size=(256, 256), min_
         return imgcp
     
 
-def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=1.0, max_w_r=0.25):
+def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=1.0, max_w_r=0.25, alpha=(0.1, 1.0)):
     """
     rect: [x1, y1, x2, y2]
     """
@@ -1321,7 +1401,7 @@ def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=
             max_h = int(imgsz[0] * max_h_r)
             max_w = int(imgsz[1] * max_w_r)
 
-            alpha = 0.1 * np.random.randint(1, 5)
+            alpha = np.random.uniform(alpha[0], alpha[1])
 
             x = np.random.randint(0, max(imgsz[1] - max_w, 1))
             y = np.random.randint(0, max(imgsz[0] - max_h, 1))
@@ -1336,7 +1416,7 @@ def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=
             # overlay = img.copy()
             overlay = np.ones(shape=img.shape, dtype=np.uint8)
             cv2.rectangle(overlay, (x, y), (x + bw, y + bh), color, -1)
-            img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+            img = cv2.addWeighted(overlay, alpha, np.uint8(img), 1 - alpha, 0)
 
             # Convert the image back to the original number of channels
             if orig_c != img.shape[2]:
@@ -1347,7 +1427,7 @@ def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=
     else:
         imgsz = img.shape
         orig_c = imgsz[2]
-        alpha = 0.1 * np.random.randint(1, 5)
+        alpha = np.random.uniform(alpha[0], alpha[1])
         color = [np.random.randint(0, 256) for _ in range(3)]
 
         if imgsz[2] < 4:
@@ -1359,7 +1439,7 @@ def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=
         x1, y1 = rect[0], rect[1]
         x2, y2 = rect[2], rect[3]
         cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-        img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+        img = cv2.addWeighted(overlay, alpha, np.uint8(img), 1 - alpha, 0)
 
         # Convert the image back to the original number of channels
         if orig_c != img.shape[2]:
@@ -1495,50 +1575,63 @@ def make_haha_mirror_effect(img, random=False, p=1, center=(50, 50), r=40, degre
                         new_data[j][i][2] = img[new_y][new_x][2]
         return new_data
 
+
+class WaveDeformer():
+    def __init__(self, a=10, b=40, gridspace=20):
+        self.a = a
+        self.b = b
+        self.gridspace = gridspace
+
+    def transform(self, x, y):
+        y = y + self.a * math.sin(x / self.b)
+        return x, y
+
+    def transform_rectangle(self, x0, y0, x1, y1):
+        return (*self.transform(x0, y0),
+                *self.transform(x0, y1),
+                *self.transform(x1, y1),
+                *self.transform(x1, y0),
+                )
+
+    def getmesh(self, img):
+        self.w, self.h = img.size
+        gridspace = self.gridspace
+
+        target_grid = []
+        for x in range(0, self.w, gridspace):
+            for y in range(0, self.h, gridspace):
+                target_grid.append((x, y, x + gridspace, y + gridspace))
+
+        source_grid = [self.transform_rectangle(*rect) for rect in target_grid]
+
+        return [t for t in zip(target_grid, source_grid)]
     
-def warp_img(img, random=False, p=1, degree=4):
+    
+def warp_and_deform(img, random=False, p=1, a=10, b=40, gridspace=20):
     """
-    产生上下波浪状扭曲的效果.
-    目前发现下底存在遮盖原图的情况, 需要优化! 2024.11.13
     """
     if random:
-        assert isinstance(degree, tuple), "If random=False, degree should be tuple!"
         if np.random.random() <= p:
-            degree = np.random.randint(degree[0], degree[1])
-            height, width, channels = img.shape
-            new_data = np.zeros([height, width, 3], np.uint8)  # null img
-            for j in range(width):
-                temp = degree * math.sin(360 * j / width * math.pi / 180)  # [-degree,degree]
-                temp = degree + temp  # [0, 2*degree]
-                for i in range(int(temp + 0.5), int(height + temp - 2 * degree)):
-                    x = int((i - temp) * height / (height - degree))
-                    if x >= height:
-                        x = height - 1
-                    if x < 0:
-                        x = 0
-                    for channel in range(channels):
-                        new_data[i][j][channel] = img[x][j][channel]
-            return new_data
+            assert isinstance(a, tuple), "If random=True, q should be tuple!"
+            assert isinstance(b, tuple), "If random=True, b should be tuple!"
+            assert isinstance(gridspace, tuple), "If random=True, gridspace should be tuple!"
+            a = np.random.randint(a[0], a[1])
+            b = np.random.randint(b[0], b[1])
+            gridspace = np.random.randint(gridspace[0], gridspace[1])
+            img = cv2pil(img)
+            img = ImageOps.deform(img, WaveDeformer(a=a, b=b, gridspace=gridspace))
+            return pil2cv(img)
         else:
             return img
     else:
-        assert isinstance(degree, int), "If random=False, degree should be int!"
-        height, width, channels = img.shape
-        new_data = np.zeros([height, width, 3], np.uint8)  # null img
-        for j in range(width):
-            temp = degree * math.sin(360 * j / width * math.pi / 180)  # [-degree,degree]
-            temp = degree + temp  # [0, 2*degree]
-            for i in range(int(temp + 0.5), int(height + temp - 2 * degree)):
-                x = int((i - temp) * height / (height - degree))
-                if x >= height:
-                    x = height - 1
-                if x < 0:
-                    x = 0
-                for channel in range(channels):
-                    new_data[i][j][channel] = img[x][j][channel]
-        return new_data
+        assert isinstance(a, float), "If random=False, q should be float!"
+        assert isinstance(b, float), "If random=False, b should be float!"
+        assert isinstance(gridspace, int), "If random=False, gridspace should be int!"
+        img = cv2pil(img)
+        img = ImageOps.deform(img, WaveDeformer(a=a, b=b, gridspace=gridspace))
+        return pil2cv(img)
 
-    
+
 def enhance_gray_value(img, random=False, p=1, gray_range=(0, 255)):
     """
     灰度变换, 通过将像素值映射到新的范围来增强图像的灰度
@@ -4349,9 +4442,9 @@ def blend_mask(image, mask, alpha=0.5, cmap='jet', color='b', color_alpha=1.0):
     basic_color = np.tile(basic_color, [image.shape[0], image.shape[1], 1])
     basic_color = basic_color.astype(dtype=np.uint8)
     # blend with basic color
-    blended_img = cv2.addWeighted(image, color_alpha, basic_color, 1 - color_alpha, 0)
+    blended_img = cv2.addWeighted(image, color_alpha, np.uint8(basic_color), 1 - color_alpha, 0)
     # blend with mask
-    blended_img = cv2.addWeighted(blended_img, alpha, mask, 1 - alpha, 0)
+    blended_img = cv2.addWeighted(blended_img, alpha, np.uint8(mask), 1 - alpha, 0)
 
     return blended_img
 

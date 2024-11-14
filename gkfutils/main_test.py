@@ -127,25 +127,108 @@ if __name__ == '__main__':
     #     print(color, type(color))
 
 
-    # img_path = "./data/images/3.jpg"
-    # dst_path = img_path.replace(".jpg", "_res.jpg")
-    img_path = "./data/images/long.png"
-    dst_path = img_path.replace(".png", "_res.png")
-    img = cv2.imread(img_path)
-    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # cv2.imwrite(dst_path, res)
+    # # img_path = "./data/images/3.jpg"
+    # # dst_path = img_path.replace(".jpg", "_res.jpg")
+    # img_path = "./data/images/long.png"
+    # dst_path = img_path.replace(".png", "_res.png")
+    # img = cv2.imread(img_path)
+    # # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # # cv2.imwrite(dst_path, res)
 
-    res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    if isinstance(res, list):
-        for i in range(len(res)):
-            cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
-    else:
-        cv2.imwrite(dst_path, res)
+    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # if isinstance(res, list):
+    #     for i in range(len(res)):
+    #         cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
+    # else:
+    #     cv2.imwrite(dst_path, res)
 
 
 
+
+    img_path = "./data/images/0.jpg"
+    dst_path = img_path.replace(".jpg", "_res.jpg")
+    if os.path.exists(dst_path): os.remove(dst_path)
+    shutil.rmtree("./data/images_results")
+    data_path = "./data/images"
+    save_path = make_save_path(data_path=data_path, relative=".", add_str="results")
+    file_list = get_file_list(data_path)
+    p = 1
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        
+        rdm0 = np.random.choice(np.arange(2))
+        if rdm0 == 0:
+            img = scale(img, random=True, p=p, fx=(0.5, 1.5), fy=(0.5, 1.5))
+        else:
+            img = stretch(img, random=True, p=p, r=(0.25, 1.25))
+
+        rdm1 = np.random.choice(np.arange(5))
+        if rdm1 == 0:
+            img = change_brightness(img, random=True, p=p, value=(-75, 75))
+        elif rdm1 == 1:
+            img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
+        elif rdm1 == 2:
+            img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.1, 1.0), beta=(-75, 75))
+        elif rdm1 == 3:
+            img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
+        else:
+            img = log_transformation(img, random=True, p=p)
+
+        rdm2 = np.random.choice(np.arange(6))
+        if rdm2 == 0:
+            img = gaussian_noise(img, random=True, p=p, mean=(0, 1), var=(0.1, 0.25))
+        elif rdm2 == 1:
+            img = poisson_noise(img, random=True, p=p, n=(2, 5))
+        elif rdm2 == 2:
+            img = sp_noise(img, random=True, p=p, salt_p=(0.01, 0.025), pepper_p=(0.01, 0.025))
+        elif rdm2 == 3:
+            img = gaussian_blur(img, random=True, p=p)
+        elif rdm2 == 4:
+            img = motion_blur(img, random=True, p=p, angle=(-180, 180))
+        else:
+            img = median_blur(img, random=True, p=p)
+        
+        rdm3 = np.random.choice(np.arange(2))
+        if rdm3 == 0:
+            img = color_distortion(img, random=True, p=p, value=(-360, 360))
+        else:
+            img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.75), sgain=(0.25, 0.75), vgain=(0.25, 0.75))
+        
+        img = transperent_overlay(img, random=True, p=p, max_h_r=1.0, max_w_r=0.5, alpha=(0.1, 0.6))
+
+        # rdm4 = np.random.choice(np.arange(3))
+        # if rdm4 == 0:
+        #     img = dilate_erode(img, random=True, p=p, flag=np.random.choice(["dilate", "erode"]))
+        # elif rdm4 == 1:
+        #     img = open_close_gradient(img, random=True, p=p, flag=np.random.choice(["open", "close", "gradient"]))
+        # else:
+        #     img = tophat_blackhat(img, random=True, p=p, flag=np.random.choice(["tophat", "blackhat"]))
+
+        rdm5 = np.random.choice(np.arange(2))
+        if rdm5 == 0:
+            img = make_sunlight_effect(img, random=True, p=p, effect_r=(10, 80), light_strength=(50, 80))
+        else:
+            img = make_rain_effect(img, random=True, p=p, m=np.random.choice([0, 1]), length=(10, 90), angle=(0, 180), noise=(100, 500))
+        
+        img = compress(img, random=True, p=p, quality=(25, 95))
+        img = rotate(img, random=True, p=p, algorithm="pil", angle=(-45, 45), expand=True)
+
+        # 以下OCR数据增强时不建议使用:
+        # img = flip(img, random=True, p=p, m=np.random.choice([-1, 0, 1]))  # m=np.random.choice([-1, 0, 1])
+        # img = equalize_hist(img, random=True, p=p, m=1)  # m=np.random.choice([0, 1])
+        # img = translate(img, random=True, p=p, tx=(-50, 50), ty=(-50, 50), dstsz=None)
+
+        # 以下还存在问题, 需要优化:
+        # img = warp_and_deform(img, random=True, p=p, a=(5, 15), b=(1, 5), gridspace=(10, 20))
+        # img = normalize(img, random=True, p=p, alpha=0, beta=1, norm_type=np.random.choice([cv2.NORM_MINMAX, cv2.NORM_L2]))  # 容易变黑图
+
+        f_dst_path = save_path + "/{}.jpg".format(fname)
+        cv2.imwrite(f_dst_path, img)
 
 
 

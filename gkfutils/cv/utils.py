@@ -3200,6 +3200,34 @@ def process_black_images(img_path, flag="mv", pixel_sum=100000):
             print(Error)
 
 
+def process_small_images(img_path, rmsz=48, mode=0):
+    img_list = sorted(os.listdir(img_path))
+    dir_name = os.path.basename(img_path)
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_small".format(dir_name)
+    os.makedirs(save_path, exist_ok=True)
+
+    for img in tqdm(img_list):
+        if os.path.isdir(img): continue
+        try:
+            img_abs_path = img_path + "/{}".format(img)
+            img_dst_path = save_path + "/{}".format(img)
+            img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+            h, w = img.shape[:2]
+            if mode == 0:
+                if (h < rmsz and w < rmsz) or (h > 8 * w or w > 5 * h):
+                    shutil.move(img_abs_path, img_dst_path)
+            elif mode == 1:
+                if h < rmsz or w < rmsz:
+                    shutil.move(img_abs_path, img_dst_path)
+            else:
+                if (h < rmsz or w < rmsz) or (h > 3 * w or w > 5 * h):
+                    shutil.move(img_abs_path, img_dst_path)
+
+        except Exception as Error:
+            print(Error)
+
+
 def check_image(img_path):
     """
     remove file: Corrupt JPEG data: premature end of file / data segment.
@@ -3539,32 +3567,7 @@ def remove_small_area(img_path):
             print(Error)
 
 
-def process_small_images(img_path, rmsz=48, mode=0):
-    img_list = sorted(os.listdir(img_path))
-    dir_name = os.path.basename(img_path)
-    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/{}_small".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
 
-    for img in tqdm(img_list):
-        if os.path.isdir(img): continue
-        try:
-            img_abs_path = img_path + "/{}".format(img)
-            img_dst_path = save_path + "/{}".format(img)
-            img = cv2.imdecode(np.fromfile(img_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-
-            h, w = img.shape[:2]
-            if mode == 0:
-                if (h < rmsz and w < rmsz) or (h > 8 * w or w > 5 * h):
-                    shutil.move(img_abs_path, img_dst_path)
-            elif mode == 1:
-                if h < rmsz or w < rmsz:
-                    shutil.move(img_abs_path, img_dst_path)
-            else:
-                if (h < rmsz or w < rmsz) or (h > 3 * w or w > 5 * h):
-                    shutil.move(img_abs_path, img_dst_path)
-
-        except Exception as Error:
-            print(Error)
 
 
 def apply_hog(img):
@@ -5561,6 +5564,16 @@ def main_gkfocr():
     out_img = ocr.inference(data)
     if out_img is not None:
         cv2.imwrite("data/doc/test_out_img.jpg", out_img)
+
+
+def read_ocr_lables(lbl_path):
+    CH_SIM_CHARS = ' '
+    ch_sim_chars = open(lbl_path, "r", encoding="utf-8")
+    lines = ch_sim_chars.readlines()
+    for l in lines:
+        CH_SIM_CHARS += l.strip()
+    alpha = CH_SIM_CHARS  # len = 1 + 6867 = 6868
+    return alpha
 
 
 def cal_distance(p1, p2):
@@ -7817,8 +7830,95 @@ def create_Camvid_train_val_txt(base_path):
     print("Created --> {}".format(save_path))
 
 
+def get_font_char_image(data_path, chars="0123456789.AbC"):
+    save_path = make_save_path(data_path, relative=".", add_str="results")
+    
+    FONT_CHARS_DICT = get_all_font_chars(font_dir=data_path, word_set="0123456789.AbC")
+    print(FONT_CHARS_DICT)
+    
+    font_path_list = list(FONT_CHARS_DICT.keys())
+    for ft_path in tqdm(font_path_list):
+        font_name = os.path.splitext(os.path.basename(ft_path))[0]
+        ft = ImageFont.truetype(ft_path, size=48)
+        for a in chars:
+            image = gen_img(imgsz=(64, 128), font=ft, alpha=a, target_len=1)
+            cv2.imwrite("{}/{}_bg1_{}.jpg".format(save_path, font_name, a), image)
+
+
 if __name__ == '__main__':
-    pass
+    # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
+    # extract_one_gif_frames(gif_path="")
+    # extract_one_video_frames(video_path="", gap=5)
+    # extract_videos_frames(base_path="", gap=5, save_path="")
+    # convert_to_jpg_format(data_path="")
+    # convert_to_png_format(data_path="")
+    # convert_to_gray_image(data_path="")
+    # convert_to_binary_image(data_path="", thr_low=88)
+    # crop_image_according_labelbee_json(data_path="", crop_ratio=(1, 1.2, 1.5, ))
+    # crop_ocr_rec_img_according_labelbee_det_json(data_path="")
+    # crop_image_according_yolo_txt(data_path="", CLS=(0, ), crop_ratio=(1.0, ))  # 1.0, 1.1, 1.2, 1.5, 2.0, 2.5, 3.0
+    # random_crop_gen_cls_negative_samples(data_path="", random_size=(196, 224, 256, 288, 384), randint_low=1, randint_high=4, hw_dis=100, dst_num=1000)
+    # seg_object_from_mask(base_path="")
+
+
+    # ======== Object detection utils ========
+    # labelbee2yolo(data_path="", copy_image=True)
+    # labelbee2voc(data_path="")  # TODO
+    # labelbee2coco(data_path="")  # TODO
+    # yolo2labelbee(data_path="")
+    # yolo2voc(data_path="")  # TODO
+    # yolo2coco(data_path="")  # TODO
+    # voc2labelbee(data_path="", classes=['dog', ], val_percent=0.1)
+    # voc2yolo(data_path="", classes=['dog', ], val_percent=0.1)
+    # voc2coco(data_path="", classes=['dog', ], val_percent=0.1)
+    # coco2labelbee(data_path="")
+    # coco2yolo(data_path="")
+    # coco2voc(data_path="")
+    # labelbee_kpt_to_yolo(data_path="", copy_image=False)
+    # labelbee_kpt_to_dbnet(data_path="", copy_image=True)
+    # labelbee_kpt_to_labelme_kpt(data_path="")
+    # labelbee_kpt_to_labelme_kpt_multi_points(data_path="")
+    # labelbee_seg_to_png(data_path="")
+
+    # convert_Stanford_Dogs_Dataset_annotations_to_yolo_format(data_path="")
+    # convert_WiderPerson_Dataset_annotations_to_yolo_format(data_path="")
+    # convert_TinyPerson_Dataset_annotations_to_yolo_format(data_path="")
+    # convert_AI_TOD_Dataset_to_yolo_format(data_path="")
+
+    # random_select_yolo_images_and_labels(data_path="", select_num=500, move_or_copy="copy", select_mode=0)
+    # vis_yolo_label(data_path="", print_flag=False, color_num=1000, rm_small_object=False, rm_size=32)  # TODO: 1.rm_small_object have bugs.
+    # list_yolo_labels(label_path="")
+    # change_txt_content(txt_base_path="")
+    # remove_yolo_txt_contain_specific_class(data_path="", rm_cls=(0, ))
+    # remove_yolo_txt_small_bbx(data_path="", rm_cls=(0, ), rmsz=(48, 48))
+    # select_yolo_txt_contain_specific_class(data_path="", select_cls=(3, ))
+    # merge_txt(path1="", path2="")
+    # merge_txt_files(data_path="")
+
+
+    # ======== OCR ========
+    # dbnet_aug_data(data_path="", bg_path="", maxnum=10000)
+    # vis_dbnet_gt(data_path="")
+    # warpPerspective_img_via_labelbee_kpt_json(data_path="")
+    # alpha = read_ocr_lables(lbl_path="")  # alpha = ' ' + '0123456789' + '.:/\\-' + 'ABbC'
+    # check_ocr_label(data_path="", label=alpha)
+    # ocr_data_gen_train_txt_v2(data_path="", LABEL=alpha)
+    # random_select_files_according_txt(data_path="", select_percent=0.25)
+    # make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # ocr_data_gen_train_txt(data_path="", LABEL=alpha)
+    # ocr_data_gen_train_txt_v2(data_path="", LABEL=alpha)
+    # ocr_data_merge_train_txt_files_v2(data_path="", LABEL=alpha)
+    # random_select_files_according_txt(data_path="", select_percent=0.25)
+    # random_select_files_from_txt(data_path="", n=2500)
+    # convert_text_renderer_json_to_my_dataset_format(data_path="")
+    # convert_Synthetic_Chinese_String_Dataset_labels(data_path="")
+    # convert_mtwi_to_ocr_rec_data(data_path="")
+    # convert_ShopSign_to_ocr_rec_data(data_path="")
+    # ocr_train_txt_change_to_abs_path()
+    # get_ocr_train_txt_alpha(data_path="")
+    # check_ocr_train_txt(data_path="")
+    # random_select_images_from_ocr_train_txt(data_path="", select_num= 5000)
+    # ocr_train_txt_split_to_train_and_test(data_path="", train_percent=0.8)
 
 
 

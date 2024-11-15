@@ -157,6 +157,7 @@ def make_save_path(data_path: str, relative=".", add_str="results"):
         print("relative should be . or .. or ...")
         raise ValueError
     os.makedirs(save_path, exist_ok=True)
+    print("Create successful! save_path: {}".format(save_path))
     return save_path
 
 
@@ -667,7 +668,7 @@ def get_sub_dir_list(base_path):
 
 
 
-def copy_file_exist_corresponding_file(dir1, dir2):
+def process_exist_corresponding_files(dir1, dir2):
     """
     :param dir1:
     :param dir2:
@@ -702,12 +703,6 @@ def copy_file_exist_corresponding_file(dir1, dir2):
 
         except Exception as Error:
             print(Error)
-
-
-def select_file_exist_corresponding_file(base_path):
-    dir1 = base_path + "/images"
-    dir2 = base_path + "/labels"
-    copy_file_exist_corresponding_file(dir1, dir2)
 
 
 def select_same_files(dir1, dir2, select_dir="dir1"):
@@ -748,7 +743,7 @@ def select_same_files(dir1, dir2, select_dir="dir1"):
             print(Error)
 
 
-def move_or_delete_file_not_exist_corresponding_file(base_path, dir1_name="images", dir2_name="labels", labelbee_json_label=False, move_or_delete="delete", dir="dir2"):
+def process_not_exist_corresponding_files(base_path, dir1_name="images", dir2_name="labels", labelbee_json_label=False, move_or_delete="delete", dir="dir2"):
     """
     :param dir1:
     :param dir2:
@@ -862,293 +857,7 @@ def move_or_delete_file_not_exist_corresponding_file(base_path, dir1_name="image
                         print(Error)
 
 
-def move_or_delete_file_not_exist_corresponding_file_under_diffirent_dir(dir_path1="images", dir_path2="labels", unexpected_path="", move_or_delete="delete", dir="dir2"):
-    """
-    :param dir_path1:
-    :param dir_path2:
-    :param move_or_delete: "move" or "delete"
-    :param dir: files in which dir will be move or delete
-    :return:
-    """
-    # dir1 = base_path + "/{}".format(dir1_name)
-    # dir2 = base_path + "/{}".format(dir2_name)
-    file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir_path1)]
-    file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir_path2)]
-
-    unexpected = set(file1_list) ^ set(file2_list)
-
-    if move_or_delete == "move":
-        if unexpected_path is None:
-            unexpected_path = os.path.abspath(os.path.join(dir_path1, "../..")) + "/unexpected"
-            os.makedirs(unexpected_path, exist_ok=True)
-        else:
-            os.makedirs(unexpected_path, exist_ok=True)
-
-    for j in unexpected:
-        try:
-            dir1_file_ends = os.path.splitext(os.listdir(dir_path1)[0])[1]
-            dir2_file_ends = os.path.splitext(os.listdir(dir_path2)[0])[1]
-
-            if move_or_delete == "delete":
-                if dir == "dir1":
-                    file_abs_path = dir_path1 + "/{}{}".format(j, dir1_file_ends)
-                    os.remove(file_abs_path)
-                    print("os.remove: --> {}".format(file_abs_path))
-                else:
-                    file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                    os.remove(file_abs_path)
-                    print("os.remove: --> {}".format(file_abs_path))
-            # move
-            else:
-                if dir == "dir1":
-                    file_abs_path = dir_path1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    shutil.move(file_abs_path, file_dst_path)
-                    print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                else:
-                    file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                    shutil.move(file_abs_path, file_dst_path)
-                    print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def move_or_delete_file_not_exist_corresponding_file_under_diffirent_dir_v2(dir_path1="images", dir_path2="labels", unexpected_path="", move_or_delete="delete"):
-    """
-    :param dir_path1:
-    :param dir_path2:
-    :param move_or_delete: "move" or "delete"
-    :param dir: files in which dir will be move or delete
-    :return:
-    """
-    # dir1 = base_path + "/{}".format(dir1_name)
-    # dir2 = base_path + "/{}".format(dir2_name)
-    # file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir_path1)]
-    # file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir_path2)]
-
-    file1_list = sorted(list(set([i.split("_")[0] for i in os.listdir(dir_path1)])))
-    file2_list = sorted([i.split(".")[0] for i in os.listdir(dir_path2)])
-
-    unexpected = set(file1_list) ^ set(file2_list)
-
-    if move_or_delete == "move":
-        if unexpected_path is None:
-            unexpected_path = os.path.abspath(os.path.join(dir_path1, "../..")) + "/unexpected"
-            os.makedirs(unexpected_path, exist_ok=True)
-        else:
-            os.makedirs(unexpected_path, exist_ok=True)
-
-    for j in unexpected:
-        try:
-            dir1_file_ends = os.path.splitext(os.listdir(dir_path1)[0])[1]
-            dir2_file_ends = os.path.splitext(os.listdir(dir_path2)[0])[1]
-
-            if move_or_delete == "delete":
-                file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                os.remove(file_abs_path)
-                print("os.remove: --> {}".format(file_abs_path))
-            # move
-            else:
-                file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                shutil.move(file_abs_path, file_dst_path)
-                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def move_or_delete_file_not_exist_corresponding_expand_ratio_cropped_images(dir_path1="images", dir_path2="labels", unexpected_path="", move_or_delete="delete"):
-    dir1_name = os.path.basename(dir_path1)
-    dir2_name = os.path.basename(dir_path2)
-
-    file1_list = sorted(list(set([i[:-7] for i in os.listdir(dir_path1)])))
-    file2_list = sorted(list(set([i[:-7] for i in os.listdir(dir_path2)])))
-
-    unexpected = set(file1_list) ^ set(file2_list)
-
-    if move_or_delete == "move":
-        if unexpected_path == "":
-            unexpected_path = os.path.abspath(os.path.join(dir_path1, "../..")) + "/unexpected"
-            os.makedirs(unexpected_path, exist_ok=True)
-        else:
-            os.makedirs(unexpected_path, exist_ok=True)
-
-    for j in unexpected:
-        try:
-            dir1_file_ends = os.path.splitext(os.listdir(dir_path1)[0])[1]
-            dir2_file_ends = os.path.splitext(os.listdir(dir_path2)[0])[1]
-
-            if move_or_delete == "delete":
-                file_abs_path = dir_path2 + "/{}{}{}".format(j, dir2_name, dir2_file_ends)
-                os.remove(file_abs_path)
-                print("os.remove: --> {}".format(file_abs_path))
-            # move
-            else:
-                file_abs_path = dir_path2 + "/{}{}{}".format(j, dir2_name, dir2_file_ends)
-                file_dst_path = unexpected_path + "/{}{}{}".format(j, dir2_name, dir2_file_ends)
-                shutil.move(file_abs_path, file_dst_path)
-                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def move_or_delete_file_exist_corresponding_file(base_path, dir1_name="images", dir2_name="labels", move_or_delete="delete", dir="dir2"):
-    """
-    :param dir1:
-    :param dir2:
-    :param move_or_delete: "move" or "delete"
-    :param dir: files in which dir will be move or delete
-    :return:
-    """
-    dir1 = base_path + "/{}".format(dir1_name)
-    dir2 = base_path + "/{}".format(dir2_name)
-    file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir1)]
-    file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir2)]
-
-    unexpected = set(file1_list) & set(file2_list)
-
-    if move_or_delete == "move" or move_or_delete == "copy":
-        unexpected_path = os.path.abspath(os.path.join(dir1, "../..")) + "/unexpected"
-        os.makedirs(unexpected_path, exist_ok=True)
-
-    for j in unexpected:
-        try:
-            dir1_file_ends = os.path.splitext(os.listdir(dir1)[0])[1]
-            dir2_file_ends = os.path.splitext(os.listdir(dir2)[0])[1]
-
-            if move_or_delete == "delete":
-                if dir == "dir1":
-                    # file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    os.remove(file_abs_path)
-                    print("os.remove: --> {}".format(file_abs_path))
-                else:
-                    file_abs_path = dir2 + "/{}{}".format(j, dir2_file_ends)
-                    os.remove(file_abs_path)
-                    print("os.remove: --> {}".format(file_abs_path))
-            elif move_or_delete == "move":
-                if dir == "dir1":
-                    file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    shutil.move(file_abs_path, file_dst_path)
-                    print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                else:
-                    file_abs_path = dir2 + "/{}{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                    shutil.move(file_abs_path, file_dst_path)
-                    print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-            elif move_or_delete == "copy":
-                if dir == "dir1":
-                    file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    shutil.copy(file_abs_path, file_dst_path)
-                    print("shutil.copy: {} --> {}".format(file_abs_path, file_dst_path))
-                else:
-                    file_abs_path = dir2 + "/{}{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                    shutil.copy(file_abs_path, file_dst_path)
-                    print("shutil.copy: {} --> {}".format(file_abs_path, file_dst_path))
-            else:
-                print("'move_or_delete' Error")
-
-        except Exception as Error:
-            print(Error)
-
-
-def move_or_delete_file_exist_corresponding_file_under_diffirent_dir(dir_path1="images", dir_path2="labels", unexpected_path="", flag="cp", dir="dir2"):
-    """
-    :param dir1:
-    :param dir2:
-    :param move_or_delete: "move" or "delete"
-    :param dir: files in which dir will be move or delete
-    :return:
-    """
-    # dir1 = base_path + "/{}".format(dir1_name)
-    # dir2 = base_path + "/{}".format(dir2_name)
-    # file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir1)]
-    # file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir2)]
-    file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir_path1)]
-    file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir_path2)]
-
-    unexpected = set(file1_list) & set(file2_list)
-
-    if flag == "move" or flag == "copy" or flag == "mv" or flag == "cp":
-        if unexpected_path == "":
-            unexpected_path = os.path.abspath(os.path.join(dir_path1, "../..")) + "/milk_tea_cup/same_files"
-            os.makedirs(unexpected_path, exist_ok=True)
-        else:
-            os.makedirs(unexpected_path, exist_ok=True)
-
-    dir1_file_ends = os.path.splitext(os.listdir(dir_path1)[0])[1]
-    dir2_file_ends = os.path.splitext(os.listdir(dir_path2)[0])[1]
-
-    for j in unexpected:
-        try:
-            if flag == "delete" or flag == "del" or flag == "rm" or flag == "remove":
-                if dir == "dir1":
-                    # file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    file_abs_path = dir_path1 + "/{}{}".format(j, dir1_file_ends)
-                    os.remove(file_abs_path)
-                    print("os.remove: --> {}".format(file_abs_path))
-                else:
-                    file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                    os.remove(file_abs_path)
-                    print("os.remove: --> {}".format(file_abs_path))
-            # copy
-            elif flag == "copy" or flag == "cp":
-                if dir == "dir1":
-                    file_abs_path = dir_path1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    shutil.copy(file_abs_path, file_dst_path)
-                    print("shutil.copy: {} --> {}".format(file_abs_path, file_dst_path))
-                else:
-                    file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                    shutil.copy(file_abs_path, file_dst_path)
-                    print("shutil.copy: {} --> {}".format(file_abs_path, file_dst_path))
-            # move
-            else:
-                if dir == "dir1":
-                    file_abs_path = dir_path1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    shutil.move(file_abs_path, file_dst_path)
-                    print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                else:
-                    file_abs_path = dir_path2 + "/{}{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                    shutil.move(file_abs_path, file_dst_path)
-                    print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def remove_specific_file_by_name(data_path, key_words, mode=0):
-    file_list = sorted(os.listdir(data_path))
-
-    for f in file_list:
-        f_abs_path = data_path + "/{}".format(f)
-        try:
-            if mode == 0:
-                for i in range(len(key_words)):
-                    if key_words[i] in f:
-                        os.remove(f_abs_path)
-                        print("Removed --> {}".format(f_abs_path))
-            else:
-                for i in range(len(key_words)):
-                    if key_words[i] not in f:
-                        os.remove(f_abs_path)
-                        print("Removed --> {}".format(f_abs_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def select_specific_file_by_name(data_path, key_words, mode=0, cp_or_mv="move"):
+def process_file_by_name(data_path, key_words, mode=0, mvcp="move"):
     file_list = sorted(os.listdir(data_path))
     data_dir_name = os.path.basename(data_path)
 
@@ -1631,16 +1340,6 @@ def random_select_files_according_txt(data_path, select_percent):
         fw.write(l)
 
     fw.close()
-
-
-def read_ocr_lables(lbl_path):
-    CH_SIM_CHARS = ' '
-    ch_sim_chars = open(lbl_path, "r", encoding="utf-8")
-    lines = ch_sim_chars.readlines()
-    for l in lines:
-        CH_SIM_CHARS += l.strip()
-    alpha = CH_SIM_CHARS  # len = 1 + 6867 = 6868
-    return alpha
 
 
 def random_select_files_from_txt(data_path, n=2500):

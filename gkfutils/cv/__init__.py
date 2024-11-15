@@ -8,7 +8,7 @@ from .utils import (
     dilate_erode, open_close_gradient, tophat_blackhat,
     make_rain_effect, compress, change_definition, stretch,
     crop, make_mask, transperent_overlay, log_transformation,
-    translate
+    translate, cal_iou, 
 )
 
 from .yolo import (
@@ -26,5 +26,5 @@ __all__ = [
     "dilate_erode", "open_close_gradient", "tophat_blackhat",
     "make_rain_effect", "compress", "change_definition", "stretch",
     "crop", "make_mask", "transperent_overlay", "log_transformation",
-    "translate", "YOLOv5_ONNX", "YOLOv8_ONNX"
+    "translate", "cal_iou", "YOLOv5_ONNX", "YOLOv8_ONNX"
 ]

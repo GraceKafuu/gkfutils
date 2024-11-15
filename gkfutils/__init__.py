@@ -8,11 +8,7 @@ from .utils import (
     get_base_name, get_dir_name, get_file_name,
     get_file_name_with_suffix, get_suffix, make_save_path,
     rename_files, save_file_path_to_txt, merge_dirs,
-    random_select_files
-)
-
-from .cv.utils import (
-    resize_images, random_select_yolo_images_and_labels
+    random_select_files, split_dir_multithread, 
 )
 
 
@@ -26,6 +22,5 @@ __all__ = [
     "get_base_name", "get_dir_name", "get_file_name",
     "get_file_name_with_suffix", "get_suffix", "make_save_path",
     "rename_files", "save_file_path_to_txt", "merge_dirs",
-    "random_select_files",
-    "resize_images", "random_select_yolo_images_and_labels"
+    "random_select_files", "split_dir_multithread"
 ]

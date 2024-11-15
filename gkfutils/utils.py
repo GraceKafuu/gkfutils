@@ -644,112 +644,36 @@ def process_via_filename(dir1, dir2, flag="same", mvcp="mv"):
     :param dir: files in which dir will be move or delete
     :return:
     """
-    dir1 = base_path + "/{}".format(dir1_name)
-    dir2 = base_path + "/{}".format(dir2_name)
     file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir1)]
     dir1_file_ends = os.path.splitext(os.listdir(dir1)[0])[1]
     dir2_file_ends = os.path.splitext(os.listdir(dir2)[0])[1]
 
-    if labelbee_json_label:
-        file2_list = [os.path.splitext(os.path.splitext(i)[0])[0] for i in os.listdir(dir2)]
+    file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir2)]
+
+    if flag == "same":
+        unexpected = list(set(file1_list) & set(file2_list))
     else:
-        file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir2)]
+        unexpected = list(set(file1_list) ^ set(file2_list))
+        
+    unexpected_path = os.path.abspath(os.path.join(dir1, "../..")) + "/unexpected"
+    os.makedirs(unexpected_path, exist_ok=True)
 
-    unexpected = list(set(file1_list) ^ set(file2_list))
-
-    if move_or_delete == "move":
-        unexpected_path = os.path.abspath(os.path.join(dir1, "../..")) + "/unexpected"
-        os.makedirs(unexpected_path, exist_ok=True)
-
-    if move_or_delete == "delete":
-        if dir == "dir1":
-            for j in tqdm(unexpected):
-                if labelbee_json_label:
-                    file_abs_path = dir1 + "/{}.jpeg{}".format(j, dir1_file_ends)
-                    try:
-                        os.remove(file_abs_path)
-                        print("os.remove: --> {}".format(file_abs_path))
-                    except Exception as Error:
-                        print(Error)
-                else:
-                    file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    try:
-                        os.remove(file_abs_path)
-                        print("os.remove: --> {}".format(file_abs_path))
-                    except Exception as Error:
-                        print(Error)
-        else:
-            for j in tqdm(unexpected):
-                if labelbee_json_label:
-                    file_abs_path = dir2 + "/{}.jpeg{}".format(j, dir2_file_ends)
-                    try:
-                        os.remove(file_abs_path)
-                        print("os.remove: --> {}".format(file_abs_path))
-                    except Exception as Error:
-                        print(Error)
-                else:
-                    file_abs_path = dir2 + "/{}{}".format(j, dir2_file_ends)
-                    try:
-                        os.remove(file_abs_path)
-                        print("os.remove: --> {}".format(file_abs_path))
-                    except Exception as Error:
-                        print(Error)
-    # move
-    else:
-        if dir == "dir1":
-            for j in tqdm(unexpected):
-                if labelbee_json_label:
-                    file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    try:
-                        shutil.move(file_abs_path, file_dst_path)
-                        print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                    except Exception as Error:
-                        print(Error)
-                else:
-                    file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-                    try:
-                        shutil.move(file_abs_path, file_dst_path)
-                        print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                    except Exception as Error:
-                        print(Error)
-
-                    # file_abs_path = dir1 + "/{}.jpeg".format(j, dir1_file_ends)
-                    # file_dst_path = unexpected_path + "/{}.jpeg".format(j, dir1_file_ends)
-                    # try:
-                    #     shutil.move(file_abs_path, file_dst_path)
-                    #     print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                    # except Exception as Error:
-                    #     print(Error)
-
-                # file_abs_path = dir1 + "/{}.PNG".format(j, dir1_file_ends)
-                # file_dst_path = unexpected_path + "/{}.PNG".format(j, dir1_file_ends)
-                # try:
-                #     shutil.move(file_abs_path, file_dst_path)
-                #     print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                # except Exception as Error:
-                #     print(Error)
-        else:
-            for j in tqdm(unexpected):
-                if labelbee_json_label:
-                    file_abs_path = dir2 + "/{}.jpg{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}.jpg{}".format(j, dir2_file_ends)
-                    try:
-                        shutil.move(file_abs_path, file_dst_path)
-                        print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                    except Exception as Error:
-                        print(Error)
-                else:
-                    file_abs_path = dir2 + "/{}{}".format(j, dir2_file_ends)
-                    file_dst_path = unexpected_path + "/{}{}".format(j, dir2_file_ends)
-                    try:
-                        shutil.move(file_abs_path, file_dst_path)
-                        print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-                    except Exception as Error:
-                        print(Error)
-
-
+    for j in tqdm(unexpected):
+        file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
+        file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
+        try:
+            if mvcp == "mv":
+                shutil.move(file_abs_path, file_dst_path)
+                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
+            elif mvcp == "del":
+                shutil.move(file_abs_path, file_dst_path)
+                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
+            else:
+                shutil.copy(file_abs_path, file_dst_path)
+                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
+        except Exception as Error:
+            print(Error)
+                    
 
 def copy_n_times(data_path, n=10, save_path="current", print_flag=True):
     data_list = sorted(os.listdir(data_path))
@@ -857,7 +781,7 @@ def get_file_type_code(file_name, max_len=16):
     """
     :param file_name:
     :param max_len:
-    :return:
+    :return: type_code: 23212F686F6D652F7A656E6779696661
     """
     with open(file_name, "rb") as fo:
         byte = fo.read(max_len)
@@ -965,9 +889,6 @@ def split_dir_by_file_suffix(data_path):
             shutil.move(f_abs_path, f_dst_path)
 
 
-
-
-
 def random_select_files_via_txt(data_path, select_percent):
     assert os.path.isfile(data_path) and data_path.endswith(".txt"), "{} should be *.txt"
     save_path = data_path.replace(".txt", "_random_selected_{}_percent.txt".format(select_percent))
@@ -1008,12 +929,15 @@ class Logger(object):
         # logpath = os.path.dirname(os.getcwd()) + '/Logs/'
         logpath = dirname + '/Logs/'
         os.makedirs(logpath, exist_ok=True)
-        th = TimedRotatingFileHandler(filename=logpath + filename +'-log.', when=when, interval=1, backupCount=backCount, encoding='utf-8') # 往文件里写入#指定间隔时间自动生成文件的处理器
-        th.suffix = "-%Y-%m-%d_%H-%M-%S.log"
+
+        # 往文件里写入#指定间隔时间自动生成文件的处理器
         # 实例化TimedRotatingFileHandler
         # interval是时间间隔，backupCount是备份文件的个数，如果超过这个个数，就会自动删除，when是间隔的时间单位，单位有以下几种：
         # S 秒、M 分、H 小时、D 天、W 每星期（interval==0时代表星期一）、midnight 每天凌晨
+        th = TimedRotatingFileHandler(filename=logpath + filename +'-log.', when=when, interval=1, backupCount=backCount, encoding='utf-8')
         th.setFormatter(format_str) # 设置文件里写入的格式
+        th.suffix = "-%Y-%m-%d_%H-%M-%S.log"
+
         self.logger.addHandler(sh) # 把对象加到logger里
         self.logger.addHandler(th)
         

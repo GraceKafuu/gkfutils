@@ -244,6 +244,251 @@ def list_module_functions():
     print(sorted(functions))
 
 
+def hog_test():
+    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data"
+    img_list = sorted(os.listdir(data_path))
+    for img in img_list:
+        img_name = os.path.splitext(img)[0]
+        img_abs_path = data_path + "/{}".format(img)
+        img = cv2.imread(img_abs_path, 0)
+        hog_res = apply_hog(img)
+        cv2.imwrite("{}/{}_hog.jpg".format(data_path, img_name), hog_res * 255)
+
+
+def dehaze_test():
+    m = dehaze(cv2.imread('/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/20221111152824_8b46d8_75_0028505.jpg') / 255.0) * 255
+    cv2.imwrite('/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/20221111152824_8b46d8_75_0028505_defog.jpg', m)
+
+
+def wt_test():
+    from pywt import dwt, idwt, dwt2, idwt2
+
+    img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/cmp_data2/smoke"
+    img_list = os.listdir(img_path)
+
+    save_path = os.path.abspath(os.path.join(img_path, "../..")) + "/output/cmp_data2/smoke"
+    os.makedirs(save_path, exist_ok=True)
+
+    Es = []
+
+    for img in img_list:
+        img_name = os.path.splitext(img)[0]
+        img_abs_path = img_path + "/{}".format(img)
+        img = cv2.imread(img_abs_path, 0)
+        cA, (cH, cV, cD) = dwt2(img, "haar")
+
+        cAH = np.hstack((cA, cH))
+        cVD = np.hstack((cV, cD))
+        cAHVD = np.vstack((cAH, cVD))
+        cv2.imwrite("{}/{}_dwt2.jpg".format(save_path, img_name), cAHVD)
+
+        img_resz = cv2.resize(img, (cA.shape[1], cA.shape[0]))
+        img_cha = cv2.subtract(np.uint8(cv2.merge([img_resz, img_resz, img_resz])), np.uint8(cv2.merge([cA, cA, cA])))
+        # img_cha = cv2.subtract(cv2.merge([img_resz, img_resz, img_resz]), cv2.merge([cA, cA, cA]))
+        # img_cha = cv2.subtract(cv2.merge([img_resz, img_resz, img_resz]), cv2.merge([cA, cA, cA]))
+        print(img_cha.sum())
+        cv2.imwrite("{}/{}_img_cha.jpg".format(save_path, img_name), img_cha)
+
+        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / img.size
+        print("E: ", energy)
+
+        Es.append(energy)
+
+    print("E mean: ", np.mean(Es))
+
+
+def saliency_map_ft_test():
+    from pywt import dwt, idwt, dwt2, idwt2
+
+    # img = cv2.imread("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133.jpg")
+    # saliency_map = cal_saliency_map_FT(img)
+    # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/data/fire_smoke_20230203_0000133_saliency_map_ft.jpg", saliency_map * 255)
+    data_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/wt/smoke_PS/data"
+
+    bg_path = os.path.abspath(os.path.join(data_path, "../..")) + "/bg"
+    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/output"
+    os.makedirs(save_path, exist_ok=True)
+
+    img_list = sorted(os.listdir(data_path))
+    for imgi in img_list:
+        img_name = os.path.splitext(imgi)[0]
+        img_abs_path = data_path + "/{}".format(imgi)
+        bg_abs_path = bg_path + "/{}".format(imgi)
+        img = cv2.imread(img_abs_path)
+        H, W = img.shape[:2]
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_cp = img.copy()
+        bg_img = cv2.imread(bg_abs_path)
+        bg_b, bg_g, bg_r = cv2.split(bg_img)
+        bg_img_gray = cv2.cvtColor(bg_img, cv2.COLOR_BGR2GRAY)
+        # bg_img_cp = bg_img.copy()
+        saliency_map2 = get_saliency_ft(img_abs_path)
+        saliency_map2_merge = cv2.merge([saliency_map2, saliency_map2, saliency_map2])
+        saliency_map = cal_saliency_map(img) * 255
+        b, g, r = cv2.split(saliency_map)
+        ret, b_bin = cv2.threshold(np.uint8(b), 70, 255, cv2.THRESH_BINARY)
+        cv2.imwrite("{}/{}_saliency_map2.jpg".format(save_path, img_name), saliency_map2)
+        cv2.imwrite("{}/{}_saliency_map2_merge.jpg".format(save_path, img_name), saliency_map2_merge)
+        cv2.imwrite("{}/{}_saliency_map.jpg".format(save_path, img_name), saliency_map)
+        cv2.imwrite("{}/{}_saliency_map_b.jpg".format(save_path, img_name), b)
+        cv2.imwrite("{}/{}_saliency_map_g.jpg".format(save_path, img_name), g)
+        cv2.imwrite("{}/{}_saliency_map_r.jpg".format(save_path, img_name), r)
+        cv2.imwrite("{}/{}_saliency_map_b_bin.jpg".format(save_path, img_name), b_bin)
+
+        b_bin_merge = cv2.merge([b_bin, b_bin, b_bin])
+
+        cnts, hierarchy = cv2.findContours(b_bin.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        max_cnts = max(cnts, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(max_cnts)
+        cv2.rectangle(b_bin, (x, y), (x + w, y + h), (255, 0, 255), 5)
+        cv2.rectangle(img_cp, (x, y), (x + w, y + h), (255, 0, 255), 5)
+        cv2.imwrite("{}/{}_saliency_map_b_bin_rect.jpg".format(save_path, img_name), b_bin)
+        # cv2.imwrite("{}/{}_saliency_map_img_rect.jpg".format(data_path, img_name), img_cp)
+
+        bg_roi = bg_img_gray[y:y + h, x:x + w]
+        bgcA, (bgcH, bgcV, bgcD) = dwt2(bg_roi, "haar")
+        # bgcAH = np.hstack((bgcA, bgcH))
+        # bgcVD = np.hstack((bgcV, bgcD))
+        # bgcAHVD = np.vstack((bgcAH, bgcVD))
+        # bg_img_resz = cv2.resize(img, (cA.shape[1], cA.shape[0]))
+        bg_energy_gray = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
+        print("E_bg_gray: ", bg_energy_gray)
+
+        bg_roi = bg_b[y:y + h, x:x + w]
+        bgcA, (bgcH, bgcV, bgcD) = dwt2(bg_roi, "haar")
+        # bgcAH = np.hstack((bgcA, bgcH))
+        # bgcVD = np.hstack((bgcV, bgcD))
+        # bgcAHVD = np.vstack((bgcAH, bgcVD))
+        # bg_img_resz = cv2.resize(img, (cA.shape[1], cA.shape[0]))
+        bg_energy = (bgcH ** 2 + bgcV ** 2 + bgcD ** 2).sum() / bg_roi.size
+        print("E_bg_b: ", bg_energy)
+
+        b_roi = img_gray[y:y + h, x:x + w]
+        cA, (cH, cV, cD) = dwt2(b_roi, "haar")
+        cAH = np.hstack((cA, cH))
+        cVD = np.hstack((cV, cD))
+        cAHVD = np.vstack((cAH, cVD))
+        img_resz = cv2.resize(cAHVD, (W, H))
+        img_resz_merge = cv2.merge([img_resz, img_resz, img_resz])
+        energy_gray = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
+        print("E_gray: ", energy_gray)
+
+        b_roi = b[y:y + h, x:x + w]
+        cA, (cH, cV, cD) = dwt2(b_roi, "haar")
+        cAH = np.hstack((cA, cH))
+        cVD = np.hstack((cV, cD))
+        cAHVD = np.vstack((cAH, cVD))
+        img_resz = cv2.resize(cAHVD, (W, H))
+        energy = (cH ** 2 + cV ** 2 + cD ** 2).sum() / b_roi.size
+        print("E_b: ", energy)
+
+        E_ratio_gray = energy_gray / bg_energy_gray
+        E_ratio_b = energy / bg_energy
+        print("E_ratio_gray: {}".format(E_ratio_gray))
+        print("E_ratio_b: {}".format(E_ratio_b))
+
+        img_roi = img[y:y + h, x:x + w]
+        # img_roi_b, img_roi_g, img_roi_r = cv2.split(img_roi)
+        B_, G_, R_ = np.mean(img_roi[:, :, 0]), np.mean(img_roi[:, :, 1]), np.mean(img_roi[:, :, 2])
+        print("B_, G_, R_: ", B_, G_, R_)
+
+        cv2.putText(img_cp, "E_bg: {:.2f}".format(bg_energy), (20, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+        cv2.putText(img_cp, "E: {:.2f}".format(energy), (20, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+        cv2.putText(img_cp, "E_ratio: {:.2f}".format(E_ratio_b), (20, 150), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+        cv2.putText(img_cp, "B_, G_, R_: {:.2f} {:.2f} {:.2f}".format(B_, G_, R_), (20, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
+
+        cv2.imwrite("{}/{}_saliency_map_img_cp.jpg".format(save_path, img_name), img_cp)
+        out_img = np.hstack((img, saliency_map, b_bin_merge, img_resz_merge, img_cp))
+        cv2.imwrite("{}/{}_saliency_map_stacked.jpg".format(save_path, img_name), out_img)
+
+
+def gkfocr_test():
+    data = "data/doc/imgs"
+    # data = "data/doc/imgs/11.jpg"
+    ocr = GKFOCR(cfg_path="configs/cfg_gkfocr.yaml", debug=False)
+    out_img = ocr.inference(data)
+    if out_img is not None:
+        cv2.imwrite("data/doc/test_out_img.jpg", out_img)
+
+
+def seamless_clone_test(save_path):
+    os.makedirs(save_path, exist_ok=True)
+    bg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/gen_fake/gen_AbC/bg/2.jpg"
+    fg_path = "/home/zengyifan/wujiahu/data/010.Digital_Rec/others/gen_fake/gen_AbC/0-9_AbC_new"
+    fg_list = sorted(os.listdir(fg_path))
+
+    bg_img = cv2.imread(bg_path)
+    bgsz = bg_img.shape[:2]
+
+    rdm = random.random()
+
+    label_str = ""
+    for i in range(4):
+        fgi = random.sample(fg_list, 1)[0]
+        fgi_name = os.path.splitext(fgi)[0]
+        if "AN" in fgi_name:
+            label_str += "A"
+        elif "bN" in fgi_name:
+            label_str += "b"
+        elif "CN" in fgi_name:
+            label_str += "C"
+        elif "0N" in fgi_name:
+            label_str += "0"
+        elif "1N" in fgi_name:
+            label_str += "1"
+        elif "2N" in fgi_name:
+            label_str += "2"
+        elif "3N" in fgi_name:
+            label_str += "3"
+        elif "4N" in fgi_name:
+            label_str += "4"
+        elif "5N" in fgi_name:
+            label_str += "5"
+        elif "6N" in fgi_name:
+            label_str += "6"
+        elif "7N" in fgi_name:
+            label_str += "7"
+        elif "8N" in fgi_name:
+            label_str += "8"
+        elif "9N" in fgi_name:
+            label_str += "9"
+        elif "0.N" in fgi_name:
+            label_str += "0."
+        elif "1.N" in fgi_name:
+            label_str += "1."
+        elif "2.N" in fgi_name:
+            label_str += "2."
+        elif "3.N" in fgi_name:
+            label_str += "3."
+        elif "4.N" in fgi_name:
+            label_str += "4."
+        elif "5.N" in fgi_name:
+            label_str += "5."
+        elif "6.N" in fgi_name:
+            label_str += "6."
+        elif "7.N" in fgi_name:
+            label_str += "7."
+        elif "8.N" in fgi_name:
+            label_str += "8."
+        elif "9.N" in fgi_name:
+            label_str += "9."
+        elif "space" in fgi_name:
+            label_str += ""
+        else:
+            print("Error!")
+
+        fg_abs_path = fg_path + "/{}".format(fgi)
+        fg_img = cv2.imread(fg_abs_path)
+        fg_img = cv2.resize(fg_img, (48, 70))
+        fgsz = fg_img.shape[:2]
+
+        mask_img = 255 * np.ones(shape=fg_img.shape, dtype=np.uint8)
+        out = cv2.seamlessClone(fg_img, bg_img, mask_img, (30 + 56 * i, 36), cv2.MIXED_CLONE)
+        bg_img = out
+
+    cv2.imwrite("{}/20231008_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
+
+    
 def main_test():
     pass
 

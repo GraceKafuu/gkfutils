@@ -635,115 +635,8 @@ def get_sub_dir_list(base_path):
     return all_dirs
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def process_exist_corresponding_files(dir1, dir2):
-    """
-    :param dir1:
-    :param dir2:
-    :return:
-    """
-    file1_list = [i.split(".")[0] for i in os.listdir(dir1)]
-    file2_list = [i.split(".")[0] for i in os.listdir(dir2)]
-
-    same_files = set(file1_list) & set(file2_list)
-
-    same_dir1_path = os.path.abspath(os.path.join(dir1, "../..")) + "/New/{}".format(os.path.basename(dir1))
-    same_dir2_path = os.path.abspath(os.path.join(dir1, "../..")) + "/New/{}".format(os.path.basename(dir2))
-    os.makedirs(same_dir1_path, exist_ok=True)
-    os.makedirs(same_dir2_path, exist_ok=True)
-
-    for j in same_files:
-        try:
-            dir1_file_ends = os.path.splitext(os.listdir(dir1)[0])[1]
-            dir2_file_ends = os.path.splitext(os.listdir(dir2)[0])[1]
-
-            # dir1
-            dir1_file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-            dir1_file_dst_path = same_dir1_path + "/{}{}".format(j, dir1_file_ends)
-            shutil.copy(dir1_file_abs_path, dir1_file_dst_path)
-            print("shutil.copy: {} --> {}".format(dir1_file_abs_path, dir1_file_dst_path))
-
-            # dir2
-            dir2_file_abs_path = dir2 + "/{}{}".format(j, dir2_file_ends)
-            dir2_file_dst_path = same_dir2_path + "/{}{}".format(j, dir2_file_ends)
-            shutil.copy(dir2_file_abs_path, dir2_file_dst_path)
-            print("shutil.copy: {} --> {}".format(dir2_file_abs_path, dir2_file_dst_path))
-
-        except Exception as Error:
-            print(Error)
-
-
-def select_same_files(dir1, dir2, select_dir="dir1"):
-    file1_list = [i.split(".")[0] for i in os.listdir(dir1)]
-    file2_list = [i.split(".")[0] for i in os.listdir(dir2)]
-
-    dir1_name = os.path.basename(dir1)
-    dir2_name = os.path.basename(dir2)
-
-    same_files = set(file1_list) & set(file2_list)
-    if select_dir == "dir1":
-        same_dir_path = os.path.abspath(os.path.join(dir1, "../..")) + "/{}_same_files".format(dir1_name)
-        os.makedirs(same_dir_path, exist_ok=True)
-    elif select_dir == "dir2":
-        same_dir_path = os.path.abspath(os.path.join(dir1, "../..")) + "/{}_same_files".format(dir2_name)
-        os.makedirs(same_dir_path, exist_ok=True)
-    else:
-        print("'select_dir' should be dir1 or dir2.")
-
-    dir1_file_ends = os.path.splitext(os.listdir(dir1)[0])[1]
-
-    for j in same_files:
-        try:
-            # dir1
-            if select_dir == "dir1":
-                same_file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-                same_file_dst_path = same_dir_path + "/{}{}".format(j, dir1_file_ends)
-                shutil.copy(same_file_abs_path, same_file_dst_path)
-                print("shutil.copy: {} --> {}".format(same_file_abs_path, same_file_dst_path))
-            elif select_dir == "dir2":
-                same_file_abs_path = dir2 + "/{}{}".format(j, dir1_file_ends)
-                same_file_dst_path = same_dir_path + "/{}{}".format(j, dir1_file_ends)
-                shutil.copy(same_file_abs_path, same_file_dst_path)
-                print("shutil.copy: {} --> {}".format(same_file_abs_path, same_file_dst_path))
-            else:
-                print("'select_dir' should be dir1 or dir2.")
-        except Exception as Error:
-            print(Error)
-
-
-def process_not_exist_corresponding_files(base_path, dir1_name="images", dir2_name="labels", labelbee_json_label=False, move_or_delete="delete", dir="dir2"):
+# ---------------------------------------------------------------
+def process_via_filename(dir1, dir2, flag="same", mvcp="mv"):
     """
     :param dir1:
     :param dir2:
@@ -857,63 +750,6 @@ def process_not_exist_corresponding_files(base_path, dir1_name="images", dir2_na
                         print(Error)
 
 
-def process_file_by_name(data_path, key_words, mode=0, mvcp="move"):
-    file_list = sorted(os.listdir(data_path))
-    data_dir_name = os.path.basename(data_path)
-
-    if mode == 0:
-        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_selected_contain_key_words_{}".format(data_dir_name, key_words[0])
-    else:
-        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_selected_not_contain_key_words_{}".format(data_dir_name, key_words[0])
-    os.makedirs(save_path, exist_ok=True)
-
-    for f in file_list:
-        f_abs_path = data_path + "/{}".format(f)
-        try:
-            if mode == 0:
-                for i in range(len(key_words)):
-                    if key_words[i] in f:
-                        f_dst_path = save_path + "/{}".format(f)
-                        if cp_or_mv == "copy" or cp_or_mv == "cp":
-                            shutil.copy(f_abs_path, f_dst_path)
-                        elif cp_or_mv == "move" or cp_or_mv == "mv":
-                            shutil.move(f_abs_path, f_dst_path)
-                        break
-            else:
-                flag = False
-                for i in range(len(key_words)):
-                    if key_words[i] in f:
-                        # f_dst_path = save_path + "/{}".format(f)
-                        # shutil.copy(f_abs_path, f_dst_path)
-                        # break
-                        flag = True
-                        break
-
-                if not flag:
-                    f_dst_path = save_path + "/{}".format(f)
-                    if cp_or_mv == "copy" or cp_or_mv == "cp":
-                        shutil.copy(f_abs_path, f_dst_path)
-                    elif cp_or_mv == "move" or cp_or_mv == "mv":
-                        shutil.move(f_abs_path, f_dst_path)
-
-        except Exception as Error:
-            print(Error)
-
-
-def remove_specific_file_by_name_index(data_path, key_index=5):
-    file_list = sorted(os.listdir(data_path))
-
-    for f in file_list:
-        file_index = int(os.path.splitext(f)[0].split("_")[-1])
-        file_abs_path = data_path + "/{}".format(f)
-        try:
-            if file_index % key_index != 0:
-                os.remove(file_abs_path)
-                print("Removed --> {}".format(file_abs_path))
-
-        except Exception as Error:
-            print(Error)
-
 
 def copy_n_times(data_path, n=10, save_path="current", print_flag=True):
     data_list = sorted(os.listdir(data_path))
@@ -927,33 +763,19 @@ def copy_n_times(data_path, n=10, save_path="current", print_flag=True):
 
     for f in tqdm(data_list):
         f_name, f_suffix = os.path.splitext(f)[0], os.path.splitext(f)[1]
-        if f_suffix != ".json":
-            f_abs_path = data_path + "/{}".format(f)
-            f_dst_names = []
-            for i in range(n):
-                f_dst_names.append("{}_cp{}{}".format(f_name, i + 1, f_suffix))
+        f_abs_path = data_path + "/{}".format(f)
+        f_dst_names = []
+        for i in range(n):
+            f_dst_names.append("{}_cp{}{}".format(f_name, i + 1, f_suffix))
 
-            for j in f_dst_names:
-                f_dst_path = save_path + "/{}".format(j)
-                shutil.copy(f_abs_path, f_dst_path)
-                if print_flag:
-                    print("{} --> {}".format(f_abs_path, f_dst_path))
-        # labelbee json files
-        else:
-            f_name, f_suffix = os.path.splitext(f_name)[0], os.path.splitext(f_name)[1] + ".json"
-            f_abs_path = data_path + "/{}".format(f)
-            f_dst_names = []
-            for i in range(n):
-                f_dst_names.append("{}_cp{}{}".format(f_name, i + 1, f_suffix))
-
-            for j in f_dst_names:
-                f_dst_path = save_path + "/{}".format(j)
-                shutil.copy(f_abs_path, f_dst_path)
-                if print_flag:
-                    print("{} --> {}".format(f_abs_path, f_dst_path))
+        for j in f_dst_names:
+            f_dst_path = save_path + "/{}".format(j)
+            shutil.copy(f_abs_path, f_dst_path)
+            if print_flag:
+                print("{} --> {}".format(f_abs_path, f_dst_path))
 
 
-def copy_file_according_txt(txt_path="", save_path=""):
+def copy_via_txt(txt_path="", save_path=""):
     os.makedirs(save_path, exist_ok=True)
 
     data = open(txt_path, "r", encoding="utf-8")
@@ -966,33 +788,6 @@ def copy_file_according_txt(txt_path="", save_path=""):
         f_dst_path = save_path + "/{}".format(fname)
 
         shutil.copy(f_abs_path, f_dst_path)
-
-
-def copy_file_by_name(data_path, key_words, mode):
-    dir_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_copyed_by_name".format(dir_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    file_list = sorted(os.listdir(data_path))
-
-    for f in file_list:
-        f_abs_path = data_path + "/{}".format(f)
-        try:
-            if mode == 0:
-                for i in range(len(key_words)):
-                    if key_words[i] in f:
-                        f_dst_path = save_path + "/{}".format(f)
-                        shutil.copy(f_abs_path, f_dst_path)
-                        print("Copyed --> {}".format(f_dst_path))
-            else:
-                for i in range(len(key_words)):
-                    if key_words[i] not in f:
-                        f_dst_path = save_path + "/{}".format(f)
-                        shutil.copy(f_abs_path, f_dst_path)
-                        print("Copyed --> {}".format(f_dst_path))
-
-        except Exception as Error:
-            print(Error)
 
 
 def split_dir(data_path, split_n=5):
@@ -1058,9 +853,8 @@ def split_dir_multithread(data_path, split_n=8):
         t.join()
 
 
-def get_file_type(file_name, max_len=16):
+def get_file_type_code(file_name, max_len=16):
     """
-
     :param file_name:
     :param max_len:
     :return:
@@ -1074,7 +868,7 @@ def get_file_type(file_name, max_len=16):
     return code
 
 
-def change_Linux_conda_envs_bin_special_files_content(conda_envs_path):
+def change_conda_envs_files_content(conda_envs_path):
     """
     Can work!
     :param conda_envs_path:
@@ -1085,7 +879,7 @@ def change_Linux_conda_envs_bin_special_files_content(conda_envs_path):
     file_list = sorted(os.listdir(conda_envs_path))
     for f in file_list:
         f_abs_path = conda_envs_path + "/{}".format(f)
-        byte = get_file_type(f_abs_path)
+        byte = get_file_type_code(f_abs_path)
         # print("{}: {}".format(f, byte))
 
         if byte == "23212F686F6D652F7A656E6779696661":  # 23212F686F6D652F77756A696168752F, 23212F686F6D652F6C69757A68656E78, 23212F686F6D652F7A656E6779696661
@@ -1105,10 +899,7 @@ def change_Linux_conda_envs_bin_special_files_content(conda_envs_path):
                 fw.writelines(lines)
 
 
-
-
-
-def merge_txt(path1, path2):
+def merge_txt_content(path1, path2):
     txt_list1 = sorted(os.listdir(path1))
     txt_list2 = sorted(os.listdir(path2))
 
@@ -1131,8 +922,24 @@ def merge_txt(path1, path2):
 
                     print("{} --> {}".format(l2.strip(), f1_abs_path))
 
-        print("----------------------------")
+        print("OK!")
 
+
+def merge_txt_files(data_path):
+    dirname = os.path.basename(data_path)
+    file_list = get_file_list(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "../Merged_txt"))
+    os.makedirs(save_path, exist_ok=True)
+    merged_txt_path = save_path + "/{}.txt".format(dirname)
+    fw = open(merged_txt_path, "w", encoding="utf-8")
+
+    for f in file_list:
+        f_path = data_path + "/{}".format(f)
+        if os.path.isfile(f_path) and f_path.endswith(".txt"):
+            with open(f_path, "r", encoding="utf-8") as fr:
+                lines = fr.readlines()
+                fw.writelines(lines)
+    fw.close()
 
 
 def split_dir_by_file_suffix(data_path):
@@ -1158,173 +965,10 @@ def split_dir_by_file_suffix(data_path):
             shutil.move(f_abs_path, f_dst_path)
 
 
-def merge_txt_files(data_path):
-    file_list = get_file_list(data_path)
-    merged_txt_path = data_path + "/merged.txt"
-    fw = open(merged_txt_path, "w", encoding="utf-8")
-
-    for f in file_list:
-        f_path = data_path + "/{}".format(f)
-        if os.path.isfile(f_path) and f_path.endswith(".txt"):
-            with open(f_path, "r", encoding="utf-8") as fr:
-                lines = fr.readlines()
-                fw.writelines(lines)
-    fw.close()
 
 
-def merge_txt_files_v2(data_path):
-    dirname = os.path.basename(data_path)
-    file_list = get_file_list(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../Merged_txt"))
-    os.makedirs(save_path, exist_ok=True)
-    merged_txt_path = save_path + "/{}.txt".format(dirname)
-    fw = open(merged_txt_path, "w", encoding="utf-8")
 
-    for f in file_list:
-        f_path = data_path + "/{}".format(f)
-        if os.path.isfile(f_path) and f_path.endswith(".txt"):
-            with open(f_path, "r", encoding="utf-8") as fr:
-                lines = fr.readlines()
-                fw.writelines(lines)
-    fw.close()
-
-
-def ocr_data_gen_train_txt(data_path, LABEL):
-    """
-    fname=label.jpg --> fname=label.jpg label
-    Returns
-    -------
-
-    """
-    # data_path = "/home/disk/disk7/data/010.Digital_Rec/crnn/test/v2/15_cls/64_256_v5"
-    save_path = data_path + ".txt"
-
-    fw = open(save_path, "w", encoding="utf-8")
-    file_list = get_file_list(data_path, abspath=True)
-
-    for f in tqdm(file_list):
-        fname = os.path.basename(f)
-        fname_ = os.path.splitext(fname)[0]
-        label = fname_.split("=")[1]
-
-        num_ = 0
-        for l in label:
-            if l not in LABEL:
-                num_ += 1
-
-        if os.path.exists(f) and num_ == 0:
-            content = "{} {}\n".format(f, label)
-            fw.write(content)
-
-    fw.close()
-
-
-def ocr_data_gen_train_txt_v2(data_path, LABEL):
-    """
-    fname=label.jpg --> fname=label.jpg label
-    Returns
-    -------
-
-    """
-    save_path = data_path + ".txt"
-
-    fw = open(save_path, "w", encoding="utf-8")
-
-    dirs = sorted(os.listdir(data_path))
-    for d in dirs:
-        d_path = data_path + "/{}".format(d)
-        ddirs = sorted(os.listdir(d_path))
-        for dd in ddirs:
-            dd_path = d_path + "/{}".format(dd)
-            if os.path.isfile(dd_path): continue
-            file_list = get_file_list(dd_path)
-            for f in tqdm(file_list):
-                f_src_path = dd_path + "/{}".format(f)
-                if not f.endswith(".jpg") and not f.endswith(".jpeg") and not f.endswith(".png"):
-                    print(f_src_path)
-                try:
-                    # fname = os.path.basename(f_src_path)
-                    fname_ = os.path.splitext(f)[0]
-                    label = fname_.split("=")[1]
-
-                    num_ = 0
-                    for l in label:
-                        if l not in LABEL:
-                            num_ += 1
-
-                    if os.path.exists(f_src_path) and num_ == 0:
-                        content = "{} {}\n".format(f_src_path, label)
-                        fw.write(content)
-                except Exception as Error:
-                    print(Error)
-                    print(f_src_path)
-    fw.close()
-
-
-def ocr_data_merge_train_txt_files_v2(data_path, LABEL):
-    """
-    fname=label.jpg --> fname=label.jpg label
-    Returns
-    -------
-
-    """
-    # save_path = data_path + ".txt"
-    #
-    # fw = open(save_path, "w", encoding="utf-8")
-
-    dirs = sorted(os.listdir(data_path))
-
-    for d in dirs:
-        d_path = data_path + "/{}".format(d)
-
-        merge_txt_files_v2(d_path)
-
-        # if os.path.isfile(d_path): continue
-        # ddirs = sorted(os.listdir(d_path))
-        # for dd in ddirs:
-        #     dd_path = d_path + "/{}".format(dd)
-        #     merge_txt_files(dd_path)
-
-    # fw.close()
-
-
-def check_ocr_label(data_path, label):
-    """
-    data_path: *.txt
-    fname=label.jpg label
-    Parameters
-    ----------
-    data_path
-    label
-
-    Returns
-    -------
-
-    """
-    assert os.path.isfile(data_path) and data_path.endswith(".txt"), "{} should be *.txt"
-    fr = open(data_path, "r", encoding="utf-8")
-    lines = fr.readlines()
-    fr.close()
-
-    LABEL = ""
-
-    for line in tqdm(lines):
-        f, lbl = line.split(" ")[0], line.split(" ")[1].strip()
-        for l in lbl:
-            if l not in LABEL:
-                LABEL += l
-
-    print("label: {}, label length: {}".format(label, len(label)))
-    print("LABEL: {}, LABEL length: {}".format(LABEL, len(LABEL)))
-
-    un = ""
-    for l in label:
-        if l not in LABEL:
-            un += l
-    print("exclude: {}".format(un))
-
-
-def random_select_files_according_txt(data_path, select_percent):
+def random_select_files_via_txt(data_path, select_percent):
     assert os.path.isfile(data_path) and data_path.endswith(".txt"), "{} should be *.txt"
     save_path = data_path.replace(".txt", "_random_selected_{}_percent.txt".format(select_percent))
 
@@ -1342,46 +986,16 @@ def random_select_files_according_txt(data_path, select_percent):
     fw.close()
 
 
-def random_select_files_from_txt(data_path, n=2500):
-
-    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/selected"
-    os.makedirs(save_path, exist_ok=True)
-
-    fr = open(data_path, "r", encoding="utf-8")
-    lines = fr.readlines()
-    rs = random.sample(lines, n)
-    for line in rs:
-        f_abs_path = line.split(" ")[0]
-        f = os.path.basename(f_abs_path)
-        f_dst_path = save_path + "/{}".format(f)
-        try:
-            shutil.copy(f_abs_path, f_dst_path)
-        except Exception as Error:
-            print(Error)
-
-            
-def rename_files_under_dirs(data_path):
-    dir_list = get_dir_list(data_path)
-    for d in tqdm(dir_list):
-        d_path = data_path + "/{}".format(d)
-        file_list = get_file_list(d_path)
-        for f in file_list:
-            f_abs_path = d_path + "/{}".format(f)
-            # f_dst_path = d_path + "/{}{}".format(d.replace(d.split("_")[0], ""), f)
-            f_dst_path = d_path + "/{}_{}".format(d, f)
-            os.rename(f_abs_path, f_dst_path)
-
-            
-
 class Logger(object):
+    # 日志级别关系映射
     level_relations = {
         'debug': logging.DEBUG,
         'info': logging.INFO,
         'warning': logging.WARNING,
         'error': logging.ERROR,
         'crit': logging.CRITICAL
-    } # 日志级别关系映射
-    def __init__(self, filename, level='info', when='D', backCount=3, fmt='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s'):
+    }
+    def __init__(self, filename, level='info', when='D', interval=1, backCount=3, fmt='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s'):
         from logging.handlers import TimedRotatingFileHandler
 
         self.logger = logging.getLogger(filename)
@@ -1389,62 +1003,19 @@ class Logger(object):
         self.logger.setLevel(self.level_relations.get(level)) # 设置日志级别
         sh = logging.StreamHandler() # 往屏幕上输出
         sh.setFormatter(format_str) # 设置屏幕上显示的格式
-        th = TimedRotatingFileHandler(filename=filename, when=when, backupCount=backCount, encoding='utf-8') # 往文件里写入#指定间隔时间自动生成文件的处理器
+
+        dirname = os.getcwd()
+        # logpath = os.path.dirname(os.getcwd()) + '/Logs/'
+        logpath = dirname + '/Logs/'
+        os.makedirs(logpath, exist_ok=True)
+        th = TimedRotatingFileHandler(filename=logpath + filename +'-log.', when=when, interval=1, backupCount=backCount, encoding='utf-8') # 往文件里写入#指定间隔时间自动生成文件的处理器
+        th.suffix = "-%Y-%m-%d_%H-%M-%S.log"
         # 实例化TimedRotatingFileHandler
         # interval是时间间隔，backupCount是备份文件的个数，如果超过这个个数，就会自动删除，when是间隔的时间单位，单位有以下几种：
         # S 秒、M 分、H 小时、D 天、W 每星期（interval==0时代表星期一）、midnight 每天凌晨
         th.setFormatter(format_str) # 设置文件里写入的格式
         self.logger.addHandler(sh) # 把对象加到logger里
         self.logger.addHandler(th)
-
-
-def LogInit(prex):
-    from logging.handlers import TimedRotatingFileHandler
-
-    """
-    日志按日输出 单进程适用
-    """
-    log_fmt = "%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
-    formatter = logging.Formatter(log_fmt)
-    # 创建TimedRotatingFileHandler对象
-    # dirname, filename = os.path.split(os.path.abspath(__file__))
-    dirname = os.getcwd()
-    # logpath = os.path.dirname(os.getcwd()) + '/Logs/'
-    logpath = dirname + '/Logs/'
-    if not os.path.exists(logpath):
-        os.mkdir(logpath)
-    log_file_handler = TimedRotatingFileHandler(filename=logpath + prex+'-log.', when="D", interval=1)
-    log_file_handler.suffix = prex + "-%Y-%m-%d_%H-%M-%S.log"
-    log_file_handler.setFormatter(formatter)
-    logging.basicConfig(level=logging.INFO)
-    log = logging.getLogger(prex)
-    log.addHandler(log_file_handler)
-
-    return log
-
-
-class ImgProgressBar(object):
-    def __init__(self, total_iter, bar_len=50):
-        self.total_iter = total_iter
-        self.bar_len = bar_len
-        self.coef = self.bar_len / 100
-        self.foo = ['-', '\\', '|', '/']
-
-    def update(self, i):
-        sys.stdout.write('\r')
-        progress = int((i + 1) / self.total_iter * 100)
-        sys.stdout.write("[%4s/%4s] %3s%% |%s%s| %s" % (
-            (i + 1), 
-            self.total_iter, 
-            progress, 
-            int(progress * self.coef) * '>', 
-            (self.bar_len - int(progress * self.coef)) * ' ', 
-            self.foo[(i + 1) % len(self.foo)]
-        ))
-        sys.stdout.flush()
-
-    def finish(self):
-        sys.stdout.write('\n')
         
 
 if __name__ == '__main__':

@@ -7881,7 +7881,144 @@ def get_font_char_image(data_path, chars="0123456789.AbC"):
             cv2.imwrite("{}/{}_bg1_{}.jpg".format(save_path, font_name, a), image)
 
 
+def create_ocr_rec_train_txt_base(data_path, alpha):
+    """
+    fname=label.jpg --> fname=label.jpg label
+    Returns
+    -------
+
+    """
+    # data_path = "/home/disk/disk7/data/010.Digital_Rec/crnn/test/v2/15_cls/64_256_v5"
+    save_path = data_path + ".txt"
+
+    fw = open(save_path, "w", encoding="utf-8")
+    file_list = get_file_list(data_path, abspath=True)
+
+    for f in tqdm(file_list):
+        fname = os.path.basename(f)
+        fname_ = os.path.splitext(fname)[0]
+        label = fname_.split("=")[1]
+
+        num_ = 0
+        for l in label:
+            if l not in alpha:
+                num_ += 1
+
+        if os.path.exists(f) and num_ == 0:
+            content = "{} {}\n".format(f, label)
+            fw.write(content)
+
+    fw.close()
+
+
+def create_ocr_rec_train_txt(data_path, LABEL):
+    """
+    fname=label.jpg --> fname=label.jpg label
+    Returns
+    -------
+
+    """
+    save_path = data_path + ".txt"
+
+    fw = open(save_path, "w", encoding="utf-8")
+
+    dirs = sorted(os.listdir(data_path))
+    for d in dirs:
+        d_path = data_path + "/{}".format(d)
+        ddirs = sorted(os.listdir(d_path))
+        for dd in ddirs:
+            dd_path = d_path + "/{}".format(dd)
+            if os.path.isfile(dd_path): continue
+            file_list = get_file_list(dd_path)
+            for f in tqdm(file_list):
+                f_src_path = dd_path + "/{}".format(f)
+                if not f.endswith(".jpg") and not f.endswith(".jpeg") and not f.endswith(".png"):
+                    print(f_src_path)
+                try:
+                    # fname = os.path.basename(f_src_path)
+                    fname_ = os.path.splitext(f)[0]
+                    label = fname_.split("=")[1]
+
+                    num_ = 0
+                    for l in label:
+                        if l not in LABEL:
+                            num_ += 1
+
+                    if os.path.exists(f_src_path) and num_ == 0:
+                        content = "{} {}\n".format(f_src_path, label)
+                        fw.write(content)
+                except Exception as Error:
+                    print(Error)
+                    print(f_src_path)
+    fw.close()
+
+
+def merge_ocr_rec_train_txt_files(data_path, LABEL):
+    """
+    fname=label.jpg --> fname=label.jpg label
+    Returns
+    -------
+
+    """
+    # save_path = data_path + ".txt"
+    #
+    # fw = open(save_path, "w", encoding="utf-8")
+
+    dirs = sorted(os.listdir(data_path))
+
+    for d in dirs:
+        d_path = data_path + "/{}".format(d)
+
+        merge_txt_files(d_path)
+
+        # if os.path.isfile(d_path): continue
+        # ddirs = sorted(os.listdir(d_path))
+        # for dd in ddirs:
+        #     dd_path = d_path + "/{}".format(dd)
+        #     merge_txt_files(dd_path)
+
+    # fw.close()
+
+
+def check_ocr_label(data_path, label):
+    """
+    data_path: *.txt
+    fname=label.jpg label
+    Parameters
+    ----------
+    data_path
+    label
+
+    Returns
+    -------
+
+    """
+    assert os.path.isfile(data_path) and data_path.endswith(".txt"), "{} should be *.txt"
+    fr = open(data_path, "r", encoding="utf-8")
+    lines = fr.readlines()
+    fr.close()
+
+    LABEL = ""
+
+    for line in tqdm(lines):
+        f, lbl = line.split(" ")[0], line.split(" ")[1].strip()
+        for l in lbl:
+            if l not in LABEL:
+                LABEL += l
+
+    print("label: {}, label length: {}".format(label, len(label)))
+    print("LABEL: {}, LABEL length: {}".format(LABEL, len(LABEL)))
+
+    un = ""
+    for l in label:
+        if l not in LABEL:
+            un += l
+    print("exclude: {}".format(un))
+    
+
 def list_module_functions():
+    import inspect
+    import importlib
     """
     列出模块中所有的函数
     """
@@ -7891,7 +8028,7 @@ def list_module_functions():
     module = importlib.import_module(os.path.basename(current_file)[:-3])
     functions = [func for func in dir(module) if callable(getattr(module, func))]
     print(sorted(functions))
-    
+
 
 if __name__ == '__main__':
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])

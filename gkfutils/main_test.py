@@ -322,7 +322,7 @@ def saliency_map_ft_test():
         bg_b, bg_g, bg_r = cv2.split(bg_img)
         bg_img_gray = cv2.cvtColor(bg_img, cv2.COLOR_BGR2GRAY)
         # bg_img_cp = bg_img.copy()
-        saliency_map2 = get_saliency_ft(img_abs_path)
+        saliency_map2 = cal_saliency_map(img_abs_path, algorithm="FT2")
         saliency_map2_merge = cv2.merge([saliency_map2, saliency_map2, saliency_map2])
         saliency_map = cal_saliency_map(img) * 255
         b, g, r = cv2.split(saliency_map)
@@ -488,7 +488,7 @@ def seamless_clone_test(save_path):
 
     cv2.imwrite("{}/20231008_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
 
-    
+
 def main_test():
     pass
 

@@ -55,7 +55,7 @@ gkfutils.cv.utils.coco2labelbee(data_path="")
 gkfutils.cv.utils.coco2yolo(data_path="")
 gkfutils.cv.utils.coco2voc(data_path="")
 
-res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm=algorithm, center=(100, 100), angle=angle, scale=1, expand=expand)
+res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm="pil", center=(100, 100), angle=angle, scale=1, expand=expand)
 res = gkfutils.cv.utils.flip(img, random=False, p=1, m=-1)
 res = gkfutils.cv.utils.scale(img, random=False, p=1, fx=0.0, fy=0.5)
 res = gkfutils.cv.utils.resize(img, random=False, p=1, dsz=(1920, 1080), interpolation=cv2.INTER_LINEAR)

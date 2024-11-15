@@ -14,12 +14,6 @@ Description:
 
 """
 
-# from ..utils import (
-#     get_file_list, get_base_name,
-#     get_dir_name, make_save_path,
-#     is_all_chinese, is_all_digits
-# )
-
 
 import os
 import re
@@ -47,7 +41,10 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import PIL
-from PIL import Image, ImageDraw, ImageOps
+from PIL import (
+    Image, ImageDraw,
+    ImageOps, ImageFont
+)
 import skimage
 import scipy
 import torch
@@ -61,6 +58,45 @@ from shapely.geometry import Polygon
 
 
 # Base utils ===================================================
+def timestamp_to_strftime(timestamp: float):
+    if timestamp is None or timestamp == "":
+        strftime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+        return strftime
+    else:
+        assert type(timestamp) == float, "timestamp should be float!"
+        strftime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+        return strftime
+
+
+def strftime_to_timestamp(strftime: str):
+    """
+    strftime = "2024-11-06 12:00:00"
+    """
+    assert strftime is not None or strftime != "", "strftime is empty!"
+    struct_time = time.strptime(strftime, "%Y-%m-%d %H:%M:%S")
+    timestamp = time.mktime(struct_time)
+    return timestamp
+
+
+def get_date_time(mode=0):
+    """
+    0: %Y-%m-%d %H:%M:%S
+    1: %Y %m %d %H:%M:%S
+    2: %Y/%m/%d %H:%M:%S
+    """
+    if mode == 0:
+        datetime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+        return datetime
+    elif mode == 1:
+        datetime = time.strftime("%Y %m %d %H:%M:%S", time.localtime(time.time()))
+        return datetime
+    elif mode == 2:
+        datetime = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
+        return datetime
+    else:
+        print("mode should be 0, 1, 2!")
+
+
 def get_file_list(data_path: str, abspath=False) -> list:
     file_list = []
     list_ = sorted(os.listdir(data_path))
@@ -145,6 +181,7 @@ def make_save_path(data_path: str, relative=".", add_str="results"):
         print("relative should be . or .. or ...")
         raise ValueError
     os.makedirs(save_path, exist_ok=True)
+    print("Create successful! save_path: {}".format(save_path))
     return save_path
 
 
@@ -306,6 +343,203 @@ def resize(img, random=False, p=1, dsz=(1920, 1080), r=(0.01, 2.0), interpolatio
         img = cv2.resize(img, dsz, interpolation=interpolation)
         return img
 
+
+def stretch(img, random=False, p=1, r=(0.8, 1.2)):
+    if random:
+        assert isinstance(r, tuple), "If random=True, r should be tuple!"
+        if np.random.random() <= p:
+            h, w = img.shape[:2]
+            rate = np.random.uniform(r[0], r[1])
+            w2 = int(w * rate)
+            h2 = int(h * rate)
+            if np.random.random() <= 0.5:
+                img = cv2.resize(img, (w2, h))
+            else:
+                img = cv2.resize(img, (w, h2))
+            return img
+        else:
+            return img
+    else:
+        assert isinstance(r, float), "If random=False, r should be float!"
+        h, w = img.shape[:2]
+        w2 = int(w * r)
+        h2 = int(h * r)
+        if np.random.random() <= 0.5:
+            img = cv2.resize(img, (w2, h))
+        else:
+            img = cv2.resize(img, (w, h2))
+        return img
+
+
+def crop(img, random=False, p=1, fix_size=False, crop_size=(256, 256), min_size=(64, 64), rect=(0, 0, 100, 200)):
+    # crop_size: [H, W]
+    if random:
+        if np.random.random() <= p:
+            imgsz = img.shape[:2]
+            assert crop_size[0] >= 0 and crop_size[0] <= imgsz[0], "crop_size[0] < 0 or crop_size[0] > imgsz[0]"
+            assert crop_size[1] >= 0 and crop_size[1] <= imgsz[1], "crop_size[1] < 0 or crop_size[1] > imgsz[1]"
+
+            if not fix_size:
+                crop_size_h = np.random.randint(min_size[0], crop_size[0])
+                crop_size_w = np.random.randint(min_size[1], crop_size[1])
+                crop_size = (crop_size_h, crop_size_w)
+                
+            x = np.random.randint(0, imgsz[1] - crop_size[1])
+            y = np.random.randint(0, imgsz[0] - crop_size[0])
+
+            try:
+                cropped_img = img[y:(y + crop_size[0]), x:(x + crop_size[1])]
+            except Exception as Error:
+                print(Error)
+                return None
+            
+            return cropped_img
+        else:
+            return img
+    else:
+        imgsz = img.shape[:2]
+        assert rect[0] >= 0 and rect[0] <= imgsz[1], "rect[0] >= 0 and rect[0] <= imgsz[1]"
+        assert rect[1] >= 0 and rect[1] <= imgsz[0], "rect[1] >= 0 and rect[1] <= imgsz[0]"
+        cropped_img = img[rect[1]:rect[3], rect[0]:rect[2]]
+        
+        return cropped_img
+
+
+def squeeze(img, random=False, p=1, center=(5, 50), degree=11):
+    """
+    产生向中心点挤压的效果。效果不太好,速度也慢,谨慎使用!
+    """
+    if random:
+        assert isinstance(degree, tuple), "If random=True, degree should be tuple!"
+        if np.random.random() <= p:
+            imgsz = img.shape
+            center_x = np.random.randint(0, imgsz[1])
+            center_y = np.random.randint(0, imgsz[0])
+            center = (center_x, center_y)
+            degree = np.random.randint(degree[0], degree[1])
+            new_data = img.copy()
+            for i in range(imgsz[1]):
+                for j in range(imgsz[0]):
+                    tx = i - center[0]
+                    ty = j - center[1]
+                    theta = math.atan2(ty, tx)
+                    # 半径
+                    radius = math.sqrt(tx ** 2 + ty ** 2)
+                    radius = math.sqrt(radius) * degree
+                    new_x = int(center[0] + radius * math.cos(theta))
+                    new_y = int(center[1] + radius * math.sin(theta))
+                    if new_x < 0:
+                        new_x = 0
+                    if new_x >= imgsz[1]:
+                        new_x = imgsz[1] - 1
+                    if new_y < 0:
+                        new_y = 0
+                    if new_y >= imgsz[0]:
+                        new_y = imgsz[0] - 1
+
+                    for c in range(imgsz[2]):
+                        new_data[j][i][c] = img[new_y][new_x][c]
+            return new_data
+        else:
+            return img
+    else:
+        assert isinstance(degree, int), "If random=False, degree should be float!"
+        imgsz = img.shape
+        new_data = img.copy()
+        for i in range(imgsz[1]):
+            for j in range(imgsz[0]):
+                tx = i - center[0]
+                ty = j - center[1]
+                theta = math.atan2(ty, tx)
+                # 半径
+                radius = math.sqrt(tx ** 2 + ty ** 2)
+                radius = math.sqrt(radius) * degree
+                new_x = int(center[0] + radius * math.cos(theta))
+                new_y = int(center[1] + radius * math.sin(theta))
+                if new_x < 0:
+                    new_x = 0
+                if new_x >= imgsz[1]:
+                    new_x = imgsz[1] - 1
+                if new_y < 0:
+                    new_y = 0
+                if new_y >= imgsz[0]:
+                    new_y = imgsz[0] - 1
+
+                for c in range(imgsz[2]):
+                    new_data[j][i][c] = img[new_y][new_x][c]
+        return new_data
+
+
+def compress(img, random=False, p=1, quality=(25, 90)):
+    """
+    like change_definition
+    """
+    if random:
+        assert isinstance(quality, tuple), "If random=True, quality should be tuple!"
+        if np.random.random() <= p:
+            q = np.random.randint(quality[0], quality[1])
+            param = [int(cv2.IMWRITE_JPEG_QUALITY), q]
+            img_encode = cv2.imencode('.jpeg', img, param)
+            img_decode = cv2.imdecode(img_encode[1], cv2.IMREAD_COLOR)
+            return img_decode
+        else:
+            return img
+    else:
+        assert isinstance(quality, int), "If random=False, quality should be int!"
+        param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        img_encode = cv2.imencode('.jpeg', img, param)
+        img_decode = cv2.imdecode(img_encode[1], cv2.IMREAD_COLOR)
+        return img_decode
+    
+
+def change_definition(img, random=False, p=1, r=(0.5, 0.95)):
+    """
+    like compress
+    """
+    if random:
+        assert isinstance(r, tuple), "If random=True, r should be tuple!"
+        if np.random.random() <= p:
+            h, w = img.shape[:2]
+            rate = np.random.uniform(r[0], r[1])
+            w2 = int(w * rate)
+            h2 = int(h * rate)
+            img = cv2.resize(img, (w2, h2))
+            img = cv2.resize(img, (w, h))
+            return img
+        else:
+            return img
+    else:
+        assert isinstance(r, float), "If random=False, r should be float!"
+        h, w = img.shape[:2]
+        w2 = int(w * r)
+        h2 = int(h * r)
+        img = cv2.resize(img, (w2, h2))
+        img = cv2.resize(img, (w, h))
+        return img
+
+
+def normalize(img, random=False, p=1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX):
+    """
+    """
+    assert norm_type == cv2.NORM_MINMAX or norm_type == cv2.NORM_L2, "norm_type: cv2.NORM_MINMAX or cv2.NORM_L2!"
+    if random:
+        if np.random.random() <= p:
+            if norm_type == cv2.NORM_MINMAX:
+                norm_img = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            else:
+                norm_img = cv2.normalize(img, None, norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
+            norm_img = (255 * norm_img).astype(np.uint8)
+            return norm_img
+        else:
+            return img
+    else:
+        if norm_type == cv2.NORM_MINMAX:
+            norm_img = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        else:
+            norm_img = cv2.normalize(img, None, norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
+        norm_img = (255 * norm_img).astype(np.uint8)
+        return norm_img
+    
 
 def equalize_hist(img, random=False, p=1, m=np.random.choice([0, 1])):
     assert m in [0, 1], "m should be one of [0, 1]"
@@ -499,6 +733,300 @@ def gamma_correction_auto(img, method=2):
         return None
     
 
+def change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=30):
+    """
+    # 使用公式f(x)=α.g(x)+β, α调节对比度, β调节亮度
+    # 小心使用
+    # TODO: PIL format
+    # con = ImageEnhance.Contrast(img)
+    # res = con.enhance(random.uniform(lower, upper))
+    # 
+    # bri = ImageEnhance.Brightness(img)
+    # res = bri.enhance(random.uniform(lower, upper))
+    """
+    
+    if random:
+        # alpha建议>= 0.1，不然容易变黑图
+        assert isinstance(alpha, tuple), "If random=True, alpha should be tuple!"
+        assert isinstance(beta, tuple), "If random=True, beta should be tuple!"
+        if np.random.random() <= p:
+            alpha = np.random.uniform(alpha[0], alpha[1])
+            beta = np.random.randint(beta[0], beta[1] + 1)
+            blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
+            img = cv2.addWeighted(np.uint8(img), alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
+            return img
+        else:
+            return img
+    else:
+        assert isinstance(alpha, float), "If random=False, alpha should be float!"
+        assert isinstance(beta, int), "If random=False, beta should be int!"
+        assert alpha >= 0 and alpha <= 1, "alpha >= 0 and alpha <= 1"
+        blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
+        img = cv2.addWeighted(np.uint8(img), alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
+        return img
+    
+
+def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
+    """
+    直方图适应均衡化
+    该函数包含以下参数:
+    clipLimit: 用于控制直方图均衡化的局部对比度,值越高,越容易出现失真和噪声。建议值为2-4,若使用默认值0则表示自动计算。
+    tileGridSize: 表示每个块的大小,推荐16x16。
+    tileGridSize.width: 块的宽度。
+    tileGridSize.height: 块的高度。
+    函数返回一个CLAHE对象,可以通过该对象调用apply函数来实现直方图均衡化。
+    """
+    assert m in [0, 1], "m should be one of [0, 1]!"
+    if random:
+        assert isinstance(clipLimit, tuple), "If random=True, clipLimit should be tuple!"
+        if np.random.random() <= p:
+            clipLimit = np.random.randint(clipLimit[0], clipLimit[1] + 1)
+            tgs = np.random.randint(tileGridSize[0], tileGridSize[1] + 1)
+            # tgs = np.random.choice([4, 8, 16, 32])
+            tileGridSize = (tgs, tgs)
+            if m == 0:
+                img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+                clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
+                res = clahe.apply(img)
+                img = cv2.merge([res, res, res])
+            else:
+                b, g, r = cv2.split(img.astype(np.uint8))
+                clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
+                clahe_b = clahe.apply(b)
+                clahe_g = clahe.apply(g)
+                clahe_r = clahe.apply(r)
+                img = cv2.merge([clahe_b, clahe_g, clahe_r])
+
+            return img
+        else:
+            return img
+    else:
+        assert isinstance(clipLimit, float), "If random=False, clipLimit should be float!"
+        if m == 0:
+            img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
+            res = clahe.apply(img)
+            img = cv2.merge([res, res, res])
+        else:
+            b, g, r = cv2.split(img.astype(np.uint8))
+            clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
+            clahe_b = clahe.apply(b)
+            clahe_g = clahe.apply(g)
+            clahe_r = clahe.apply(r)
+            img = cv2.merge([clahe_b, clahe_g, clahe_r])
+        return img
+
+
+def change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5):
+    if random:
+        if np.random.random() <= p:
+            img = img.astype(np.uint8)
+            hgain = np.random.uniform(hgain[0], hgain[1])
+            sgain = np.random.uniform(sgain[0], sgain[1])
+            vgain = np.random.uniform(vgain[0], vgain[1])
+            r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
+            hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
+            dtype = img.dtype  # uint8
+
+            x = np.arange(0, 256, dtype=np.int16)
+            lut_hue = ((x * r[0]) % 180).astype(dtype)
+            lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
+            lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+
+            img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
+            cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
+            img = img.astype(np.float32)
+            return img
+        else:
+            return img
+    else:
+        img = img.astype(np.uint8)
+        r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
+        hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
+        dtype = img.dtype  # uint8
+
+        x = np.arange(0, 256, dtype=np.int16)
+        lut_hue = ((x * r[0]) % 180).astype(dtype)
+        lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
+        lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+
+        img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
+        cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
+        img = img.astype(np.float32)
+        return img
+    
+
+def log_transformation(img, random=False, p=1):
+    """
+    对数变换
+    """
+    if random:
+        if np.random.random() <= p:
+            img = np.clip(img, 2, 255)
+            c = 255 / np.log(1 + np.max(img))
+            log_image = c * (np.log(img))
+            # Specify the data type so that
+            # float value will be converted to int
+            log_image = np.clip(log_image, 0, 255)
+            log_image = np.array(log_image, dtype=np.uint8)
+            return log_image
+        else:
+            return img
+    else:
+        img = np.clip(img, 2, 255)
+        c = 255 / np.log(1 + np.max(img))
+        log_image = c * (np.log(img))
+        # Specify the data type so that
+        # float value will be converted to int
+        log_image = np.clip(log_image, 0, 255)
+        log_image = np.array(log_image, dtype=np.uint8)
+        return log_image
+    
+
+def color_distortion(img, random=False, p=1, value=(-50, 50)):
+    """
+    TODO: PIL format
+    col = ImageEnhance.Color(img)
+    res = col.enhance(random.uniform(lower, upper))
+
+    def random_jitter(image):
+        # 对图像进行颜色抖动
+        # :param image: PIL的图像image
+        # :return: 有颜色色差的图像image
+
+        random_factor = np.random.randint(0, 31) / 10.  # 随机因子
+        color_image = ImageEnhance.Color(image).enhance(random_factor)  # 调整图像的饱和度
+        random_factor = np.random.randint(10, 21) / 10.  # 随机因子
+        brightness_image = ImageEnhance.Brightness(color_image).enhance(random_factor)  # 调整图像的亮度
+        random_factor = np.random.randint(10, 21) / 10.  # 随机因1子
+        contrast_image = ImageEnhance.Contrast(brightness_image).enhance(random_factor)  # 调整图像对比度
+        random_factor = np.random.randint(0, 31) / 10.  # 随机因子
+        return ImageEnhance.Sharpness(contrast_image).enhance(random_factor)  # 调整图像锐度
+
+    def random_sharpness(img, p=0.5, lower=0.5, upper=1.5):
+        assert upper >= lower, "upper must be >= lower."
+        assert lower >= 0, "lower must be non-negative."
+        if np.random.random() < p:
+            img = getpilimage(img)
+            sha = ImageEnhance.Sharpness(img)
+            return sha.enhance(random.uniform(lower, upper))
+        else:
+            return img
+            
+    """
+    if random:
+        assert isinstance(value, tuple), "If random=True, value should be tuple!"
+        if np.random.random() <= p:
+            hue_v = np.random.randint(value[0], value[1])
+            hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
+            hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue_v) % 180  # 在Hue通道上增加30
+            hsv_image = np.clip(hsv_image, 0, 255)
+            img = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+            return img
+        else:
+            return img
+    else:
+        assert isinstance(value, int), "If random=False, value should be int!"
+        hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
+        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + value) % 180  # 在Hue通道上增加30
+        hsv_image = np.clip(hsv_image, 0, 255)
+        img = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+        return img
+    
+
+def make_mask(img, random=False, p=1, fix_size=False, mask_size=(256, 256), min_size=(64, 64), rect=(0, 0, 100, 200), color=(255, 0, 255)):
+    """
+    like transperent_overlay
+    """
+    imgcp = copy.copy(img)
+    if random:
+        if np.random.random() <= p:
+            # 在图像上随机生成一个矩形遮挡,遮挡的位置和大小都是随机生成的。遮挡的颜色也是随机选择的
+            # 生成随机遮挡位置和大小
+            imgsz = imgcp.shape[:2]
+
+            if not fix_size:
+                assert min_size[1] < mask_size[1], "min_size[1] < mask_size[1]"
+                assert min_size[0] < mask_size[0], "min_size[0] < mask_size[0]"
+                mask_size_x = np.random.randint(min_size[1], mask_size[1])
+                mask_size_y = np.random.randint(min_size[0], mask_size[0])
+                mask_size = (mask_size_x, mask_size_y)
+
+            mask_x = np.random.randint(0, max(imgsz[1] - mask_size[1], 1))
+            mask_y = np.random.randint(0, max(imgsz[0] - mask_size[0], 1))
+
+            # 生成随机颜色的遮挡
+            mask_color = np.random.randint(0, 256, (1, 1, 3))
+            imgcp[mask_y:mask_y + mask_size[0], mask_x:mask_x + mask_size[1]] = mask_color
+            return imgcp
+        else:
+            return imgcp
+    else:
+        imgsz = imgcp.shape[:2]
+        assert rect[0] >= 0 and rect[2] <= imgsz[1], "rect[0] >= 0 and rect[2] <= imgsz[1]"
+        assert rect[1] >= 0 and rect[3] <= imgsz[0], "rect[1] >= 0 and rect[3] <= imgsz[0]"
+
+        imgcp[rect[1]:rect[3], rect[0]:rect[2]] = color
+        return imgcp
+    
+
+def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=1.0, max_w_r=0.25, alpha=(0.1, 1.0)):
+    """
+    rect: [x1, y1, x2, y2]
+    """
+    if random:
+        if np.random.random() <= p:
+            imgsz = img.shape
+            orig_c = imgsz[2]
+            max_h = int(imgsz[0] * max_h_r)
+            max_w = int(imgsz[1] * max_w_r)
+
+            alpha = np.random.uniform(alpha[0], alpha[1])
+
+            x = np.random.randint(0, max(imgsz[1] - max_w, 1))
+            y = np.random.randint(0, max(imgsz[0] - max_h, 1))
+            bw = np.random.randint(0, max(max_w, 1))
+            bh = np.random.randint(0, max(max_h, 1))
+            color = [np.random.randint(0, 256) for _ in range(3)]
+
+            if imgsz[2] < 4:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+
+            # 创建一个与图片大小相同的覆盖层
+            # overlay = img.copy()
+            overlay = np.ones(shape=img.shape, dtype=np.uint8)
+            cv2.rectangle(overlay, (x, y), (x + bw, y + bh), color, -1)
+            img = cv2.addWeighted(np.uint8(overlay), alpha, np.uint8(img), 1 - alpha, 0)
+
+            # Convert the image back to the original number of channels
+            if orig_c != img.shape[2]:
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            return img
+        else:
+            return img
+    else:
+        imgsz = img.shape
+        orig_c = imgsz[2]
+        alpha = np.random.uniform(alpha[0], alpha[1])
+        color = [np.random.randint(0, 256) for _ in range(3)]
+
+        if imgsz[2] < 4:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+
+        # 创建一个与图片大小相同的覆盖层
+        # overlay = img.copy()
+        overlay = np.ones(shape=img.shape, dtype=np.uint8)
+        x1, y1 = rect[0], rect[1]
+        x2, y2 = rect[2], rect[3]
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
+        img = cv2.addWeighted(np.uint8(overlay), alpha, np.uint8(img), 1 - alpha, 0)
+
+        # Convert the image back to the original number of channels
+        if orig_c != img.shape[2]:
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        return img
+    
+
 def gaussian_noise(img, random=False, p=1, mean=0, var=0.25):
     """
     Examples
@@ -620,256 +1148,6 @@ def sp_noise(img, random=False, p=1, salt_p=0.01, pepper_p=0.01):
         noisy_image[pepper_coords[0], pepper_coords[1]] = 0
 
         return noisy_image
-
-
-def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 200), light_strength=(50, 150)):
-    if random:
-        assert isinstance(effect_r, tuple), "If random=True, effect_r should be tuple!"
-        assert isinstance(light_strength, tuple), "If random=True, light_strength should be tuple!"
-        if np.random.random() <= p:
-            imgsz = img.shape[:2]
-            center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
-            effectR = np.random.randint(effect_r[0], effect_r[1])
-            lightStrength = np.random.randint(light_strength[0], light_strength[1])
-
-            dst = np.zeros(shape=img.shape, dtype=np.uint8)
-
-            for i in range(imgsz[0]):
-                for j in range(imgsz[1]):
-                    dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
-                    B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
-                    if dis < effectR * effectR:
-                        result = int(lightStrength * (1.0 - np.sqrt(dis) / effectR))
-                        B += result
-                        G += result
-                        R += result
-
-                        B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
-                        dst[i, j] = np.uint8((B, G, R))
-                    else:
-                        dst[i, j] = np.uint8((B, G, R))
-            return dst
-        else:
-            return img
-    else:
-        assert isinstance(effect_r, int), "If random=False, effect_r should be int!"
-        assert isinstance(light_strength, int), "If random=False, light_strength should be int!"
-
-        imgsz = img.shape[:2]
-        dst = np.zeros(shape=img.shape, dtype=np.uint8)
-
-        for i in range(imgsz[0]):
-            for j in range(imgsz[1]):
-                dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
-                B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
-                if dis < effect_r * effect_r:
-                    result = int(light_strength * (1.0 - np.sqrt(dis) / effect_r))
-                    B += result
-                    G += result
-                    R += result
-
-                    B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
-                    dst[i, j] = np.uint8((B, G, R))
-                else:
-                    dst[i, j] = np.uint8((B, G, R))
-        return dst
-
-        
-def color_distortion(img, random=False, p=1, value=(-50, 50)):
-    """
-    TODO: PIL format
-    col = ImageEnhance.Color(img)
-    res = col.enhance(random.uniform(lower, upper))
-
-    def random_jitter(image):
-        # 对图像进行颜色抖动
-        # :param image: PIL的图像image
-        # :return: 有颜色色差的图像image
-
-        random_factor = np.random.randint(0, 31) / 10.  # 随机因子
-        color_image = ImageEnhance.Color(image).enhance(random_factor)  # 调整图像的饱和度
-        random_factor = np.random.randint(10, 21) / 10.  # 随机因子
-        brightness_image = ImageEnhance.Brightness(color_image).enhance(random_factor)  # 调整图像的亮度
-        random_factor = np.random.randint(10, 21) / 10.  # 随机因1子
-        contrast_image = ImageEnhance.Contrast(brightness_image).enhance(random_factor)  # 调整图像对比度
-        random_factor = np.random.randint(0, 31) / 10.  # 随机因子
-        return ImageEnhance.Sharpness(contrast_image).enhance(random_factor)  # 调整图像锐度
-
-    def random_sharpness(img, p=0.5, lower=0.5, upper=1.5):
-        assert upper >= lower, "upper must be >= lower."
-        assert lower >= 0, "lower must be non-negative."
-        if np.random.random() < p:
-            img = getpilimage(img)
-            sha = ImageEnhance.Sharpness(img)
-            return sha.enhance(random.uniform(lower, upper))
-        else:
-            return img
-            
-    """
-    if random:
-        assert isinstance(value, tuple), "If random=True, value should be tuple!"
-        if np.random.random() <= p:
-            hue_v = np.random.randint(value[0], value[1])
-            hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
-            hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue_v) % 180  # 在Hue通道上增加30
-            hsv_image = np.clip(hsv_image, 0, 255)
-            img = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-            return img
-        else:
-            return img
-    else:
-        assert isinstance(value, int), "If random=False, value should be int!"
-        hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
-        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + value) % 180  # 在Hue通道上增加30
-        hsv_image = np.clip(hsv_image, 0, 255)
-        img = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-        return img
-
-
-def change_contrast_and_brightness(img, random=False, p=1, alpha=0.5, beta=30):
-    """
-    # 使用公式f(x)=α.g(x)+β, α调节对比度, β调节亮度
-    # 小心使用
-    # TODO: PIL format
-    # con = ImageEnhance.Contrast(img)
-    # res = con.enhance(random.uniform(lower, upper))
-    # 
-    # bri = ImageEnhance.Brightness(img)
-    # res = bri.enhance(random.uniform(lower, upper))
-    """
-    
-    if random:
-        # alpha建议>= 0.1，不然容易变黑图
-        assert isinstance(alpha, tuple), "If random=True, alpha should be tuple!"
-        assert isinstance(beta, tuple), "If random=True, beta should be tuple!"
-        if np.random.random() <= p:
-            alpha = np.random.uniform(alpha[0], alpha[1])
-            beta = np.random.randint(beta[0], beta[1] + 1)
-            blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-            img = cv2.addWeighted(np.uint8(img), alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
-            return img
-        else:
-            return img
-    else:
-        assert isinstance(alpha, float), "If random=False, alpha should be float!"
-        assert isinstance(beta, int), "If random=False, beta should be int!"
-        assert alpha >= 0 and alpha <= 1, "alpha >= 0 and alpha <= 1"
-        blank = np.zeros(img.shape, img.dtype)  # 创建图片类型的零矩阵
-        img = cv2.addWeighted(np.uint8(img), alpha, np.uint8(blank), 1 - alpha, beta)  # 图像混合加权
-        return img
-
-
-def normalize(img, random=False, p=1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX):
-    """
-    """
-    assert norm_type == cv2.NORM_MINMAX or norm_type == cv2.NORM_L2, "norm_type: cv2.NORM_MINMAX or cv2.NORM_L2!"
-    if random:
-        if np.random.random() <= p:
-            if norm_type == cv2.NORM_MINMAX:
-                norm_img = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-            else:
-                norm_img = cv2.normalize(img, None, norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
-            norm_img = (255 * norm_img).astype(np.uint8)
-            return norm_img
-        else:
-            return img
-    else:
-        if norm_type == cv2.NORM_MINMAX:
-            norm_img = cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        else:
-            norm_img = cv2.normalize(img, None, norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
-        norm_img = (255 * norm_img).astype(np.uint8)
-        return norm_img
-
-
-def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
-    """
-    直方图适应均衡化
-    该函数包含以下参数:
-    clipLimit: 用于控制直方图均衡化的局部对比度,值越高,越容易出现失真和噪声。建议值为2-4,若使用默认值0则表示自动计算。
-    tileGridSize: 表示每个块的大小,推荐16x16。
-    tileGridSize.width: 块的宽度。
-    tileGridSize.height: 块的高度。
-    函数返回一个CLAHE对象,可以通过该对象调用apply函数来实现直方图均衡化。
-    """
-    assert m in [0, 1], "m should be one of [0, 1]!"
-    if random:
-        assert isinstance(clipLimit, tuple), "If random=True, clipLimit should be tuple!"
-        if np.random.random() <= p:
-            clipLimit = np.random.randint(clipLimit[0], clipLimit[1] + 1)
-            tgs = np.random.randint(tileGridSize[0], tileGridSize[1] + 1)
-            # tgs = np.random.choice([4, 8, 16, 32])
-            tileGridSize = (tgs, tgs)
-            if m == 0:
-                img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-                clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-                res = clahe.apply(img)
-                img = cv2.merge([res, res, res])
-            else:
-                b, g, r = cv2.split(img.astype(np.uint8))
-                clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-                clahe_b = clahe.apply(b)
-                clahe_g = clahe.apply(g)
-                clahe_r = clahe.apply(r)
-                img = cv2.merge([clahe_b, clahe_g, clahe_r])
-
-            return img
-        else:
-            return img
-    else:
-        assert isinstance(clipLimit, float), "If random=False, clipLimit should be float!"
-        if m == 0:
-            img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-            clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-            res = clahe.apply(img)
-            img = cv2.merge([res, res, res])
-        else:
-            b, g, r = cv2.split(img.astype(np.uint8))
-            clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-            clahe_b = clahe.apply(b)
-            clahe_g = clahe.apply(g)
-            clahe_r = clahe.apply(r)
-            img = cv2.merge([clahe_b, clahe_g, clahe_r])
-        return img
-
-
-def change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5):
-    if random:
-        if np.random.random() <= p:
-            img = img.astype(np.uint8)
-            hgain = np.random.uniform(hgain[0], hgain[1])
-            sgain = np.random.uniform(sgain[0], sgain[1])
-            vgain = np.random.uniform(vgain[0], vgain[1])
-            r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
-            hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
-            dtype = img.dtype  # uint8
-
-            x = np.arange(0, 256, dtype=np.int16)
-            lut_hue = ((x * r[0]) % 180).astype(dtype)
-            lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
-            lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
-
-            img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
-            cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
-            img = img.astype(np.float32)
-            return img
-        else:
-            return img
-    else:
-        img = img.astype(np.uint8)
-        r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
-        hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
-        dtype = img.dtype  # uint8
-
-        x = np.arange(0, 256, dtype=np.int16)
-        lut_hue = ((x * r[0]) % 180).astype(dtype)
-        lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
-        lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
-
-        img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
-        cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
-        img = img.astype(np.float32)
-        return img
 
 
 def gaussian_blur(img, random=False, p=1, k=3):
@@ -1209,307 +1487,57 @@ def make_rain_effect(img, random=False, p=1, m=0, length=(10, 80), angle=(-45, 4
 # Rain effect --------------------------------------------------------------------------------
 
 
-def compress(img, random=False, p=1, quality=(25, 90)):
-    """
-    like change_definition
-    """
+def make_sunlight_effect(img, random=False, p=1, center=(50, 50), effect_r=(50, 200), light_strength=(50, 150)):
     if random:
-        assert isinstance(quality, tuple), "If random=True, quality should be tuple!"
-        if np.random.random() <= p:
-            q = np.random.randint(quality[0], quality[1])
-            param = [int(cv2.IMWRITE_JPEG_QUALITY), q]
-            img_encode = cv2.imencode('.jpeg', img, param)
-            img_decode = cv2.imdecode(img_encode[1], cv2.IMREAD_COLOR)
-            return img_decode
-        else:
-            return img
-    else:
-        assert isinstance(quality, int), "If random=False, quality should be int!"
-        param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
-        img_encode = cv2.imencode('.jpeg', img, param)
-        img_decode = cv2.imdecode(img_encode[1], cv2.IMREAD_COLOR)
-        return img_decode
-    
-
-def change_definition(img, random=False, p=1, r=(0.5, 0.95)):
-    """
-    like compress
-    """
-    if random:
-        assert isinstance(r, tuple), "If random=True, r should be tuple!"
-        if np.random.random() <= p:
-            h, w = img.shape[:2]
-            rate = np.random.uniform(r[0], r[1])
-            w2 = int(w * rate)
-            h2 = int(h * rate)
-            img = cv2.resize(img, (w2, h2))
-            img = cv2.resize(img, (w, h))
-            return img
-        else:
-            return img
-    else:
-        assert isinstance(r, float), "If random=False, r should be float!"
-        h, w = img.shape[:2]
-        w2 = int(w * r)
-        h2 = int(h * r)
-        img = cv2.resize(img, (w2, h2))
-        img = cv2.resize(img, (w, h))
-        return img
-
-
-def exposure(img, random=False, p=1, rect=(50, 50, 100, 100)):
-    # 目前有问题, 2024.11.13
-    if random:
-        if np.random.random() <= p:
-            h, w = img.shape[:2]
-            x0 = random.randint(0, w)
-            y0 = random.randint(0, h)
-            x1 = random.randint(x0, w)
-            y1 = random.randint(y0, h)
-            area = (x0, y0, x1, y1)
-            mask = Image.new('L', (w, h), color=255)
-            draw = ImageDraw.Draw(mask)
-            mask = np.array(mask)
-            if len(img.shape) == 3:
-                mask = mask[:, :, np.newaxis]
-                mask = np.concatenate([mask, mask, mask], axis=2)
-            draw.rectangle(area, fill=np.random.randint(150, 255))
-            res = img + (255 - mask)
-            res = np.clip(res, 0, 255)
-            return res
-        else:
-            return img
-    else:
-        h, w = img.shape[:2]
-        mask = Image.new('L', (w, h), color=255)
-        draw = ImageDraw.Draw(mask)
-        mask = np.array(mask)
-        if len(img.shape) == 3:
-            mask = mask[:, :, np.newaxis]
-            mask = np.concatenate([mask, mask, mask], axis=2)
-        draw.rectangle(rect, fill=np.random.randint(150, 255))
-        res = img + (255 - mask)
-        res = np.clip(res, 0, 255)
-        return res
-
-
-def stretch(img, random=False, p=1, r=(0.8, 1.2)):
-    if random:
-        assert isinstance(r, tuple), "If random=True, r should be tuple!"
-        if np.random.random() <= p:
-            h, w = img.shape[:2]
-            rate = np.random.uniform(r[0], r[1])
-            w2 = int(w * rate)
-            h2 = int(h * rate)
-            if np.random.random() <= 0.5:
-                img = cv2.resize(img, (w2, h))
-            else:
-                img = cv2.resize(img, (w, h2))
-            return img
-        else:
-            return img
-    else:
-        assert isinstance(r, float), "If random=False, r should be float!"
-        h, w = img.shape[:2]
-        w2 = int(w * r)
-        h2 = int(h * r)
-        if np.random.random() <= 0.5:
-            img = cv2.resize(img, (w2, h))
-        else:
-            img = cv2.resize(img, (w, h2))
-        return img
-
-
-def crop(img, random=False, p=1, fix_size=False, crop_size=(256, 256), min_size=(64, 64), rect=(0, 0, 100, 200)):
-    # crop_size: [H, W]
-    if random:
+        assert isinstance(effect_r, tuple), "If random=True, effect_r should be tuple!"
+        assert isinstance(light_strength, tuple), "If random=True, light_strength should be tuple!"
         if np.random.random() <= p:
             imgsz = img.shape[:2]
-            assert crop_size[0] >= 0 and crop_size[0] <= imgsz[0], "crop_size[0] < 0 or crop_size[0] > imgsz[0]"
-            assert crop_size[1] >= 0 and crop_size[1] <= imgsz[1], "crop_size[1] < 0 or crop_size[1] > imgsz[1]"
+            center = (np.random.randint(0, imgsz[1]), np.random.randint(0, imgsz[0]))
+            effectR = np.random.randint(effect_r[0], effect_r[1])
+            lightStrength = np.random.randint(light_strength[0], light_strength[1])
 
-            if not fix_size:
-                crop_size_h = np.random.randint(min_size[0], crop_size[0])
-                crop_size_w = np.random.randint(min_size[1], crop_size[1])
-                crop_size = (crop_size_h, crop_size_w)
-                
-            x = np.random.randint(0, imgsz[1] - crop_size[1])
-            y = np.random.randint(0, imgsz[0] - crop_size[0])
+            dst = np.zeros(shape=img.shape, dtype=np.uint8)
 
-            try:
-                cropped_img = img[y:(y + crop_size[0]), x:(x + crop_size[1])]
-            except Exception as Error:
-                print(Error)
-                return None
-            
-            return cropped_img
+            for i in range(imgsz[0]):
+                for j in range(imgsz[1]):
+                    dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
+                    B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
+                    if dis < effectR * effectR:
+                        result = int(lightStrength * (1.0 - np.sqrt(dis) / effectR))
+                        B += result
+                        G += result
+                        R += result
+
+                        B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
+                        dst[i, j] = np.uint8((B, G, R))
+                    else:
+                        dst[i, j] = np.uint8((B, G, R))
+            return dst
         else:
             return img
     else:
+        assert isinstance(effect_r, int), "If random=False, effect_r should be int!"
+        assert isinstance(light_strength, int), "If random=False, light_strength should be int!"
+
         imgsz = img.shape[:2]
-        assert rect[0] >= 0 and rect[0] <= imgsz[1], "rect[0] >= 0 and rect[0] <= imgsz[1]"
-        assert rect[1] >= 0 and rect[1] <= imgsz[0], "rect[1] >= 0 and rect[1] <= imgsz[0]"
-        cropped_img = img[rect[1]:rect[3], rect[0]:rect[2]]
-        
-        return cropped_img
+        dst = np.zeros(shape=img.shape, dtype=np.uint8)
 
+        for i in range(imgsz[0]):
+            for j in range(imgsz[1]):
+                dis = (center[0] - j) ** 2 + (center[1] - i) ** 2
+                B, G, R = img[i, j][0], img[i, j][1], img[i, j][2]
+                if dis < effect_r * effect_r:
+                    result = int(light_strength * (1.0 - np.sqrt(dis) / effect_r))
+                    B += result
+                    G += result
+                    R += result
 
-def make_mask(img, random=False, p=1, fix_size=False, mask_size=(256, 256), min_size=(64, 64), rect=(0, 0, 100, 200), color=(255, 0, 255)):
-    """
-    like transperent_overlay
-    """
-    imgcp = copy.copy(img)
-    if random:
-        if np.random.random() <= p:
-            # 在图像上随机生成一个矩形遮挡,遮挡的位置和大小都是随机生成的。遮挡的颜色也是随机选择的
-            # 生成随机遮挡位置和大小
-            imgsz = imgcp.shape[:2]
-
-            if not fix_size:
-                assert min_size[1] < mask_size[1], "min_size[1] < mask_size[1]"
-                assert min_size[0] < mask_size[0], "min_size[0] < mask_size[0]"
-                mask_size_x = np.random.randint(min_size[1], mask_size[1])
-                mask_size_y = np.random.randint(min_size[0], mask_size[0])
-                mask_size = (mask_size_x, mask_size_y)
-
-            mask_x = np.random.randint(0, max(imgsz[1] - mask_size[1], 1))
-            mask_y = np.random.randint(0, max(imgsz[0] - mask_size[0], 1))
-
-            # 生成随机颜色的遮挡
-            mask_color = np.random.randint(0, 256, (1, 1, 3))
-            imgcp[mask_y:mask_y + mask_size[0], mask_x:mask_x + mask_size[1]] = mask_color
-            return imgcp
-        else:
-            return imgcp
-    else:
-        imgsz = imgcp.shape[:2]
-        assert rect[0] >= 0 and rect[2] <= imgsz[1], "rect[0] >= 0 and rect[2] <= imgsz[1]"
-        assert rect[1] >= 0 and rect[3] <= imgsz[0], "rect[1] >= 0 and rect[3] <= imgsz[0]"
-
-        imgcp[rect[1]:rect[3], rect[0]:rect[2]] = color
-        return imgcp
-    
-
-def transperent_overlay(img, random=False, p=1, rect=(50, 50, 100, 80), max_h_r=1.0, max_w_r=0.25, alpha=(0.1, 1.0)):
-    """
-    rect: [x1, y1, x2, y2]
-    """
-    if random:
-        if np.random.random() <= p:
-            imgsz = img.shape
-            orig_c = imgsz[2]
-            max_h = int(imgsz[0] * max_h_r)
-            max_w = int(imgsz[1] * max_w_r)
-
-            alpha = np.random.uniform(alpha[0], alpha[1])
-
-            x = np.random.randint(0, max(imgsz[1] - max_w, 1))
-            y = np.random.randint(0, max(imgsz[0] - max_h, 1))
-            bw = np.random.randint(0, max(max_w, 1))
-            bh = np.random.randint(0, max(max_h, 1))
-            color = [np.random.randint(0, 256) for _ in range(3)]
-
-            if imgsz[2] < 4:
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-
-            # 创建一个与图片大小相同的覆盖层
-            # overlay = img.copy()
-            overlay = np.ones(shape=img.shape, dtype=np.uint8)
-            cv2.rectangle(overlay, (x, y), (x + bw, y + bh), color, -1)
-            img = cv2.addWeighted(np.uint8(overlay), alpha, np.uint8(img), 1 - alpha, 0)
-
-            # Convert the image back to the original number of channels
-            if orig_c != img.shape[2]:
-                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-            return img
-        else:
-            return img
-    else:
-        imgsz = img.shape
-        orig_c = imgsz[2]
-        alpha = np.random.uniform(alpha[0], alpha[1])
-        color = [np.random.randint(0, 256) for _ in range(3)]
-
-        if imgsz[2] < 4:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-
-        # 创建一个与图片大小相同的覆盖层
-        # overlay = img.copy()
-        overlay = np.ones(shape=img.shape, dtype=np.uint8)
-        x1, y1 = rect[0], rect[1]
-        x2, y2 = rect[2], rect[3]
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-        img = cv2.addWeighted(np.uint8(overlay), alpha, np.uint8(img), 1 - alpha, 0)
-
-        # Convert the image back to the original number of channels
-        if orig_c != img.shape[2]:
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        return img
-
-
-def squeeze(img, random=False, p=1, center=(5, 50), degree=11):
-    """
-    产生向中心点挤压的效果。效果不太好,速度也慢,谨慎使用!
-    """
-    if random:
-        assert isinstance(degree, tuple), "If random=True, degree should be tuple!"
-        if np.random.random() <= p:
-            imgsz = img.shape
-            center_x = np.random.randint(0, imgsz[1])
-            center_y = np.random.randint(0, imgsz[0])
-            center = (center_x, center_y)
-            degree = np.random.randint(degree[0], degree[1])
-            new_data = img.copy()
-            for i in range(imgsz[1]):
-                for j in range(imgsz[0]):
-                    tx = i - center[0]
-                    ty = j - center[1]
-                    theta = math.atan2(ty, tx)
-                    # 半径
-                    radius = math.sqrt(tx ** 2 + ty ** 2)
-                    radius = math.sqrt(radius) * degree
-                    new_x = int(center[0] + radius * math.cos(theta))
-                    new_y = int(center[1] + radius * math.sin(theta))
-                    if new_x < 0:
-                        new_x = 0
-                    if new_x >= imgsz[1]:
-                        new_x = imgsz[1] - 1
-                    if new_y < 0:
-                        new_y = 0
-                    if new_y >= imgsz[0]:
-                        new_y = imgsz[0] - 1
-
-                    for c in range(imgsz[2]):
-                        new_data[j][i][c] = img[new_y][new_x][c]
-            return new_data
-        else:
-            return img
-    else:
-        assert isinstance(degree, int), "If random=False, degree should be float!"
-        imgsz = img.shape
-        new_data = img.copy()
-        for i in range(imgsz[1]):
-            for j in range(imgsz[0]):
-                tx = i - center[0]
-                ty = j - center[1]
-                theta = math.atan2(ty, tx)
-                # 半径
-                radius = math.sqrt(tx ** 2 + ty ** 2)
-                radius = math.sqrt(radius) * degree
-                new_x = int(center[0] + radius * math.cos(theta))
-                new_y = int(center[1] + radius * math.sin(theta))
-                if new_x < 0:
-                    new_x = 0
-                if new_x >= imgsz[1]:
-                    new_x = imgsz[1] - 1
-                if new_y < 0:
-                    new_y = 0
-                if new_y >= imgsz[0]:
-                    new_y = imgsz[0] - 1
-
-                for c in range(imgsz[2]):
-                    new_data[j][i][c] = img[new_y][new_x][c]
-        return new_data
+                    B, G, R = min(max(0, B), 255), min(max(0, G), 255), min(max(0, R), 255)
+                    dst[i, j] = np.uint8((B, G, R))
+                else:
+                    dst[i, j] = np.uint8((B, G, R))
+        return dst
     
 
 def make_haha_mirror_effect(img, random=False, p=1, center=(50, 50), r=40, degree=4):
@@ -1575,6 +1603,42 @@ def make_haha_mirror_effect(img, random=False, p=1, center=(50, 50), r=40, degre
                         new_data[j][i][2] = img[new_y][new_x][2]
         return new_data
 
+
+def exposure(img, random=False, p=1, rect=(50, 50, 100, 100)):
+    # 目前有问题, 2024.11.13
+    if random:
+        if np.random.random() <= p:
+            h, w = img.shape[:2]
+            x0 = random.randint(0, w)
+            y0 = random.randint(0, h)
+            x1 = random.randint(x0, w)
+            y1 = random.randint(y0, h)
+            area = (x0, y0, x1, y1)
+            mask = Image.new('L', (w, h), color=255)
+            draw = ImageDraw.Draw(mask)
+            mask = np.array(mask)
+            if len(img.shape) == 3:
+                mask = mask[:, :, np.newaxis]
+                mask = np.concatenate([mask, mask, mask], axis=2)
+            draw.rectangle(area, fill=np.random.randint(150, 255))
+            res = img + (255 - mask)
+            res = np.clip(res, 0, 255)
+            return res
+        else:
+            return img
+    else:
+        h, w = img.shape[:2]
+        mask = Image.new('L', (w, h), color=255)
+        draw = ImageDraw.Draw(mask)
+        mask = np.array(mask)
+        if len(img.shape) == 3:
+            mask = mask[:, :, np.newaxis]
+            mask = np.concatenate([mask, mask, mask], axis=2)
+        draw.rectangle(rect, fill=np.random.randint(150, 255))
+        res = img + (255 - mask)
+        res = np.clip(res, 0, 255)
+        return res
+    
 
 class WaveDeformer():
     def __init__(self, a=10, b=40, gridspace=20):
@@ -1698,33 +1762,6 @@ def homomorphic_filter(img, random=False, p=1):
         gray_filtered = cv2.normalize(gray_filtered, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
         return gray_filtered
 
-
-def log_transformation(img, random=False, p=1):
-    """
-    对数变换
-    """
-    if random:
-        if np.random.random() <= p:
-            img = np.clip(img, 2, 255)
-            c = 255 / np.log(1 + np.max(img))
-            log_image = c * (np.log(img))
-            # Specify the data type so that
-            # float value will be converted to int
-            log_image = np.clip(log_image, 0, 255)
-            log_image = np.array(log_image, dtype=np.uint8)
-            return log_image
-        else:
-            return img
-    else:
-        img = np.clip(img, 2, 255)
-        c = 255 / np.log(1 + np.max(img))
-        log_image = c * (np.log(img))
-        # Specify the data type so that
-        # float value will be converted to int
-        log_image = np.clip(log_image, 0, 255)
-        log_image = np.array(log_image, dtype=np.uint8)
-        return log_image
-
         
 def translate(img, random=False, p=1, tx=20, ty=30, border_color=(114, 114, 114), dstsz=None):
     if random:
@@ -1763,7 +1800,6 @@ def resize_images(data_path, size=(1920, 1080)):
 
 
 # Object detection utils ===================================================
-
 def bbox_voc_to_yolo(size, box):
     """
     VOC --> YOLO
@@ -7844,6 +7880,18 @@ def get_font_char_image(data_path, chars="0123456789.AbC"):
             image = gen_img(imgsz=(64, 128), font=ft, alpha=a, target_len=1)
             cv2.imwrite("{}/{}_bg1_{}.jpg".format(save_path, font_name, a), image)
 
+
+def list_module_functions():
+    """
+    列出模块中所有的函数
+    """
+    current_file = inspect.getfile(inspect.currentframe())
+    current_dir = os.path.dirname(current_file)
+    os.chdir(current_dir)
+    module = importlib.import_module(os.path.basename(current_file)[:-3])
+    functions = [func for func in dir(module) if callable(getattr(module, func))]
+    print(sorted(functions))
+    
 
 if __name__ == '__main__':
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])

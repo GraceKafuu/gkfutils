@@ -4,135 +4,6 @@ import warnings
 import math
 
 
-# def autopad(k, p=None):  # kernel, padding
-#     # Pad to 'same'
-#     if p is None:
-#         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
-#     return p
-
-
-# class UpSample(nn.Module):
-
-#     def __init__(self):
-#         super(UpSample, self).__init__()
-#         self.up_sample = nn.Upsample(scale_factor=2, mode='nearest')
-
-#     def forward(self, x):
-#         return self.up_sample(x)
-    
-
-# class CBL(nn.Module):
-
-#     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True, e=1.0):
-#         super(CBL, self).__init__()
-#         c1 = round(c1 * e)
-#         c2 = round(c2 * e)
-#         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
-#         self.bn = nn.BatchNorm2d(c2)
-#         self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
-
-#     def forward(self, x):
-#         return self.act(self.bn(self.conv(x)))
-
-
-# class Focus(nn.Module):
-
-#     def __init__(self, c1, c2, k=3, s=1, p=1, g=1, act=True, e=1.0):
-#         super(Focus, self).__init__()
-#         c2 = round(c2 * e)
-#         self.conv = CBL(c1 * 4, c2, k, s, p, g, act)
-
-#     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
-#         flatten_channel = torch.cat([x[..., 0::2, 0::2],
-#                                      x[..., 1::2, 0::2],
-#                                      x[..., 0::2, 1::2],
-#                                      x[..., 1::2, 1::2]], dim=1)
-#         return self.conv(flatten_channel)
-
-
-# class SPP(nn.Module):
-
-#     def __init__(self, c1, c2, k=(5, 9, 13), e=1.0):
-#         super(SPP, self).__init__()
-#         c1 = round(c1 * e)
-#         c2 = round(c2 * e)
-#         c_ = c1 // 2
-#         self.cbl_before = CBL(c1, c_, 1, 1)
-#         self.max_pool = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
-#         self.cbl_after = CBL(c_ * 4, c2, 1, 1)
-
-#     def forward(self, x):  
-#         x = self.cbl_before(x)
-#         x_cat = torch.cat([x] + [m(x) for m in self.max_pool], 1)
-#         return self.cbl_after(x_cat)
-
-
-# class ResUnit_n(nn.Module):
-
-#     def __init__(self, c1, c2, n):
-#         super(ResUnit_n, self).__init__()
-#         self.shortcut = c1 == c2
-#         res_unit = nn.Sequential(
-#             CBL(c1, c1, k=1, s=1, p=0),
-#             CBL(c1, c2, k=3, s=1, p=1)
-#         )
-#         self.res_unit_n = nn.Sequential(*[res_unit for _ in range(n)])
-
-#     def forward(self, x):
-#         return x + self.res_unit_n(x) if self.shortcut else self.res_unit_n(x)
-
-
-# class CSP1_n(nn.Module):
-
-#     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True, n=1, e=None):
-#         super(CSP1_n, self).__init__()
-
-#         c1 = round(c1 * e[1])
-#         c2 = round(c2 * e[1])
-#         n = round(n * e[0])
-#         c_ = c2 // 2
-#         self.up = nn.Sequential(
-#             CBL(c1, c_, k, s, autopad(k, p), g, act),
-#             ResUnit_n(c_, c_, n),
-#             # nn.Conv2d(c_, c_, 1, 1, 0, bias=False) 这里最新yolov5结构中去掉了，与网上的结构图稍微有些区别
-#         )
-#         self.bottom = nn.Conv2d(c1, c_, 1, 1, 0)
-#         self.tie = nn.Sequential(
-#             nn.BatchNorm2d(c_ * 2),
-#             nn.LeakyReLU(),
-#             nn.Conv2d(c_ * 2, c2, 1, 1, 0, bias=False)
-#         )
-#     def forward(self, x):
-#         total = torch.cat([self.up(x), self.bottom(x)], dim=1)
-#         out = self.tie(total)
-#         return out
-
-
-# class CSP2_n(nn.Module):
-
-#     def __init__(self, c1, c2, e=0.5, n=1):
-#         super(CSP2_n, self).__init__()
-#         c_ = int(c1 * e)
-#         cbl_2 = nn.Sequential(
-#             CBL(c1, c_, 1, 1, 0),
-#             CBL(c_, c_, 1, 1, 0),
-#         )
-#         self.cbl_2n = nn.Sequential(*[cbl_2 for _ in range(n)])
-#         self.conv_up = nn.Conv2d(c_, c_, 1, 1, 0)
-#         self.conv_bottom = nn.Conv2d(c1, c_, 1, 1, 0)
-#         self.tie = nn.Sequential(
-#             nn.BatchNorm2d(c_ * 2),
-#             nn.LeakyReLU(),
-#             nn.Conv2d(c_ * 2, c2, 1, 1, 0)
-#         )
-
-#     def forward(self, x):
-#         up = self.conv_up(self.cbl_2n(x))
-#         total = torch.cat([up, self.conv_bottom(x)], dim=1)
-#         out = self.tie(total)
-#         return out
-
-
 # ==============================================================================================================
 # ==============================================================================================================
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -465,12 +336,16 @@ def darknet53(gd, gw, pretrained, **kwargs):
 
 
 class yolov5(nn.Module):
+    """添加一个分类分支"""
     def __init__(self, nc=80, gd=0.33, gw=0.5, clsFlag=True, num_class=3):
         super(yolov5, self).__init__()
         # ------------------------------Backbone--------------------------------
         self.backbone = darknet53(gd, gw, None)
         self.clsFlag = clsFlag
         self.num_class = num_class
+        self.nc = nc
+        self.gd = gd
+        self.gw = gw
 
         # ------------------------------Neck------------------------------------
         self.up_sample = UpSample()
@@ -518,17 +393,19 @@ class yolov5(nn.Module):
         )
 
         self.conv_befor_cls = nn.Sequential(
-            Conv(512, 128, k=3, s=2),
-            Conv(128, 32, k=3, s=2)
+            # Conv(512, 128, k=3, s=2),
+            # Conv(128, 32, k=3, s=2)
+            Conv(round(1024 * gw), round(256 * gw), k=3, s=2),
+            Conv(round(256 * gw), round(128 * gw), k=3, s=2)
         )
         self.classifier = nn.Sequential(
-            nn.Linear(32 * 3 * 3, 256),
+            nn.Linear(round(128 * gw) * 3 * 3, round(256 * gw)),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
-            nn.Linear(256, 128),
+            nn.Linear(round(256 * gw), round(128 * gw)),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
-            nn.Linear(128, self.num_class)
+            nn.Linear(round(128 * gw), self.num_class)
         )
 
     def forward(self, x):
@@ -559,7 +436,7 @@ class yolov5(nn.Module):
 
         if self.clsFlag:
             conv_befor_cls = self.conv_befor_cls(cat4)
-            conv_befor_cls = conv_befor_cls.view(-1, 32 * 3 * 3)
+            conv_befor_cls = conv_befor_cls.view(-1, round(128 * self.gw) * 3 * 3)
             cls_out = self.classifier(conv_befor_cls)
             return small_out, medium_out, large_out, cls_out
         else:
@@ -578,12 +455,16 @@ if __name__ == '__main__':
         'yolov5x': [1.33, 1.25]
     }
     # 修改一次文件名字
+
+    # 单模态多任务
+
     net_size = config['yolov5s']
     clsFlag = True
     num_class = 3
     net = yolov5(nc=80, gd=net_size[0], gw=net_size[1], clsFlag=clsFlag, num_class=num_class)
     print(net)
     a = torch.randn(1, 3, 384, 384)
+    # a = torch.randn(1, 3, 640, 640)
     y = net(a)
 
     if clsFlag:

@@ -1958,70 +1958,78 @@ def yolo_to_labelbee(data_path, save_path="", copy_images=True, small_bbx_thresh
             jw.write(json.dumps(write_labelbee_det_json(bbx_for_json, imgsz)))
 
 
-def convert_annotation(img_name, data_path, classes):
+def voc_to_yolo(data_path, save_path="", classes={}, copy_images=True, small_bbx_thresh=3, cls_plus=0):
     import xml.etree.ElementTree as ET
 
-    in_file = open('{}/xmls/{}.xml'.format(data_path, img_name), encoding='utf-8')
-    out_file = open('{}/labels/{}.txt'.format(data_path, img_name), 'w')
+    img_path = data_path + "/images"
+    xml_path = data_path + "/xmls"
 
-    tree = ET.parse(in_file)
-    root = tree.getroot()
-    size = root.find('size')
-    w = int(size.find('width').text)
-    h = int(size.find('height').text)
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "yolo_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
 
+    img_save_path = save_path + "/images"
+    txt_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(txt_save_path, exist_ok=True)
+
+    file_list = sorted(os.listdir(img_path))
     class_names = []
-    for obj in root.iter('object'):
-        difficult = obj.find('difficult').text
-        cls = obj.find('name').text
-        if cls not in class_names:
-            class_names.append(cls)
-        if cls not in classes or int(difficult) == 1:
-            continue
-        cls_id = classes.index(cls)
-        xmlbox = obj.find('bndbox')
-        # b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
-        # bb = convert_bbx_VOC_to_yolo((h, w), b)
-        b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
-        bb = bbox_voc_to_yolo((h, w), b)
-        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+    for f in tqdm(file_list):
+        file_name = os.path.splitext(f)[0]
+        img_src_path = img_path + "/{}".format(f)
+        xml_src_path = xml_path + "/{}.xml".format(file_name)
 
-    return class_names
+        if not os.path.exists(xml_src_path): continue
 
+        img = cv2.imread(img_src_path)
+        if img is None: continue
+        imgsz = img.shape
 
-def voc_to_yolo(data_path, classes, val_percent=0.1):
-    # classes = ["fire"]  # own data sets which classes which category to write, in the order
-    # test set proportion of the total data set, the default 0.1, if the test set and the training set have been demarcated, the corresponding code is modified
+        if copy_images:
+            img_dst_path = img_save_path + "/{}".format(f)
+            shutil.copy(img_src_path, img_dst_path)
 
-    images_path = data_path + "/images/"  # darknet relative path folder, see description github, and they need to modify, according to note here the absolute path can also be used
-
-    if not os.path.exists("{}/labels".format(data_path)):
-        os.makedirs("{}/labels".format(data_path))
-
-    xml_list = [f for f in os.listdir('{}/xmls'.format(data_path))]  # XML data storage folder
-    train_file = open('{}/train.txt'.format(data_path), 'w', encoding="utf-8")
-    val_file = open('{}/val.txt'.format(data_path), 'w', encoding="utf-8")
-    class_names_all = []
-    for i, xml_ in enumerate(xml_list):
-        img_name = os.path.splitext(xml_)[0]
-        if xml_.endswith(".xml"):  # Sometimes jpg and xml files are placed in the same folder, so to determine what suffixes
-            if i < (len(xml_list) * val_percent):
-                val_file.write("{}/{}.jpg".format(images_path, img_name))
-            else:
-                train_file.write("{}/{}.jpg".format(images_path, img_name))
+        txt_dst_path = txt_save_path + "/{}.txt".format(file_name)
+        fw = open(txt_dst_path, "w", encoding="utf-8")
 
         try:
-            class_names = convert_annotation(img_name, data_path, classes)
-            for nm in class_names:
-                if nm not in class_names_all:
-                    class_names_all.append(nm)
+            tree = ET.parse(xml_src_path)
+            root = tree.getroot()
+            size = root.find('size')
+            imgsz = (int(size.find('height').text), int(size.find('width').text))
+
+            class_names_i = []
+            for obj in root.iter('object'):
+                difficult = obj.find('difficult').text
+                cls = obj.find('name').text
+                if cls not in class_names_i:
+                    class_names_i.append(cls)
+                if classes is not None and classes != {}:
+                    if cls not in list(classes.values()):
+                        print("{} is not in {}!".format(cls, classes))
+                        continue
+                    if int(difficult) == 1:
+                        print("int(difficult) == 1!")
+                        continue
+
+                cls_id = list(classes.values()).index(cls)
+                xmlbox = obj.find('bndbox')
+                b = (float(xmlbox.find('xmin').text), float(xmlbox.find('ymin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymax').text))
+                bb = bbox_voc_to_yolo(imgsz, b)
+                content = str(int(cls_id) + cls_plus) + " " + " ".join([str(a) for a in bb]) + '\n'
+                fw.write(content)
+        
+            for n in class_names_i:
+                if n not in class_names:
+                    class_names.append(n)
         except Exception as Error:
-            print("Error: {}".format(img_name))
+            print("Error: {}".format(xml_src_path))
 
-    print(class_names_all)
+        fw.close()
 
-    train_file.close()
-    val_file.close()
+    print("class_names: {}".format(class_names))
 
 
 def labelbee_to_yolo(data_path, save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1):
@@ -2162,104 +2170,111 @@ def coco_to_yolo(root):
     list_file.close()
 
 
-def write_point(doc, root, label1, label2, value1, value2):
-    root = root.appendChild(doc.createElement('points'))
-    root.appendChild(doc.createElement(label1)).appendChild(doc.createTextNode(value1))
-    root.appendChild(doc.createElement(label2)).appendChild(doc.createTextNode(value2))
+def yolo_to_coco():
+    pass
 
 
-def write_one(doc, root, label, value):
-    root.appendChild(doc.createElement(label)).appendChild(doc.createTextNode(value))
+def write_xml_point(root, node, label1, value1, label2, value2):
+    node = node.appendChild(root.createElement('points'))
+    node.appendChild(root.createElement(label1)).appendChild(root.createTextNode(value1))
+    node.appendChild(root.createElement(label2)).appendChild(root.createTextNode(value2))
 
 
-def yolo_to_voc(data_path):
+def write_xml_node(root, node, label, value):
+    node.appendChild(root.createElement(label)).appendChild(root.createTextNode(value))
+
+
+def yolo_to_voc(data_path, save_path="", classes={}, copy_images=True, small_bbx_thresh=3, cls_plus=0):
     from xml.dom import minidom
 
     img_path = data_path + "/images"
     txt_path = data_path + "/labels"
-    xml_path = data_path + "/xmls"
-    os.makedirs(xml_path, exist_ok=True)
+
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "voc_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    xml_save_path = save_path + "/xmls"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(xml_save_path, exist_ok=True)
 
     file_list = sorted(os.listdir(img_path))
-
     for f in tqdm(file_list):
         file_name = os.path.splitext(f)[0]
-        img_abs_path = img_path + "/{}".format(f)
-        txt_abs_path = txt_path + "/{}.txt".format(file_name)
+        img_src_path = img_path + "/{}".format(f)
+        txt_src_path = txt_path + "/{}.txt".format(file_name)
 
-        if not os.path.exists(txt_abs_path): continue
+        if not os.path.exists(txt_src_path): continue
 
-        img = cv2.imread(img_abs_path)
-        imgsz = img.shape[:2]
+        img = cv2.imread(img_src_path)
+        if img is None: continue
+        imgsz = img.shape
+
+        if copy_images:
+            img_dst_path = img_save_path + "/{}".format(f)
+            shutil.copy(img_src_path, img_dst_path)
 
         bbxs = []
-        with open(txt_abs_path, "r", encoding="utf-8") as fo:
-            lines = fo.readlines()
-            for l in lines:
-                l_ = l.strip().split(" ")
-                bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
-                VOC_bbx = bbox_yolo_to_voc(imgsz, bbx_)
-                VOC_bbx = list(VOC_bbx)
+        with open(txt_src_path, "r", encoding="utf-8") as fr:
+            lines = fr.readlines()
+            for line in lines:
+                l = line.strip().split(" ")
+                bbx = list(map(float, l[1:]))
+                voc_bbx = bbox_yolo_to_voc(imgsz, bbx)
 
-                w_, h_ = VOC_bbx[2] - VOC_bbx[0], VOC_bbx[3] - VOC_bbx[1]
-                if w_ < 3 or h_ < 3:
-                    print("img_abs_path: ", img_abs_path)
-                    print("txt_abs_path: ", txt_abs_path)
+                print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_src_path)
 
-                VOC_bbx.append(int(l_[0]) + 1)
-                bbxs.append(VOC_bbx)
+                voc_bbx.append(int(l[0]) + cls_plus)
+                bbxs.append(voc_bbx)
 
-        key = file_name
-        doc = minidom.Document()
-        annotationlist = doc.createElement('annotation')
-        doc.appendChild(annotationlist)
+        xml_abs_path = xml_save_path + "/{}.xml".format(file_name)
 
-        annotationlist.appendChild(doc.createElement('filename')).appendChild(doc.createTextNode(sys.argv[0]))
+        root = minidom.Document()
+        annotation = root.createElement('annotation')
+        root.appendChild(annotation)
 
-        xml_abs_path = xml_path + "/{}.xml".format(file_name)
-        xml_size = minidom.parse(xml_abs_path)
-        width_value = xml_size.getElementsByTagName('width')
-        width_value = width_value[0].firstChild.data
-        height_value = xml_size.getElementsByTagName('height')
-        height_value = height_value[0].firstChild.data
-        depth_value = xml_size.getElementsByTagName('depth')
-        depth_value = depth_value[0].firstChild.data
+        write_xml_node(root, annotation, 'filename', img_src_path)
 
-        size = doc.createElement('size')
-        annotationlist.appendChild(size)
-        write_one(doc, size, 'width', width_value)
-        write_one(doc, size, 'height', height_value)
-        write_one(doc, size, 'depth', depth_value)
+        size = root.createElement('size')
+        annotation.appendChild(size)
+        write_xml_node(root, size, 'width', str(imgsz[1]))
+        write_xml_node(root, size, 'height', str(imgsz[0]))
+        write_xml_node(root, size, 'depth', str(imgsz[2]))
 
         for i in range(len(bbxs)):
-            x_min = bbxs[i][0]
-            y_min = bbxs[i][1]
-            x_max = bbxs[i][2]
-            y_max = bbxs[i][3]
-            label = bbxs[i][4]
+            x_min = str(bbxs[i][0])
+            y_min = str(bbxs[i][1])
+            x_max = str(bbxs[i][2])
+            y_max = str(bbxs[i][3])
+            label = str(bbxs[i][4])
 
-            objectlist = doc.createElement('object')
-            annotationlist.appendChild(objectlist)
-            write_one(doc, objectlist, 'name', label)
-            write_one(doc, objectlist, 'difficult', '0')
-            write_one(doc, objectlist, 'truncated', '0')
+            object_ = root.createElement('object')
+            annotation.appendChild(object_)
+            if classes is not None and classes != {}:
+                write_xml_node(root, object_, 'name', classes[label])
+            else:
+                write_xml_node(root, object_, 'name', label)
+            write_xml_node(root, object_, 'difficult', '0')
+            write_xml_node(root, object_, 'truncated', '0')
 
-            bndbox = doc.createElement('bndbox')
-            objectlist.appendChild(bndbox)
-            write_one(doc, bndbox, 'xmin', x_min)
-            write_one(doc, bndbox, 'ymin', y_min)
-            write_one(doc, bndbox, 'xmax', x_max)
-            write_one(doc, bndbox, 'ymax', y_max)
+            bndbox = root.createElement('bndbox')
+            object_.appendChild(bndbox)
+            write_xml_node(root, bndbox, 'xmin', x_min)
+            write_xml_node(root, bndbox, 'ymin', y_min)
+            write_xml_node(root, bndbox, 'xmax', x_max)
+            write_xml_node(root, bndbox, 'ymax', y_max)
 
-            segmentation = doc.createElement('segmentation')
-            objectlist.appendChild(segmentation)
-            write_point(doc, segmentation, 'x', 'y', x_min, y_min)
-            write_point(doc, segmentation, 'x', 'y', x_max, y_min)
-            write_point(doc, segmentation, 'x', 'y', x_max, y_max)
-            write_point(doc, segmentation, 'x', 'y', x_min, y_max)
+            segmentation = root.createElement('segmentation')
+            object_.appendChild(segmentation)
+            write_xml_point(root, segmentation, 'x', x_min, 'y', y_min)
+            write_xml_point(root, segmentation, 'x', x_max, 'y', y_min)
+            write_xml_point(root, segmentation, 'x', x_max, 'y', y_max)
+            write_xml_point(root, segmentation, 'x', x_min, 'y', y_max)
 
-            with open(xml_abs_path, 'w', encoding='UTF-8') as fh:
-                doc.writexml(fh, indent='', addindent='\t', newl='\n', encoding='UTF-8')
+        with open(xml_abs_path, 'w', encoding='UTF-8') as fw:
+            root.writexml(fw, indent='', addindent='\t', newl='\n', encoding='UTF-8')
 
 
 def labelbee_kpt_to_yolo(data_path, copy_image=True):
@@ -7195,7 +7210,24 @@ def create_labels_via_yolo_pose(data_path, cls=2):
 
 
 def get_coco_names():
-    names = {'0': 'background', '1': 'person', '2': 'bicycle', '3': 'car', '4': 'motorcycle', '5': 'airplane', '6': 'bus', '7': 'train', '8': 'truck', '9': 'boat', '10': 'traffic light', '11': 'fire hydrant', '13': 'stop sign', '14': 'parking meter', '15': 'bench', '16': 'bird', '17': 'cat', '18': 'dog', '19': 'horse', '20': 'sheep', '21': 'cow', '22': 'elephant', '23': 'bear', '24': 'zebra', '25': 'giraffe', '27': 'backpack', '28': 'umbrella', '31': 'handbag', '32': 'tie', '33': 'suitcase', '34': 'frisbee', '35': 'skis', '36': 'snowboard', '37': 'sports ball', '38': 'kite', '39': 'baseball bat', '40': 'baseball glove', '41': 'skateboard', '42': 'surfboard', '43': 'tennis racket', '44': 'bottle', '46': 'wine glass', '47': 'cup', '48': 'fork', '49': 'knife', '50': 'spoon', '51': 'bowl', '52': 'banana', '53': 'apple', '54': 'sandwich', '55': 'orange', '56': 'broccoli', '57': 'carrot', '58': 'hot dog', '59': 'pizza', '60': 'donut', '61': 'cake', '62': 'chair', '63': 'couch', '64': 'potted plant', '65': 'bed', '67': 'dining table', '70': 'toilet', '72': 'tv', '73': 'laptop', '74': 'mouse', '75': 'remote', '76': 'keyboard', '77': 'cell phone', '78': 'microwave', '79': 'oven', '80': 'toaster', '81': 'sink', '82': 'refrigerator', '84': 'book', '85': 'clock', '86': 'vase', '87': 'scissors', '88': 'teddybear', '89': 'hair drier', '90': 'toothbrush'}
+    names = {
+        '0': 'person', '1': 'bicycle', '2': 'car', '3': 'motorcycle', '4': 'airplane',
+        '5': 'bus', '6': 'train', '7': 'truck', '8': 'boat', '9': 'traffic light',
+        '10': 'fire hydrant', '11': 'stop sign', '12': 'parking meter', '13': 'bench', '14': 'bird',
+        '15': 'cat', '16': 'dog', '17': 'horse', '18': 'sheep', '19': 'cow',
+        '20': 'elephant', '21': 'bear', '22': 'zebra', '23': 'giraffe', '24': 'backpack',
+        '25': 'umbrella', '26': 'handbag', '27': 'tie', '28': 'suitcase', '29': 'frisbee',
+        '30': 'skis', '31': 'snowboard', '32': 'sports ball', '33': 'kite', '34': 'baseball bat',
+        '35': 'baseball glove', '36': 'skateboard', '37': 'surfboard', '38': 'tennis racket', '39': 'bottle',
+        '40': 'wine glass', '41': 'cup', '42': 'fork', '43': 'knife', '44': 'spoon',
+        '45': 'bowl', '46': 'banana', '47': 'apple', '48': 'sandwich', '49': 'orange',
+        '50': 'broccoli', '51': 'carrot', '52': 'hot dog', '53': 'pizza', '54': 'donut',
+        '55': 'cake', '56': 'chair', '57': 'couch', '58': 'potted plant', '59': 'bed',
+        '60': 'dining table', '61': 'toilet', '62': 'tv', '63': 'laptop', '64': 'mouse',
+        '65': 'remote', '66': 'keyboard', '67': 'cell phone', '68': 'microwave', '69': 'oven',
+        '70': 'toaster', '71': 'sink', '72': 'refrigerator', '73': 'book', '74': 'clock',
+        '75': 'vase', '76': 'scissors', '77': 'teddy bear', '78': 'hair drier', '79': 'toothbrush'
+        }
     return names
 
 

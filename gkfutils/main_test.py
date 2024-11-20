@@ -490,7 +490,10 @@ def seamless_clone_test(save_path):
 
 
 def main_test():
-    pass
+    # labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
+    yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
+
+
 
 
 if __name__ == '__main__':

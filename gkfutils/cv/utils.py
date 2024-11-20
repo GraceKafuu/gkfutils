@@ -182,7 +182,7 @@ def make_save_path(data_path: str, relative=".", add_str="results"):
         print("relative should be . or .. or ...")
         raise ValueError
     os.makedirs(save_path, exist_ok=True)
-    print("Create successful! save_path: {}".format(save_path))
+    print("Create directory successful! save_path: {}".format(save_path))
     return save_path
 
 
@@ -1801,17 +1801,17 @@ def resize_images(data_path, size=(1920, 1080)):
 
 
 # Object detection utils ===================================================
-def bbox_voc_to_yolo(size, box):
+def bbox_voc_to_yolo(imgsz, box):
     """
     VOC --> YOLO
-    :param size: [H, W]
+    :param imgsz: [H, W]
     :param box:
     orig: [xmin, xmax, ymin, ymax], deprecated;
     new:  [xmin, ymin, xmax, ymax], 2024.03.29, WJH.
     :return: [x, y, w, h]
     """
-    dh = 1. / (size[0])
-    dw = 1. / (size[1])
+    dh = 1. / (imgsz[0])
+    dw = 1. / (imgsz[1])
     # x = (box[0] + box[1]) / 2.0
     # y = (box[2] + box[3]) / 2.0
     # w = box[1] - box[0]
@@ -1833,15 +1833,15 @@ def bbox_voc_to_yolo(size, box):
     return [x, y, w, h]
 
 
-def bbox_yolo_to_voc(size, bbx):
+def bbox_yolo_to_voc(imgsz, bbx):
     """
     YOLO --> VOC
-    !!!!!! orig: (bbx, size) 20230329 changed to (size, bbx)
+    !!!!!! orig: (bbx, imgsz) 20230329 changed to (imgsz, bbx)
     :param bbx: yolo format bbx
-    :param size: [H, W]
+    :param imgsz: [H, W]
     :return: [x_min, y_min, x_max, y_max]
     """
-    bbx_ = (bbx[0] * size[1], bbx[1] * size[0], bbx[2] * size[1], bbx[3] * size[0])
+    bbx_ = (bbx[0] * imgsz[1], bbx[1] * imgsz[0], bbx[2] * imgsz[1], bbx[3] * imgsz[0])
     x_min = int(round(bbx_[0] - (bbx_[2] / 2)))
     y_min = int(round(bbx_[1] - (bbx_[3] / 2)))
     x_max = int(round(bbx_[0] + (bbx_[2] / 2)))
@@ -1850,12 +1850,12 @@ def bbox_yolo_to_voc(size, bbx):
     return [x_min, y_min, x_max, y_max]
 
 
-def write_labelbee_det_json(bbx, size):
+def write_labelbee_det_json(bbx, imgsz):
     """
     {"x":316.6583427922815,"y":554.4245175936436,"width":1419.1872871736662,"height":556.1679909194097,
     "attribute":"1","valid":true,"id":"tNd2HY6C","sourceID":"","textAttribute":"","order":1}
     :param bbx: x1, y1, x2, y2
-    :param size: H, W
+    :param imgsz: H, W
     :return:
     """
 
@@ -1867,75 +1867,95 @@ def write_labelbee_det_json(bbx, size):
     for k in range(97, 97 + 25):
         chars += chr(k)
 
-    json_ = {}
-    json_["width"] = size[1]
-    json_["height"] = size[0]
-    json_["valid"] = True
-    json_["rotate"] = 0
+    j = {}
+    j["width"] = imgsz[1]
+    j["height"] = imgsz[0]
+    j["valid"] = True
+    j["rotate"] = 0
 
-    step_1_ = {}
-    step_1_["toolName"] = "rectTool"
+    step_1 = {}
+    step_1["toolName"] = "rectTool"
 
-    result_list = []
+    result = []
     for i in range(len(bbx)):
-        result_list_dict = {}
-        result_list_dict["x"] = bbx[i][0]
-        result_list_dict["y"] = bbx[i][1]
-        result_list_dict["width"] = bbx[i][2] - bbx[i][0]
-        result_list_dict["height"] = bbx[i][3] - bbx[i][1]
-        result_list_dict["attribute"] = "{}".format(bbx[i][4])
-        result_list_dict["valid"] = True
+        result_dict = {}
+        result_dict["x"] = bbx[i][0]
+        result_dict["y"] = bbx[i][1]
+        result_dict["width"] = bbx[i][2] - bbx[i][0]
+        result_dict["height"] = bbx[i][3] - bbx[i][1]
+        result_dict["attribute"] = "{}".format(bbx[i][4])
+        result_dict["valid"] = True
         id_ = random.sample(chars, 8)
-        result_list_dict["id"] = "".join(d for d in id_)
-        result_list_dict["sourceID"] = ""
-        result_list_dict["textAttribute"] = ""
-        result_list_dict["order"] = i + 1
-        result_list.append(result_list_dict)
+        result_dict["id"] = "".join(d for d in id_)
+        result_dict["sourceID"] = ""
+        result_dict["textAttribute"] = ""
+        result_dict["order"] = i + 1
+        result.append(result_dict)
 
-    step_1_["result"] = result_list
-    json_["step_1"] = step_1_
+    step_1["result"] = result
+    j["step_1"] = step_1
 
-    return json_
+    return j
 
 
-def yolo_to_labelbee(data_path):
+def print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_src_path):
+    bw = voc_bbx[2] - voc_bbx[0]
+    bh = voc_bbx[3] - voc_bbx[1]
+    if bw <= small_bbx_thresh and bh <= small_bbx_thresh:
+        print("\nAttention! Have very small bxx: bw <= {} and bh <= {}! \
+                txt_src_path: {}".format(small_bbx_thresh, small_bbx_thresh, txt_src_path))
+
+
+def yolo_to_labelbee(data_path, save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1):
+    """
+    Usually labelbee's class 0 is background, 1 is the first class.
+    So yolo -> labelbee: class = int(l[0]) + cls_plus, where cls_plus == 1.
+    """
     img_path = data_path + "/images"
     txt_path = data_path + "/labels"
-    json_path = data_path + "/jsons"
-    os.makedirs(json_path, exist_ok=True)
+
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "labelbee_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    json_save_path = save_path + "/jsons"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(json_save_path, exist_ok=True)
 
     file_list = sorted(os.listdir(img_path))
 
     for f in tqdm(file_list):
-        base_name = os.path.splitext(f)[0]
-        img_abs_path = img_path + "/{}".format(f)
-        txt_abs_path = txt_path + "/{}.txt".format(base_name)
-        json_abs_path = json_path + "/{}.json".format(f)
+        file_name = os.path.splitext(f)[0]
+        img_src_path = img_path + "/{}".format(f)
+        txt_src_path = txt_path + "/{}.txt".format(file_name)
+        if not os.path.exists(img_src_path): continue
+        if not os.path.exists(txt_src_path): continue
 
-        if not os.path.exists(txt_abs_path): continue
-
-        img = cv2.imread(img_abs_path)
+        img = cv2.imread(img_src_path)
+        if img is None: continue
         imgsz = img.shape[:2]
 
+        if copy_images:
+            img_dst_path = img_save_path + "/{}".format(f)
+            shutil.copy(img_src_path, img_dst_path)
+        json_dst_path = json_save_path + "/{}.json".format(f)
+
         bbx_for_json = []
-        with open(txt_abs_path, "r", encoding="utf-8") as fo:
-            lines = fo.readlines()
-            for l in lines:
-                l_ = l.strip().split(" ")
-                bbx_ = [float(l_[1]), float(l_[2]), float(l_[3]), float(l_[4])]
-                VOC_bbx = bbox_yolo_to_voc(imgsz, bbx_)
-                VOC_bbx = list(VOC_bbx)
+        with open(txt_src_path, "r", encoding="utf-8") as fr:
+            lines = fr.readlines()
+            for line in lines:
+                l = line.strip().split(" ")
+                bbx = list(map(float, l[1:]))
+                voc_bbx = bbox_yolo_to_voc(imgsz, bbx)
+                print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_src_path)
+                
+                voc_bbx.append(int(l[0]) + cls_plus)
+                bbx_for_json.append(voc_bbx)
 
-                w_, h_ = VOC_bbx[2] - VOC_bbx[0], VOC_bbx[3] - VOC_bbx[1]
-                if w_ < 3 or h_ < 3:
-                    print("img_abs_path: ", img_abs_path)
-                    print("txt_abs_path: ", txt_abs_path)
-
-                VOC_bbx.append(int(l_[0]) + 1)
-                bbx_for_json.append(VOC_bbx)
-
-        with open(json_abs_path, "w", encoding="utf-8") as jfw:
-            jfw.write(json.dumps(write_labelbee_det_json(bbx_for_json, imgsz)))
+        with open(json_dst_path, "w", encoding="utf-8") as jw:
+            jw.write(json.dumps(write_labelbee_det_json(bbx_for_json, imgsz)))
 
 
 def convert_annotation(img_name, data_path, classes):
@@ -2004,56 +2024,59 @@ def voc_to_yolo(data_path, classes, val_percent=0.1):
     val_file.close()
 
 
-def labelbee_to_yolo(data_path, copy_image=False):
+def labelbee_to_yolo(data_path, save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1):
+    """
+    Usually labelbee's class 0 is background, 1 is the first class.
+    So labelbee -> yolo: cls_id = cls_id + cls_plus, where cls_plus == -1.
+    """
     img_path = data_path + "/images"
     json_path = data_path + "/jsons"
 
-    det_images_path = data_path + "/{}".format("selected_images")
-    det_labels_path = data_path + "/labels"
-    if copy_image:
-        os.makedirs(det_images_path, exist_ok=True)
-    os.makedirs(det_labels_path, exist_ok=True)
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "yolo_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    txt_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(txt_save_path, exist_ok=True)
 
     json_list = sorted(os.listdir(json_path))
-
     for j in tqdm(json_list):
         try:
-            img_name = os.path.splitext(j)[0]
-            img_base_name = os.path.splitext(img_name)[0]
+            img_name_ws= os.path.splitext(j)[0]  # img_name_with_suffix
+            img_name = os.path.splitext(img_name_ws)[0]
 
             json_abs_path = json_path + "/{}".format(j)
             json_ = json.load(open(json_abs_path, 'r', encoding='utf-8'))
             if not json_: continue
-            w, h = json_["width"], json_["height"]
+            imgsz = (json_["height"], json_["width"])
 
-            result_ = json_["step_1"]["result"]
-            if not result_: continue
+            result = json_["step_1"]["result"]
+            if not result: continue
 
-            if copy_image:
-                img_abs_path = img_path + "/{}".format(img_name)
-                shutil.copy(img_abs_path, det_images_path + "/{}".format(img_name))
+            if copy_images:
+                img_src_path = img_path + "/{}".format(img_name_ws)
+                img_dst_path = img_save_path + "/{}".format(img_name_ws)
+                shutil.copy(img_src_path, img_dst_path)
 
-            len_result = len(result_)
+            len_result = len(result)
 
-            txt_save_path = det_labels_path + "/{}.txt".format(img_base_name)
-            with open(txt_save_path, "w", encoding="utf-8") as fw:
+            txt_dst_path = txt_save_path + "/{}.txt".format(img_name)
+            with open(txt_dst_path, "w", encoding="utf-8") as fw:
                 for i in range(len_result):
-                    x_ = result_[i]["x"]
-                    y_ = result_[i]["y"]
-                    w_ = result_[i]["width"]
-                    h_ = result_[i]["height"]
+                    cls_id = int(result[i]["attribute"])
 
-                    cls_id = int(result_[i]["attribute"])
+                    x = result[i]["x"]
+                    y = result[i]["y"]
+                    w = result[i]["width"]
+                    h = result[i]["height"]
+                    voc_bbx = (x, y, x + w, y + h)
 
-                    x_min = x_
-                    x_max = x_ + w_
-                    y_min = y_
-                    y_max = y_ + h_
-
-                    bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
-                    txt_content = "{}".format(cls_id) + " " + " ".join([str(b) for b in bb]) + "\n"
-                    # txt_content = "{}".format(cls_id - 1) + " " + " ".join([str(b) for b in bb]) + "\n"
-                    # txt_content = "{}".format(cls_id + 1) + " " + " ".join([str(b) for b in bb]) + "\n"
+                    print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_dst_path)
+                    bb = bbox_voc_to_yolo(imgsz, voc_bbx)
+                    txt_content = "{}".format(cls_id + cls_plus) + " " + " ".join([str(b) for b in bb]) + "\n"
                     fw.write(txt_content)
 
         except Exception as Error:
@@ -2494,7 +2517,7 @@ def labelbee_seg_json_to_yolo_txt(data_path):
             print("Saved --> {}".format(txt_save_path))
 
 
-def labelme2voc(data_path):
+def labelme_to_voc(data_path):
     img_path = data_path + "/images"
     labelme_path = data_path + "/jsons"  # Original labelme label data path
     saved_path = data_path + "/xmls"  # Save path
@@ -7447,6 +7470,7 @@ def list_module_functions():
 
 
 if __name__ == '__main__':
+    pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
     # extract_one_gif_frames(gif_path="")
     # extract_one_video_frames(video_path="", gap=5)

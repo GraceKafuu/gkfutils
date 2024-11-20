@@ -1829,6 +1829,10 @@ def bbox_voc_to_yolo(imgsz, box):
     if y < 0: y = 0
     if w > 1: w = 1
     if h > 1: h = 1
+    assert x <= 1, "x: {}".format(x)
+    assert y <= 1, "y: {}".format(y)
+    assert w >= 0, "w: {}".format(w)
+    assert h >= 0, "h: {}".format(h)
 
     return [x, y, w, h]
 
@@ -1846,6 +1850,11 @@ def bbox_yolo_to_voc(imgsz, bbx):
     y_min = int(round(bbx_[1] - (bbx_[3] / 2)))
     x_max = int(round(bbx_[0] + (bbx_[2] / 2)))
     y_max = int(round(bbx_[1] + (bbx_[3] / 2)))
+
+    assert x_min >= 0 and x_min <= imgsz[1], "x_min: {}".format(x_min)
+    assert y_min >= 0 and y_min <= imgsz[0], "y_min: {}".format(y_min)
+    assert x_max >= 0 and x_max <= imgsz[1], "x_max: {}".format(x_max)
+    assert y_max >= 0 and y_max <= imgsz[0], "y_max: {}".format(y_max)
 
     return [x_min, y_min, x_max, y_max]
 
@@ -2091,87 +2100,69 @@ def labelbee_to_yolo(data_path, save_path="", copy_images=True, small_bbx_thresh
             print(Error)
 
 
-def coco_to_yolo(root):
-    json_trainfile = root + '/annotations/instances_train2017.json'  # COCO Object Instance 类型的标注
-    json_valfile = root + '/annotations/instances_val2017.json'  # COCO Object Instance 类型的标注
-    train_ana_txt_save_path = root + '/train2017_labels/'  # 保存的路径
-    val_ana_txt_save_path = root + '/val2017_labels/'  # 保存的路径
+def coco_to_yolo(data_path, json_name="instances_train2017.json", save_path="", copy_images=False, small_bbx_thresh=3, cls_plus=0):
+    """
+    json_path = data_path/annotations/json_name
+    """
+    img_path = data_path + "/images"
+    json_path = data_path + '/annotations/{}'.format(json_name)
 
-    traindata = json.load(open(json_trainfile, 'r'))
-    valdata = json.load(open(json_valfile, 'r'))
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "yolo_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    txt_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(txt_save_path, exist_ok=True)
+
+    j = json.load(open(json_path, 'r', encoding="utf-8"))
 
     # 重新映射并保存class 文件
-    if not os.path.exists(train_ana_txt_save_path):
-        os.makedirs(train_ana_txt_save_path)
-    if not os.path.exists(val_ana_txt_save_path):
-        os.makedirs(val_ana_txt_save_path)
-
     id_map = {}  # coco数据集的id不连续!重新映射一下再输出!
-    with open(os.path.join(root, 'classes.txt'), 'w') as f:
-        # 写入classes.txt
-        for i, category in enumerate(traindata['categories']):
-            f.write(f"{category['name']}\n")
+    with open(os.path.join(save_path, 'classes.txt'), 'w', encoding="utf-8") as fw:
+        for i, category in enumerate(j['categories']):
+            fw.write(f"{category['name']}\n")
             id_map[category['id']] = i
 
-    '''
-    保存train txt
-    '''
-    # print(id_map)
-    # 这里需要根据自己的需要,更改写入图像相对路径的文件位置。
-    list_file = open(os.path.join(root, 'train2017.txt'), 'w')
-    for img in tqdm(traindata['images']):
-        filename = img["file_name"]
-        img_width = img["width"]
-        img_height = img["height"]
+    for img in tqdm(j['images']):
+        file_name_ws = img["file_name"]
+        file_name = os.path.splitext(file_name_ws)[0]
+        imgsz = (img["height"], img["width"])
         img_id = img["id"]
-        head, tail = os.path.splitext(filename)
-        ana_txt_name = head + ".txt"  # 对应的txt名字,与jpg一致
-        f_txt = open(os.path.join(train_ana_txt_save_path, ana_txt_name), 'w')
-        for ann in traindata['annotations']:
-            if ann['image_id'] == img_id:
-                # box = convert((img_width, img_height), ann["bbox"])
-                # box = convert_bbx_VOC_to_yolo((img_height, img_width), ann["bbox"])
-                ann_np = np.array([ann["bbox"]])
-                ann_np = ann_np[:, [0, 2, 1, 3]]
-                ann_list = list(ann_np[0])
-                box = bbox_voc_to_yolo((img_height, img_width), ann_list)
-                f_txt.write("%s %s %s %s %s\n" % (id_map[ann["category_id"]], box[0], box[1], box[2], box[3]))
-        f_txt.close()
-        # 将图片的相对路径写入train2017或val2017的路径
-        list_file.write('./images/train2017/%s.jpg\n' % (head))
-    list_file.close()
 
-    '''
-    保存val txt
-    '''
-    # print(id_map)
-    # 这里需要根据自己的需要,更改写入图像相对路径的文件位置。
-    list_file = open(os.path.join(root, 'val2017.txt'), 'w')
-    for img in tqdm(valdata['images']):
-        filename = img["file_name"]
-        img_width = img["width"]
-        img_height = img["height"]
-        img_id = img["id"]
-        head, tail = os.path.splitext(filename)
-        ana_txt_name = head + ".txt"  # 对应的txt名字,与jpg一致
-        f_txt = open(os.path.join(val_ana_txt_save_path, ana_txt_name), 'w')
-        for ann in valdata['annotations']:
+        img_src_path = img_path + "/{}".format(file_name_ws)
+        if copy_images:
+            img_dst_path = img_save_path + "/{}".format(file_name_ws)
+            shutil.copy(img_src_path, img_dst_path)
+
+        txt_dst_path = txt_save_path + "/{}.txt".format(file_name)
+        txt_fw = open(txt_dst_path, 'w', encoding="utf-8")
+        for ann in j['annotations']:
             if ann['image_id'] == img_id:
-                # box = convert((img_width, img_height), ann["bbox"])
-                # box = convert_bbx_VOC_to_yolo((img_height, img_width), ann["bbox"])
                 ann_np = np.array([ann["bbox"]])
-                ann_np = ann_np[:, [0, 2, 1, 3]]
+                # ann_np = ann_np[:, [0, 2, 1, 3]]
                 ann_list = list(ann_np[0])
-                box = bbox_voc_to_yolo((img_height, img_width), ann_list)
-                f_txt.write("%s %s %s %s %s\n" % (id_map[ann["category_id"]], box[0], box[1], box[2], box[3]))
-        f_txt.close()
-        # 将图片的相对路径写入train2017或val2017的路径
-        list_file.write('./images/val2017/%s.jpg\n' % (head))
-    list_file.close()
+                ann_list = [ann_list[0], ann_list[1], ann_list[0] + ann_list[2], ann_list[1] + ann_list[3]]
+                bbx_yolo = bbox_voc_to_yolo(imgsz, ann_list)
+                content = str(int(id_map[ann["category_id"]]) + cls_plus) + " " + " ".join([str(a) for a in bbx_yolo]) + '\n'
+                txt_fw.write(content)
+
+        txt_fw.close()
 
 
 def yolo_to_coco():
     pass
+
+
+def labelme_to_yolo():
+    pass
+
+
+def yolo_to_labelme():
+    pass
+
 
 
 def write_xml_point(root, node, label1, value1, label2, value2):

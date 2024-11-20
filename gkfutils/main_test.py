@@ -489,16 +489,21 @@ def seamless_clone_test(save_path):
     cv2.imwrite("{}/20231008_{}_{}={}.jpg".format(save_path, str(rdm).replace(".", ""), fgi_name, label_str), out)
 
 
-def main_test():
+def det_labels_convertion():
     # labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
     # yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
 
-    coco_classes = get_coco_names()
-    voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+    # coco_classes = get_coco_names()
+    # voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
     # yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
 
-    # coco_to_yolo()
+    coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/coco", json_name="instances_val2017.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
     # yolo_to_coco()
+
+    # labelme_to_yolo()
+    # yolo_to_labelme()
+
+
 
 
 
@@ -508,7 +513,7 @@ if __name__ == '__main__':
     # image_processing_aug()
     # make_border()
 
-    main_test()
+    det_labels_convertion()
 
     
 

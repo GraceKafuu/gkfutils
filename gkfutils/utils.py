@@ -636,6 +636,18 @@ def get_sub_dir_list(base_path):
 
 
 # ---------------------------------------------------------------
+def get_fname_ws(f, file_list):
+    """
+    f: file name with no suffix
+    """
+    fname_ws = ""
+    for fn in file_list:
+        if f in fn:
+            fname_ws = fn
+            break
+    return fname_ws
+
+
 def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="same", mvcp="mv"):
     """
     :param dir1:
@@ -650,6 +662,7 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="sam
     dir2_name = get_dir_name(path2)
     file1_list = get_file_list(path1)
     file2_list = get_file_list(path2)
+
 
     if save_path is None or save_path == "":
         save_path = make_save_path(path1, relative=".", add_str="Processed_{}_{}".format(dir1_name, dir2_name))
@@ -705,37 +718,32 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="sam
         
         if flag == "same":
             for f in same_list:
-                for fn in file1_list:
-                    if f in fn:
-                        f_src_path1 = path1 + "/{}".format(f)
-                        f_src_path2 = path2 + "/{}".format(f)
-                        f_dst_path1 = same_path1 + "/{}".format(f)
-                        f_dst_path2 = same_path2 + "/{}".format(f)
-                        
-                        if mvcp == "move" or mvcp == "mv":
-                            shutil.move(f_src_path1, f_dst_path1)
-                            shutil.move(f_src_path2, f_dst_path2)
-                        else:
-                            shutil.copy(f_src_path1, f_dst_path1)
-                            shutil.copy(f_src_path2, f_dst_path2)
-
-                        break
+                fname_ws = get_fname_ws(f, file1_list)
+                f_src_path1 = path1 + "/{}".format(fname_ws)
+                f_src_path2 = path2 + "/{}".format(fname_ws)
+                f_dst_path1 = same_path1 + "/{}".format(fname_ws)
+                f_dst_path2 = same_path2 + "/{}".format(fname_ws)
+                
+                if mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_src_path1, f_dst_path1)
+                    shutil.move(f_src_path2, f_dst_path2)
+                else:
+                    shutil.copy(f_src_path1, f_dst_path1)
+                    shutil.copy(f_src_path2, f_dst_path2)
         else:
             for f in diff_list:
-                for fn in file1_list:
-                    if f in fn:
-                        f_src_path1 = path1 + "/{}".format(f)
-                        f_src_path2 = path2 + "/{}".format(f)
-                        f_dst_path1 = diff_path1 + "/{}".format(f)
-                        f_dst_path2 = diff_path2 + "/{}".format(f)
-                        
-                        if mvcp == "move" or mvcp == "mv":
-                            shutil.move(f_src_path1, f_dst_path1)
-                            shutil.move(f_src_path2, f_dst_path2)
-                        else:
-                            shutil.copy(f_src_path1, f_dst_path1)
-                            shutil.copy(f_src_path2, f_dst_path2)
-                        break
+                fname_ws = get_fname_ws(f, file1_list)
+                f_src_path1 = path1 + "/{}".format(fname_ws)
+                f_src_path2 = path2 + "/{}".format(fname_ws)
+                f_dst_path1 = diff_path1 + "/{}".format(fname_ws)
+                f_dst_path2 = diff_path2 + "/{}".format(fname_ws)
+                
+                if mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_src_path1, f_dst_path1)
+                    shutil.move(f_src_path2, f_dst_path2)
+                else:
+                    shutil.copy(f_src_path1, f_dst_path1)
+                    shutil.copy(f_src_path2, f_dst_path2)
 
 
 def copy_n_times(data_path, n=10, save_path="current", print_flag=True):

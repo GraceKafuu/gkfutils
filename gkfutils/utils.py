@@ -636,7 +636,7 @@ def get_sub_dir_list(base_path):
 
 
 # ---------------------------------------------------------------
-def process_via_filename(dir1, dir2, flag="same", mvcp="mv"):
+def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="same", mvcp="mv"):
     """
     :param dir1:
     :param dir2:
@@ -644,36 +644,92 @@ def process_via_filename(dir1, dir2, flag="same", mvcp="mv"):
     :param dir: files in which dir will be move or delete
     :return:
     """
-    file1_list = [os.path.splitext(i)[0] for i in os.listdir(dir1)]
-    dir1_file_ends = os.path.splitext(os.listdir(dir1)[0])[1]
-    dir2_file_ends = os.path.splitext(os.listdir(dir2)[0])[1]
+    assert flag == "same" or flag == "diff", "flag should be 'same' or 'diff'!"
+    assert mvcp in ["move", "mv", "copy", "cp"], 'mvcp not in ["move", "mv", "copy", "cp"]!'
+    dir1_name = get_dir_name(path1)
+    dir2_name = get_dir_name(path2)
+    file1_list = get_file_list(path1)
+    file2_list = get_file_list(path2)
 
-    file2_list = [os.path.splitext(i)[0] for i in os.listdir(dir2)]
-
-    if flag == "same":
-        unexpected = list(set(file1_list) & set(file2_list))
+    if save_path is None or save_path == "":
+        save_path = make_save_path(path1, relative=".", add_str="Processed_{}_{}".format(dir1_name, dir2_name))
     else:
-        unexpected = list(set(file1_list) ^ set(file2_list))
-        
-    unexpected_path = os.path.abspath(os.path.join(dir1, "../..")) + "/unexpected"
-    os.makedirs(unexpected_path, exist_ok=True)
+        os.makedirs(save_path, exist_ok=True)
 
-    for j in tqdm(unexpected):
-        file_abs_path = dir1 + "/{}{}".format(j, dir1_file_ends)
-        file_dst_path = unexpected_path + "/{}{}".format(j, dir1_file_ends)
-        try:
-            if mvcp == "mv":
-                shutil.move(file_abs_path, file_dst_path)
-                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-            elif mvcp == "del":
-                shutil.move(file_abs_path, file_dst_path)
-                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-            else:
-                shutil.copy(file_abs_path, file_dst_path)
-                print("shutil.move: {} --> {}".format(file_abs_path, file_dst_path))
-        except Exception as Error:
-            print(Error)
-                    
+    same_path = save_path + "/same"
+    diff_path = save_path + "/diff"
+    same_path1 = same_path + "/{}".format(dir1_name)
+    same_path2 = same_path + "/{}".format(dir2_name)
+    diff_path1 = diff_path + "/{}".format(dir1_name)
+    diff_path2 = diff_path + "/{}".format(dir2_name)
+    os.makedirs(same_path1, exist_ok=True)
+    os.makedirs(same_path2, exist_ok=True)
+    os.makedirs(diff_path1, exist_ok=True)
+    os.makedirs(diff_path2, exist_ok=True)
+
+    if with_suffix:
+        same_list = list(set(file1_list) & set(file2_list))
+        diff_list = list(set(file1_list) ^ set(file2_list))
+
+        if flag == "same":
+            for f in same_list:
+                f_src_path1 = path1 + "/{}".format(f)
+                f_src_path2 = path2 + "/{}".format(f)
+                f_dst_path1 = same_path1 + "/{}".format(f)
+                f_dst_path2 = same_path2 + "/{}".format(f)
+                
+                if mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_src_path1, f_dst_path1)
+                    shutil.move(f_src_path2, f_dst_path2)
+                else:
+                    shutil.copy(f_src_path1, f_dst_path1)
+                    shutil.copy(f_src_path2, f_dst_path2)
+        else:
+            for f in diff_list:
+                f_src_path1 = path1 + "/{}".format(f)
+                f_src_path2 = path2 + "/{}".format(f)
+                f_dst_path1 = diff_path1 + "/{}".format(f)
+                f_dst_path2 = diff_path2 + "/{}".format(f)
+                
+                if mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_src_path1, f_dst_path1)
+                    shutil.move(f_src_path2, f_dst_path2)
+                else:
+                    shutil.copy(f_src_path1, f_dst_path1)
+                    shutil.copy(f_src_path2, f_dst_path2)
+    else:
+        file1_list_ns = [os.path.splitext(fn)[0] for fn in sorted(os.listdir(path1))]  # ns: no suffix
+        file2_list_ns = [os.path.splitext(fn)[0] for fn in sorted(os.listdir(path2))]  # ns: no suffix
+        same_list = list(set(file1_list_ns) & set(file2_list_ns))
+        diff_list = list(set(file1_list_ns) ^ set(file2_list_ns))
+        
+        if flag == "same":
+            for f in same_list:
+                f_src_path1 = path1 + "/{}".format(f)
+                f_src_path2 = path2 + "/{}".format(f)
+                f_dst_path1 = same_path1 + "/{}".format(f)
+                f_dst_path2 = same_path2 + "/{}".format(f)
+                
+                if mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_src_path1, f_dst_path1)
+                    shutil.move(f_src_path2, f_dst_path2)
+                else:
+                    shutil.copy(f_src_path1, f_dst_path1)
+                    shutil.copy(f_src_path2, f_dst_path2)
+        else:
+            for f in diff_list:
+                f_src_path1 = path1 + "/{}".format(f)
+                f_src_path2 = path2 + "/{}".format(f)
+                f_dst_path1 = diff_path1 + "/{}".format(f)
+                f_dst_path2 = diff_path2 + "/{}".format(f)
+                
+                if mvcp == "move" or mvcp == "mv":
+                    shutil.move(f_src_path1, f_dst_path1)
+                    shutil.move(f_src_path2, f_dst_path2)
+                else:
+                    shutil.copy(f_src_path1, f_dst_path1)
+                    shutil.copy(f_src_path2, f_dst_path2)
+
 
 def copy_n_times(data_path, n=10, save_path="current", print_flag=True):
     data_list = sorted(os.listdir(data_path))

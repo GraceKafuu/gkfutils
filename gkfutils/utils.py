@@ -648,7 +648,7 @@ def get_fname_ws(f, file_list):
     return fname_ws
 
 
-def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="same", mvcp="mv"):
+def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="diff", mvcp="mv"):
     """
     :param dir1:
     :param dir2:
@@ -705,11 +705,16 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="sam
                 f_dst_path2 = diff_path2 + "/{}".format(f)
                 
                 if mvcp == "move" or mvcp == "mv":
-                    shutil.move(f_src_path1, f_dst_path1)
-                    shutil.move(f_src_path2, f_dst_path2)
+                    if os.path.exists(f_src_path1):
+                        shutil.move(f_src_path1, f_dst_path1)
+                    if os.path.exists(f_src_path2):
+                        shutil.move(f_src_path2, f_dst_path2)
                 else:
-                    shutil.copy(f_src_path1, f_dst_path1)
-                    shutil.copy(f_src_path2, f_dst_path2)
+                    if os.path.exists(f_src_path1):
+                        shutil.copy(f_src_path1, f_dst_path1)
+                    if os.path.exists(f_src_path2):
+                        shutil.copy(f_src_path2, f_dst_path2)
+
     else:
         file1_list_ns = [os.path.splitext(fn)[0] for fn in sorted(os.listdir(path1))]  # ns: no suffix
         file2_list_ns = [os.path.splitext(fn)[0] for fn in sorted(os.listdir(path2))]  # ns: no suffix
@@ -732,18 +737,32 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="sam
                     shutil.copy(f_src_path2, f_dst_path2)
         else:
             for f in diff_list:
-                fname_ws = get_fname_ws(f, file1_list)
+                fname_ws1 = get_fname_ws(f, file1_list)
+                fname_ws2 = get_fname_ws(f, file2_list)
+
+                if fname_ws1 != "" and fname_ws2 == "":
+                    fname_ws = fname_ws1
+                elif fname_ws1 == "" and fname_ws2 != "":
+                    fname_ws = fname_ws2
+                else:
+                    print("fname_ws1: {} fname_ws2: {}".format(fname_ws1, fname_ws2))
+                    raise Exception("Error")
+
                 f_src_path1 = path1 + "/{}".format(fname_ws)
                 f_src_path2 = path2 + "/{}".format(fname_ws)
                 f_dst_path1 = diff_path1 + "/{}".format(fname_ws)
                 f_dst_path2 = diff_path2 + "/{}".format(fname_ws)
                 
                 if mvcp == "move" or mvcp == "mv":
-                    shutil.move(f_src_path1, f_dst_path1)
-                    shutil.move(f_src_path2, f_dst_path2)
+                    if os.path.exists(f_src_path1):
+                        shutil.move(f_src_path1, f_dst_path1)
+                    if os.path.exists(f_src_path2):
+                        shutil.move(f_src_path2, f_dst_path2)
                 else:
-                    shutil.copy(f_src_path1, f_dst_path1)
-                    shutil.copy(f_src_path2, f_dst_path2)
+                    if os.path.exists(f_src_path1):
+                        shutil.copy(f_src_path1, f_dst_path1)
+                    if os.path.exists(f_src_path2):
+                        shutil.copy(f_src_path2, f_dst_path2)
 
 
 def copy_n_times(data_path, n=10, save_path="current", print_flag=True):

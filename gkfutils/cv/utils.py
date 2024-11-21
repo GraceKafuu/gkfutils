@@ -1966,6 +1966,8 @@ def yolo_to_labelbee(data_path, save_path="", copy_images=True, small_bbx_thresh
         with open(json_dst_path, "w", encoding="utf-8") as jw:
             jw.write(json.dumps(write_labelbee_det_json(bbx_for_json, imgsz)))
 
+    print("OK!")
+
 
 def voc_to_yolo(data_path, save_path="", classes={}, copy_images=True, small_bbx_thresh=3, cls_plus=0):
     import xml.etree.ElementTree as ET
@@ -2039,6 +2041,7 @@ def voc_to_yolo(data_path, save_path="", classes={}, copy_images=True, small_bbx
         fw.close()
 
     print("class_names: {}".format(class_names))
+    print("OK!")
 
 
 def labelbee_to_yolo(data_path, save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1):
@@ -2099,6 +2102,8 @@ def labelbee_to_yolo(data_path, save_path="", copy_images=True, small_bbx_thresh
         except Exception as Error:
             print(Error)
 
+    print("OK!")
+
 
 def coco_to_yolo(data_path, json_name="instances_train2017.json", save_path="", copy_images=False, small_bbx_thresh=3, cls_plus=0):
     """
@@ -2151,9 +2156,120 @@ def coco_to_yolo(data_path, json_name="instances_train2017.json", save_path="", 
 
         txt_fw.close()
 
+    print("OK!")
 
-def yolo_to_coco():
-    pass
+
+def yolo_to_coco(data_path, save_path="", json_name="instances_val2017_20241121.json", categories=[], copy_images=True, small_bbx_thresh=3, cls_plus=0):
+    img_path = data_path + "/images"
+    txt_path = data_path + "/labels"
+
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "coco_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    json_save_path = save_path + "/annotations"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(json_save_path, exist_ok=True)
+
+    file_list = sorted(os.listdir(img_path))
+
+    if json_name is None or json_name == "":
+        date = get_date_time().split(" ")[0]
+        json_dst_path = json_save_path + "/instances_train2017_{}.json".format(date)
+    else:
+        json_dst_path = json_save_path + "/{}".format(json_name)
+
+    # json content -----------------------------------------
+    info = {
+        "year": 2024,
+        "version": '1.0',
+        "date_created": 2024 - 10 - 16
+    }
+
+    licenses = {
+        "id": 1,
+        "name": "null",
+        "url": "null",
+    }
+
+    # 自己的标签类别，跟yolo的数据集类别要对应好
+    assert isinstance(categories, list), "categories is not list!"
+    assert categories is not None and categories != [], "Please input categories!"
+    # categories = [
+    #     {
+    #         "id": 0,
+    #         "name": 'ship',
+    #         "supercategory": 'sar',
+    #     },
+    #     {
+    #         "id": 1,
+    #         "name": 'aircraft',
+    #         "supercategory": 'sar',
+    #     },
+    #     {
+    #         "id": 2,
+    #         "name": 'car',
+    #         "supercategory": 'sar',
+    #     },
+    # ]
+
+    jdata = {'info': info, 'licenses': licenses, 'categories': categories, 'images': [], 'annotations': []}
+    images = []
+    annotations = []
+    # -----------------------------------------
+
+    with open(json_dst_path, "w", encoding="utf-8") as jw:
+        for i, f in tqdm(enumerate(file_list)):
+            file_name = os.path.splitext(f)[0]
+            img_src_path = img_path + "/{}".format(f)
+            txt_src_path = txt_path + "/{}.txt".format(file_name)
+
+            if not os.path.exists(txt_src_path): continue
+
+            img = cv2.imread(img_src_path)
+            if img is None: continue
+            imgsz = img.shape
+
+            img_info = {}
+            img_info['id'] = i
+            img_info['file_name'] = f
+            img_info['width'] = imgsz[1]
+            img_info['height'] = imgsz[0]
+
+            if img_info != {}:
+                images.append(img_info)
+
+            if copy_images:
+                img_dst_path = img_save_path + "/{}".format(f)
+                shutil.copy(img_src_path, img_dst_path)
+
+            with open(txt_src_path, "r", encoding="utf-8") as fr:
+                lines = fr.readlines()
+                for idx, line in enumerate(lines):
+                    annotation_info = {}
+                    l = line.strip().split(" ")
+                    bbx = list(map(float, l[1:]))
+                    voc_bbx = bbox_yolo_to_voc(imgsz, bbx)
+                    box_xywh = [voc_bbx[0], voc_bbx[1], voc_bbx[2] - voc_bbx[0], voc_bbx[3] - voc_bbx[1]]
+
+                    print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_src_path)
+
+                    annotation_info["category_id"] = int(l[0])
+                    annotation_info['bbox'] = box_xywh
+                    annotation_info['area'] = box_xywh[2] * box_xywh[3]
+                    annotation_info['image_id'] = i
+                    annotation_info['id'] = i * 100 + idx
+                    annotation_info['segmentation'] = [[voc_bbx[0], voc_bbx[1], voc_bbx[2], voc_bbx[1], voc_bbx[2], voc_bbx[3], voc_bbx[0], voc_bbx[3]]]  # 四个点的坐标
+                    annotation_info['iscrowd'] = 0  # 单例
+                    annotations.append(annotation_info)
+
+        jdata['images'] = images
+        jdata['annotations'] = annotations
+        jw.write(json.dumps(jdata, indent=2))
+
+    print("OK!")
 
 
 def labelme_to_yolo():
@@ -2266,6 +2382,8 @@ def yolo_to_voc(data_path, save_path="", classes={}, copy_images=True, small_bbx
 
         with open(xml_abs_path, 'w', encoding='UTF-8') as fw:
             root.writexml(fw, indent='', addindent='\t', newl='\n', encoding='UTF-8')
+
+    print("OK!")
 
 
 def labelbee_kpt_to_yolo(data_path, copy_image=True):
@@ -7221,6 +7339,412 @@ def get_coco_names():
         }
     return names
 
+
+def get_coco_categories():
+    categories = [
+        {
+            "id": 0,
+            "name": 'person',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 1,
+            "name": 'bicycle',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 2,
+            "name": 'car',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 3,
+            "name": 'motorcycle',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 4,
+            "name": 'airplane',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 5,
+            "name": 'bus',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 6,
+            "name": 'train',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 7,
+            "name": 'truck',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 8,
+            "name": 'boat',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 9,
+            "name": 'traffic light',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 10,
+            "name": 'fire hydrant',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 11,
+            "name": 'stop sign',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 12,
+            "name": 'parking meter',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 13,
+            "name": 'bench',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 14,
+            "name": 'bird',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 15,
+            "name": 'cat',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 16,
+            "name": 'dog',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 17,
+            "name": 'horse',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 18,
+            "name": 'sheep',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 19,
+            "name": 'cow',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 20,
+            "name": 'elephant',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 21,
+            "name": 'bear',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 22,
+            "name": 'zebra',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 23,
+            "name": 'giraffe',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 24,
+            "name": 'backpack',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 25,
+            "name": 'umbrella',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 26,
+            "name": 'handbag',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 27,
+            "name": 'tie',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 28,
+            "name": 'suitcase',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 29,
+            "name": 'frisbee',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 30,
+            "name": 'skis',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 31,
+            "name": 'snowboard',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 32,
+            "name": 'sports ball',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 33,
+            "name": 'kite',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 34,
+            "name": 'baseball bat',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 35,
+            "name": 'baseball glove',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 36,
+            "name": 'skateboard',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 37,
+            "name": 'surfboard',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 38,
+            "name": 'tennis racket',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 39,
+            "name": 'bottle',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 40,
+            "name": 'wine glass',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 41,
+            "name": 'cup',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 42,
+            "name": 'fork',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 43,
+            "name": 'knife',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 44,
+            "name": 'spoon',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 45,
+            "name": 'bowl',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 46,
+            "name": 'banana',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 47,
+            "name": 'apple',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 48,
+            "name": 'sandwich',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 49,
+            "name": 'orange',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 50,
+            "name": 'broccoli',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 51,
+            "name": 'carrot',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 52,
+            "name": 'hot dog',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 53,
+            "name": 'pizza',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 54,
+            "name": 'donut',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 55,
+            "name": 'cake',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 56,
+            "name": 'chair',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 57,
+            "name": 'couch',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 58,
+            "name": 'potted plant',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 59,
+            "name": 'bed',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 60,
+            "name": 'dining table',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 61,
+            "name": 'toilet',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 62,
+            "name": 'tv',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 63,
+            "name": 'laptop',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 64,
+            "name": 'mouse',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 65,
+            "name": 'remote',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 66,
+            "name": 'keyboard',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 67,
+            "name": 'cell phone',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 68,
+            "name": 'microwave',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 69,
+            "name": 'oven',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 70,
+            "name": 'toaster',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 71,
+            "name": 'sink',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 72,
+            "name": 'refrigerator',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 73,
+            "name": 'book',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 74,
+            "name": 'clock',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 75,
+            "name": 'vase',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 76,
+            "name": 'scissors',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 77,
+            "name": 'teddy bear',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 78,
+            "name": 'hair drier',
+            "supercategory": 'sar',
+        },
+        {
+            "id": 79,
+            "name": 'toothbrush',
+            "supercategory": 'sar',
+        }
+    ]
+
+    return categories
 
 # 读取出图像中的目标框
 def read_xml(root, image_id):

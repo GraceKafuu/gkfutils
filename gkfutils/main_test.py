@@ -490,16 +490,22 @@ def seamless_clone_test(save_path):
 
 
 def det_labels_convertion():
-    # labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
-    # yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
+    """ yolo <-> labelbee """
+    labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
+    yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
 
-    # coco_classes = get_coco_names()
-    # voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
-    # yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+    """ yolo <-> voc """
+    coco_classes = get_coco_names()
+    voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+    yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
 
+    """ yolo <-> coco """
+    categories = get_coco_categories()
     coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/coco", json_name="instances_val2017.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
-    # yolo_to_coco()
+    yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 
+    """ yolo <-> labelme """
+    # TODO
     # labelme_to_yolo()
     # yolo_to_labelme()
 

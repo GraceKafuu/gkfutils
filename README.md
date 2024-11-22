@@ -53,7 +53,7 @@ gkfutils.cv.utils.yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", class
 
 """ yolo <-> coco """
 categories = gkfutils.cv.utils.get_coco_categories()
-gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3,cls_plus=0)  # OK
+gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 
 res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm="pil", center=(100, 100), angle=angle, scale=1, expand=expand)

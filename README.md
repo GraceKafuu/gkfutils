@@ -19,6 +19,7 @@ import gkfutils
 
 print(gkfutils.__version__)
 
+
 """ ======== Base utils ======== """
 # 文件重命名
 gkfutils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", use_orig_name=False, new_name_prefix="Test", zeros_num=20, start_num=0)
@@ -49,7 +50,6 @@ file_name = gkfutils.get_file_name_with_suffix(data_path="data/images/0.jpg")  #
 suffix = gkfutils.get_suffix(data_path="data/images/0.jpg")  # .jpg
 
 
-
 """ ======== 目标检测 ======== """  
 # yolo <-> labelbee
 gkfutils.cv.utils.labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
@@ -64,6 +64,7 @@ gkfutils.cv.utils.yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", class
 categories = gkfutils.cv.utils.get_coco_categories()
 gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
+
 
 """ ======== 图像处理 ======== """
 # 1.random=False: 支持单次指定对应参数单张图片处理
@@ -103,6 +104,7 @@ res = gkfutils.cv.utils.homomorphic_filter(img, random=False, p=1)
 res = gkfutils.cv.utils.contrast_stretch(img, random=False, p=1, alpha=0.25, beta=0.75)
 res = gkfutils.cv.utils.log_transformation(img, random=False, p=1)
 res = gkfutils.cv.utils.translate(img, random=False, p=1, tx=-20, ty=30, border_color=(114, 0, 114), dstsz=None)
+
 
 """ ======== OCR ======== """
 

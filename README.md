@@ -65,6 +65,8 @@ gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_f
 gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 
 """ ======== 图像处理 ======== """
+# 1.random=False: 支持单次指定对应参数单张图片处理
+# 2.random=True: 也支持循环中参数范围内以一定概率随机处理，适用于数据增强
 res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm="pil", center=(100, 100), angle=angle, scale=1, expand=expand)
 res = gkfutils.cv.utils.flip(img, random=False, p=1, m=-1)
 res = gkfutils.cv.utils.scale(img, random=False, p=1, fx=0.0, fy=0.5)

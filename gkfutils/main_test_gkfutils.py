@@ -155,8 +155,29 @@ def make_border():
         cv2.imwrite(dst_path, res)
 
 
+def det_labels_convertion():
+    """ yolo <-> labelbee """
+    # labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
+    # yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
+
+    """ yolo <-> voc """
+    # coco_classes = get_coco_names()
+    # voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+    # yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+
+    """ yolo <-> coco """
+    # categories = get_coco_categories()
+    # coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
+    # yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
+
+    """ yolo <-> labelme """
+    # TODO
+    # labelme_to_yolo()
+    # yolo_to_labelme()
+
+
 if __name__ == '__main__':
-    # print(gkfutils.__version__)
+    print(gkfutils.__version__)
 
 
     # ======== Base utils ========
@@ -185,6 +206,7 @@ if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
     # make_border()
+    # det_labels_convertion()
 
     # iou = gkfutils.cv.utils.cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
     # gkfutils.cv.utils.extract_one_gif_frames(gif_path="")
@@ -202,18 +224,20 @@ if __name__ == '__main__':
 
 
     # ======== Object detection utils ========
-    # gkfutils.cv.utils.labelbee2yolo(data_path="", copy_image=True)
-    # gkfutils.cv.utils.labelbee2voc(data_path="")  # TODO
-    # gkfutils.cv.utils.labelbee2coco(data_path="")  # TODO
-    # gkfutils.cv.utils.yolo2labelbee(data_path="")
-    # gkfutils.cv.utils.yolo2voc(data_path="")  # TODO
-    # gkfutils.cv.utils.yolo2coco(data_path="")  # TODO
-    # gkfutils.cv.utils.voc2labelbee(data_path="", classes=['dog', ], val_percent=0.1)
-    # gkfutils.cv.utils.voc2yolo(data_path="", classes=['dog', ], val_percent=0.1)
-    # gkfutils.cv.utils.voc2coco(data_path="", classes=['dog', ], val_percent=0.1)
-    # gkfutils.cv.utils.coco2labelbee(data_path="")
-    # gkfutils.cv.utils.coco2yolo(data_path="")
-    # gkfutils.cv.utils.coco2voc(data_path="")
+    """ yolo <-> labelbee """
+    # gkfutils.cv.utils.labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
+    # gkfutils.cv.utils.yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
+
+    """ yolo <-> voc """
+    # coco_classes = gkfutils.cv.utils.get_coco_names()
+    # gkfutils.cv.utils.voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+    # gkfutils.cv.utils.yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+
+    """ yolo <-> coco """
+    # categories = gkfutils.cv.utils.get_coco_categories()
+    # gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
+    # gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
+
     # gkfutils.cv.utils.labelbee_kpt_to_yolo(data_path="", copy_image=False)
     # gkfutils.cv.utils.labelbee_kpt_to_dbnet(data_path="", copy_image=True)
     # gkfutils.cv.utils.labelbee_kpt_to_labelme_kpt(data_path="")

@@ -42,18 +42,19 @@ gkfutils.split_dir_multithread(data_path="", split_n=10)
 
 
 # ======== CV ========  yolo <--> voc <--> labelbee <--> coco
-gkfutils.cv.utils.labelbee2yolo(data_path="", copy_image=True)
-gkfutils.cv.utils.labelbee2voc(data_path="")  # TODO
-gkfutils.cv.utils.labelbee2coco(data_path="")  # TODO
-gkfutils.cv.utils.yolo2labelbee(data_path="")
-gkfutils.cv.utils.yolo2voc(data_path="")  # TODO
-gkfutils.cv.utils.yolo2coco(data_path="")  # TODO
-gkfutils.cv.utils.voc2labelbee(data_path="", classes=['dog', ], val_percent=0.1)
-gkfutils.cv.utils.voc2yolo(data_path="", classes=['dog', ], val_percent=0.1)
-gkfutils.cv.utils.voc2coco(data_path="", classes=['dog', ], val_percent=0.1)
-gkfutils.cv.utils.coco2labelbee(data_path="")
-gkfutils.cv.utils.coco2yolo(data_path="")
-gkfutils.cv.utils.coco2voc(data_path="")
+""" yolo <-> labelbee """
+gkfutils.cv.utils.labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
+gkfutils.cv.utils.yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
+
+""" yolo <-> voc """
+coco_classes = gkfutils.cv.utils.get_coco_names()
+gkfutils.cv.utils.voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+gkfutils.cv.utils.yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
+
+""" yolo <-> coco """
+categories = gkfutils.cv.utils.get_coco_categories()
+gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3,cls_plus=0)  # OK
+gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 
 res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm="pil", center=(100, 100), angle=angle, scale=1, expand=expand)
 res = gkfutils.cv.utils.flip(img, random=False, p=1, m=-1)

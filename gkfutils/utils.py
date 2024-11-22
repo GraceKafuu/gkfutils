@@ -671,10 +671,10 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="dif
 
     same_path = save_path + "/same"
     diff_path = save_path + "/diff"
-    same_path1 = same_path + "/{}".format(dir1_name)
-    same_path2 = same_path + "/{}".format(dir2_name)
-    diff_path1 = diff_path + "/{}".format(dir1_name)
-    diff_path2 = diff_path + "/{}".format(dir2_name)
+    same_path1 = same_path + "/path1/{}".format(dir1_name)
+    same_path2 = same_path + "/path2/{}".format(dir2_name)
+    diff_path1 = diff_path + "/path1/{}".format(dir1_name)
+    diff_path2 = diff_path + "/path2/{}".format(dir2_name)
     os.makedirs(same_path1, exist_ok=True)
     os.makedirs(same_path2, exist_ok=True)
     os.makedirs(diff_path1, exist_ok=True)

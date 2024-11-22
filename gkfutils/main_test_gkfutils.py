@@ -180,7 +180,7 @@ if __name__ == '__main__':
     print(gkfutils.__version__)
 
 
-    # ======== Base utils ========
+    """ ======== Base utils ======== """
     # gkfutils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", use_orig_name=False, new_name_prefix="Test", zeros_num=20, start_num=0)
     # gkfutils.save_file_path_to_txt(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", abspath=True)
     # gkfutils.merge_dirs(data_path="data/test")
@@ -202,11 +202,10 @@ if __name__ == '__main__':
     # gkfutils.split_dir_multithread(data_path="", split_n=10)
 
 
-    # ======== CV ========
+    """ ======== CV ======== """
     # image_processing()
     # image_processing_aug()
     # make_border()
-    # det_labels_convertion()
 
     # iou = gkfutils.cv.utils.cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
     # gkfutils.cv.utils.extract_one_gif_frames(gif_path="")
@@ -223,17 +222,17 @@ if __name__ == '__main__':
     # gkfutils.cv.utils.seg_object_from_mask(base_path="")
 
 
-    # ======== Object detection utils ========
-    """ yolo <-> labelbee """
+    """ ======== 目标检测 ======== """ 
+    # yolo <-> labelbee
     # gkfutils.cv.utils.labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
     # gkfutils.cv.utils.yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
 
-    """ yolo <-> voc """
+    # yolo <-> voc
     # coco_classes = gkfutils.cv.utils.get_coco_names()
     # gkfutils.cv.utils.voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
     # gkfutils.cv.utils.yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
 
-    """ yolo <-> coco """
+    # yolo <-> coco
     # categories = gkfutils.cv.utils.get_coco_categories()
     # gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
     # gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
@@ -260,7 +259,7 @@ if __name__ == '__main__':
     # gkfutils.cv.utils.merge_txt_files(data_path="")
 
 
-    # ======== OCR ========
+    """ ======== OCR ======== """
     # gkfutils.cv.utils.dbnet_aug_data(data_path="", bg_path="", maxnum=10000)
     # gkfutils.cv.utils.vis_dbnet_gt(data_path="")
     # gkfutils.cv.utils.warpPerspective_img_via_labelbee_kpt_json(data_path="")

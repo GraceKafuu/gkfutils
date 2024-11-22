@@ -19,15 +19,21 @@ import gkfutils
 
 print(gkfutils.__version__)
 
-# ======== Base utils ========
+""" ======== Base utils ======== """
+# 文件重命名
 gkfutils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", use_orig_name=False, new_name_prefix="Test", zeros_num=20, start_num=0)
+# 将文件夹下所有的文件路径存入一个txt文件中，类似linux的 find data_path -name "*.*" > result.txt
 gkfutils.save_file_path_to_txt(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", abspath=True)
+# 合并所有文件夹下的文件至一个文件夹下
 gkfutils.merge_dirs(data_path="data/test")
+# 随机选取一些文件
 gkfutils.random_select_files(data_path="data/images", mvcp="copy", select_num=5, select_mode=0)
 
+# 有关时间的操作
 strftime = gkfutils.timestamp_to_strftime(timestamp=123456789.00)
 timestamp = gkfutils.strftime_to_timestamp(strftime="2024-11-15 09:12:00")
 curr_time = gkfutils.get_date_time()
+# 获取所有的文件、文件名及后缀等信息
 file_list = gkfutils.get_file_list(data_path="data/images", abspath=True)
 dir_list = gkfutils.get_dir_list(data_path="data")
 dir_file_list = gkfutils.get_dir_file_list(data_path="data")
@@ -37,25 +43,29 @@ dir_name = gkfutils.get_dir_name(data_path="data/images")  # images
 file_name = gkfutils.get_file_name(data_path="data/images/0.jpg")  # 0
 file_name = gkfutils.get_file_name_with_suffix(data_path="data/images/0.jpg")  # 0.jpg
 suffix = gkfutils.get_suffix(data_path="data/images/0.jpg")  # .jpg
+# 相对于data_path生成一个文件夹用于保存结果
 save_path = gkfutils.make_save_path(data_path="data/images", relative=".", add_str="test")
+# 切分文件夹下的文件至多个文件夹
 gkfutils.split_dir_multithread(data_path="", split_n=10)
 
 
-# ======== CV ========  yolo <--> voc <--> labelbee <--> coco
-""" yolo <-> labelbee """
+""" ======== CV ======== """  
+""" yolo <--> voc <--> labelbee <--> coco """
+# yolo <-> labelbee
 gkfutils.cv.utils.labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
 gkfutils.cv.utils.yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
 
-""" yolo <-> voc """
+# yolo <-> voc
 coco_classes = gkfutils.cv.utils.get_coco_names()
 gkfutils.cv.utils.voc_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_voc_format", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
 gkfutils.cv.utils.yolo_to_voc(data_path="E:/GraceKafuu/yolo/coco128/data", classes=coco_classes, copy_images=True, small_bbx_thresh=3, cls_plus=0)  # OK
 
-""" yolo <-> coco """
+# yolo <-> coco
 categories = gkfutils.cv.utils.get_coco_categories()
 gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 
+""" 有关图像处理的操作 """
 res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm="pil", center=(100, 100), angle=angle, scale=1, expand=expand)
 res = gkfutils.cv.utils.flip(img, random=False, p=1, m=-1)
 res = gkfutils.cv.utils.scale(img, random=False, p=1, fx=0.0, fy=0.5)

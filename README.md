@@ -49,8 +49,7 @@ save_path = gkfutils.make_save_path(data_path="data/images", relative=".", add_s
 gkfutils.split_dir_multithread(data_path="", split_n=10)
 
 
-""" ======== CV ======== """  
-""" yolo <--> voc <--> labelbee <--> coco """
+""" ======== 目标检测标注文件格式互相转换 ======== """  
 # yolo <-> labelbee
 gkfutils.cv.utils.labelbee_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_labelbee_format", copy_images=True, small_bbx_thresh=3, cls_plus=-1)  # OK
 gkfutils.cv.utils.yolo_to_labelbee(data_path="E:/GraceKafuu/yolo/coco128/data", copy_images=True, small_bbx_thresh=3, cls_plus=1)  # OK
@@ -65,7 +64,7 @@ categories = gkfutils.cv.utils.get_coco_categories()
 gkfutils.cv.utils.coco_to_yolo(data_path="E:/GraceKafuu/yolo/coco128/data_coco_format", json_name="instances_val2017_20241121.json", copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 gkfutils.cv.utils.yolo_to_coco(data_path="E:/GraceKafuu/yolo/coco128/data", json_name="instances_val2017_20241121.json", categories=categories, copy_images=False, small_bbx_thresh=3, cls_plus=0)  # OK
 
-""" 有关图像处理的操作 """
+""" ======== 图像处理 ======== """
 res = gkfutils.cv.utils.rotate(img, random=False, p=1, algorithm="pil", center=(100, 100), angle=angle, scale=1, expand=expand)
 res = gkfutils.cv.utils.flip(img, random=False, p=1, m=-1)
 res = gkfutils.cv.utils.scale(img, random=False, p=1, fx=0.0, fy=0.5)

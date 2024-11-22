@@ -26,8 +26,12 @@ gkfutils.rename_files(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD
 gkfutils.save_file_path_to_txt(data_path="E:\\Gosuncn\\Projects\\006.Fire_Smoke_Det\\SSOD_test\\unlabel_pred_same", abspath=True)
 # 合并所有文件夹下的文件至一个文件夹下
 gkfutils.merge_dirs(data_path="data/test")
+# 切分文件夹下的文件至多个文件夹
+gkfutils.split_dir_multithread(data_path="", split_n=10)
 # 随机选取一些文件
 gkfutils.random_select_files(data_path="data/images", mvcp="copy", select_num=5, select_mode=0)
+# 相对于data_path生成一个文件夹用于保存结果
+save_path = gkfutils.make_save_path(data_path="data/images", relative=".", add_str="test")
 
 # 有关时间的操作
 strftime = gkfutils.timestamp_to_strftime(timestamp=123456789.00)
@@ -43,10 +47,7 @@ dir_name = gkfutils.get_dir_name(data_path="data/images")  # images
 file_name = gkfutils.get_file_name(data_path="data/images/0.jpg")  # 0
 file_name = gkfutils.get_file_name_with_suffix(data_path="data/images/0.jpg")  # 0.jpg
 suffix = gkfutils.get_suffix(data_path="data/images/0.jpg")  # .jpg
-# 相对于data_path生成一个文件夹用于保存结果
-save_path = gkfutils.make_save_path(data_path="data/images", relative=".", add_str="test")
-# 切分文件夹下的文件至多个文件夹
-gkfutils.split_dir_multithread(data_path="", split_n=10)
+
 
 
 """ ======== 目标检测 ======== """  

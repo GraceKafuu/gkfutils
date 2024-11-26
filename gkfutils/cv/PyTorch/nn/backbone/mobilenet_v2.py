@@ -528,7 +528,7 @@ class MyMobileNetV2(nn.Module):
                 self.out_channels.append(output_channel)
             if idx == 2:
                 self.out_channels.append(output_channel)
-            if idx == 3:
+            if idx == 4:
                 self.out_channels.append(output_channel)
 
         # building last several layers
@@ -538,7 +538,7 @@ class MyMobileNetV2(nn.Module):
             )
         )
         self.out_channels.append(output_channel)
-        
+
         # make it nn.Sequential
         self.features = nn.Sequential(*features)
         self.features1 = self.features[:4]

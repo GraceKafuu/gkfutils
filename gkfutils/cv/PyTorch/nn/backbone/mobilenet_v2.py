@@ -490,6 +490,7 @@ class MyMobileNetV2(nn.Module):
 
         input_channel = 32
         last_channel = 1280
+        self.out_channels = []
 
         if inverted_residual_setting is None:
             inverted_residual_setting = [
@@ -516,18 +517,28 @@ class MyMobileNetV2(nn.Module):
             Conv2dNormActivation(3, input_channel, stride=2, norm_layer=norm_layer, activation_layer=nn.ReLU6)
         ]
         # building inverted residual blocks
-        for t, c, n, s in inverted_residual_setting:
+        for idx, (t, c, n, s) in enumerate(inverted_residual_setting):
             output_channel = _make_divisible(c * width_mult, round_nearest)
             for i in range(n):
                 stride = s if i == 0 else 1
                 features.append(block(input_channel, output_channel, stride, expand_ratio=t, norm_layer=norm_layer))
                 input_channel = output_channel
+
+            if idx == 1:
+                self.out_channels.append(output_channel)
+            if idx == 2:
+                self.out_channels.append(output_channel)
+            if idx == 3:
+                self.out_channels.append(output_channel)
+
         # building last several layers
         features.append(
             Conv2dNormActivation(
                 input_channel, self.last_channel, kernel_size=1, norm_layer=norm_layer, activation_layer=nn.ReLU6
             )
         )
+        self.out_channels.append(output_channel)
+        
         # make it nn.Sequential
         self.features = nn.Sequential(*features)
         self.features1 = self.features[:4]

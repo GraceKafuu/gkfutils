@@ -13,7 +13,7 @@ from .utils import (
 
 
 __appname__ = "gkfutils"
-__version__ = "1.1.8"
+__version__ = "1.1.8.1"
 
 
 __all__ = [

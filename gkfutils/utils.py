@@ -28,6 +28,7 @@ import pickle
 import socket
 import logging
 import hashlib
+import zipfile
 import threading
 import numpy as np
 import pandas as pd
@@ -157,7 +158,7 @@ def make_save_path(data_path: str, relative=".", add_str="results"):
         print("relative should be . or .. or ...")
         raise ValueError
     os.makedirs(save_path, exist_ok=True)
-    print("Create successful! save_path: {}".format(save_path))
+    # print("Create successful! save_path: {}".format(save_path))
     return save_path
 
 
@@ -1032,8 +1033,39 @@ class Logger(object):
         self.logger.addHandler(th)
         
 
+def unzip_file(path, pwd, save_path):
+    with zipfile.ZipFile(path, 'r') as zip:
+        try:
+            zip.extractall(save_path, pwd=pwd.encode('utf-8'))
+            print("解压成功，密码是：%s"%(pwd))
+            return True
+        except Exception as e:
+            pass
+
+
+def create_passward(words):
+    import itertools as its
+    words = its.product(words, repeat=6)
+    for i in words:
+        yield ''.join(i)
+    
+
+def crack_passward(file_path, words='0123456789'):
+    assert file_path.endswith(".zip"), "{} should be *.zip".format(file_path)
+    save_path = make_save_path(file_path, ".", "Extracted")
+
+    pwd = create_passward(words)
+    for p in pwd:
+        flag = unzip_file(file_path, p, save_path)
+        if flag: break
+
+
 if __name__ == '__main__':
-    pass
+    # pass
+
+    crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip")
+
+    
 
 
 

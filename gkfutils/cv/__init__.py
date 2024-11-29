@@ -11,7 +11,7 @@ from .utils import (
     translate, cal_iou, 
 )
 
-from .yolo import (
+from .YOLO.yolo import (
     YOLOv5_ONNX, YOLOv8_ONNX
 )
 

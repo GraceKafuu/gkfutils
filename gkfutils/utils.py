@@ -1043,19 +1043,20 @@ def unzip_file(path, pwd, save_path):
             pass
 
 
-def create_passward(words):
+def create_passward(words, repeat=6):
     import itertools as its
-    words = its.product(words, repeat=6)
+    words = its.product(words, repeat=repeat)
     for i in words:
         yield ''.join(i)
     
 
-def crack_passward(file_path, words='0123456789'):
+def crack_passward(file_path, words='0123456789', repeat=6):
     assert file_path.endswith(".zip"), "{} should be *.zip".format(file_path)
     save_path = make_save_path(file_path, ".", "Extracted")
 
-    pwd = create_passward(words)
+    pwd = create_passward(words, repeat=repeat)
     for p in pwd:
+
         flag = unzip_file(file_path, p, save_path)
         if flag: break
 
@@ -1063,7 +1064,11 @@ def crack_passward(file_path, words='0123456789'):
 if __name__ == '__main__':
     # pass
 
-    crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip")
+    # words = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?`~"
+    words='0123456789'
+    for n in range(1, 9):
+        print(n)
+        crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     
 

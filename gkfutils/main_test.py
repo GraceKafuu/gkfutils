@@ -23,7 +23,7 @@ Change Log:
 
 
 from cv.utils import *
-from cv.yolo import (
+from cv.YOLO.yolo import (
     YOLOv5_ONNX, YOLOv8_ONNX
 )
 
@@ -510,7 +510,99 @@ def det_labels_convertion():
     # yolo_to_labelme()
 
 
+def warmup_schedule(optimizer, name):
+    import pytorch_warmup
 
+    if name == 'linear':
+        return pytorch_warmup.UntunedLinearWarmup(optimizer)
+    elif name == 'exponential':
+        return pytorch_warmup.UntunedExponentialWarmup(optimizer)
+    elif name == 'radam':
+        return pytorch_warmup.RAdamWarmup(optimizer)
+    elif name == 'none':
+        return pytorch_warmup.LinearWarmup(optimizer, 1)
+    
+
+def pytorch_warmup_test():
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import pytorch_warmup
+    from torchvision.models import mobilenet_v2
+
+    device = torch.device('cpu')
+
+    model = mobilenet_v2().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=(0.9, 0.999), weight_decay=0.01)
+    epochs = 500
+    num_steps = 1000 * epochs
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_steps, eta_min=1e-5)
+    warmup_scheduler = warmup_schedule(optimizer, 'exponential')
+
+    for epoch in range(1, epochs + 1):
+        for i in range(250):
+            optimizer.zero_grad()
+            optimizer.step()
+
+            with warmup_scheduler.dampening():
+                lr_scheduler.step()
+
+            lr = optimizer.param_groups[0]['lr']
+            lr2 = lr_scheduler.get_last_lr()[0]
+            # print("lr: {} lr2: {}".format(lr, lr2))
+        
+        lr_curr = lr_scheduler.get_last_lr()[0]
+        print("Epoch: {}, lr_curr: {}".format(epoch, lr_curr))
+
+
+def adjust_lr(optimizer, lr_scheduler, epoch, warmup_epochs, init_lr):
+    """ 动态调整学习率 """
+    if epoch <= warmup_epochs:
+        lr = init_lr * (epoch + 1) / warmup_epochs
+        optimizer.param_groups[0]['lr'] = lr
+        lr_scheduler.get_last_lr()[0] = lr
+
+        return lr
+    else:
+        lr_scheduler.step()
+        lr = lr_scheduler.get_last_lr()[0]
+
+        return lr
+
+
+def pytorch_warmup_test2():
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import pytorch_warmup
+    from torchvision.models import mobilenet_v2
+
+    device = torch.device('cpu')
+
+    model = mobilenet_v2().to(device)
+
+    init_lr = 0.01
+    epochs = 500
+    warmup_epochs = 5
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=init_lr)
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
+    # lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    # num_steps = len(train_loader) * epochs
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000 * 500, eta_min=1e-5)
+
+    
+
+    for e in range(epochs):
+        lr = adjust_lr(optimizer, lr_scheduler, e, warmup_epochs, init_lr)
+
+        for i in range(250):
+            optimizer.zero_grad()
+            optimizer.step()
+
+        lr_curr1 = optimizer.param_groups[0]['lr']
+        lr_curr2 = lr_scheduler.get_last_lr()[0]
+        print("Epoch: {}, lr: {}, lr_curr: {}, lr_curr2: {}".format(e, lr, lr_curr1, lr_curr2))
 
 
 
@@ -519,7 +611,10 @@ if __name__ == '__main__':
     # image_processing_aug()
     # make_border()
 
-    det_labels_convertion()
+    # det_labels_convertion()
+
+    # pytorch_warmup_test()
+    pytorch_warmup_test2()
 
     
 

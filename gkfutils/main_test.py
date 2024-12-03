@@ -540,7 +540,7 @@ def pytorch_warmup_test1():
     len_train_loader = 1000
     num_steps = len_train_loader * epochs
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_steps, eta_min=1e-5)
-    warmup_scheduler = warmup_schedule(optimizer, 'radam')  # linear exponential radam none
+    warmup_scheduler = warmup_schedule(optimizer, 'exponential')  # linear exponential radam none
 
     for epoch in range(1, epochs + 1):
         for i in range(250):
@@ -563,7 +563,6 @@ def adjust_lr(optimizer, lr_scheduler, epoch, warmup_epochs, init_lr):
         lr = init_lr * (epoch + 1) / warmup_epochs
         optimizer.param_groups[0]['lr'] = lr
         lr_scheduler.get_last_lr()[0] = lr
-
     else:
         lr_scheduler.step()
         lr = lr_scheduler.get_last_lr()[0]

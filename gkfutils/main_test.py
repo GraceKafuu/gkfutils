@@ -523,7 +523,8 @@ def warmup_schedule(optimizer, name):
         return pytorch_warmup.LinearWarmup(optimizer, 1)
     
 
-def pytorch_warmup_test():
+def pytorch_warmup_test1():
+    """ OK """
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
@@ -532,12 +533,14 @@ def pytorch_warmup_test():
 
     device = torch.device('cpu')
 
+    init_lr = 0.01
     model = mobilenet_v2().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=(0.9, 0.999), weight_decay=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=init_lr, betas=(0.9, 0.999), weight_decay=0.01)
     epochs = 500
-    num_steps = 1000 * epochs
+    len_train_loader = 1000
+    num_steps = len_train_loader * epochs
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_steps, eta_min=1e-5)
-    warmup_scheduler = warmup_schedule(optimizer, 'exponential')
+    warmup_scheduler = warmup_schedule(optimizer, 'radam')  # linear exponential radam none
 
     for epoch in range(1, epochs + 1):
         for i in range(250):
@@ -547,30 +550,29 @@ def pytorch_warmup_test():
             with warmup_scheduler.dampening():
                 lr_scheduler.step()
 
-            lr = optimizer.param_groups[0]['lr']
-            lr2 = lr_scheduler.get_last_lr()[0]
-            # print("lr: {} lr2: {}".format(lr, lr2))
-        
-        lr_curr = lr_scheduler.get_last_lr()[0]
-        print("Epoch: {}, lr_curr: {}".format(epoch, lr_curr))
+        lr_scheduler.step()
+
+        lr1 = optimizer.param_groups[0]['lr']
+        lr2 = lr_scheduler.get_last_lr()[0]
+        print("Epoch: {}, lr1: {} lr2: {}".format(epoch, lr1, lr2))
 
 
 def adjust_lr(optimizer, lr_scheduler, epoch, warmup_epochs, init_lr):
-    """ 动态调整学习率 """
+    """ warmup 调整学习率 """
     if epoch <= warmup_epochs:
         lr = init_lr * (epoch + 1) / warmup_epochs
         optimizer.param_groups[0]['lr'] = lr
         lr_scheduler.get_last_lr()[0] = lr
 
-        return lr
     else:
         lr_scheduler.step()
         lr = lr_scheduler.get_last_lr()[0]
 
-        return lr
+    return lr
 
 
 def pytorch_warmup_test2():
+    """ OK """
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
@@ -587,23 +589,19 @@ def pytorch_warmup_test2():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=init_lr)
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
-    # lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     # num_steps = len(train_loader) * epochs
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000 * 500, eta_min=1e-5)
-
-    
+    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_steps, eta_min=1e-5)
 
     for e in range(epochs):
-        lr = adjust_lr(optimizer, lr_scheduler, e, warmup_epochs, init_lr)
+        lr1 = adjust_lr(optimizer, lr_scheduler, e, warmup_epochs, init_lr)
 
         for i in range(250):
             optimizer.zero_grad()
             optimizer.step()
 
-        lr_curr1 = optimizer.param_groups[0]['lr']
-        lr_curr2 = lr_scheduler.get_last_lr()[0]
-        print("Epoch: {}, lr: {}, lr_curr: {}, lr_curr2: {}".format(e, lr, lr_curr1, lr_curr2))
-
+        lr2 = lr_scheduler.get_last_lr()[0]
+        print("Epoch: {}, lr1: {}, lr2: {}".format(e, lr1, lr2))
 
 
 if __name__ == '__main__':
@@ -613,8 +611,8 @@ if __name__ == '__main__':
 
     # det_labels_convertion()
 
-    # pytorch_warmup_test()
-    pytorch_warmup_test2()
+    # pytorch_warmup_test1()  # OK
+    pytorch_warmup_test2()  # OK
 
     
 

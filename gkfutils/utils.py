@@ -1061,6 +1061,52 @@ def crack_passward(file_path, words='0123456789', repeat=6):
         if flag: break
 
 
+def send_email(from_addr, to_addr, subject, password):
+    import smtplib
+    from email import encoders
+    from email.header import Header
+    from email.mime.text import MIMEText
+    from email.utils import parseaddr, formataddr
+
+    """ 
+    # 这里的密码是开启smtp服务时输入的客户端登录授权码，并不是邮箱密码
+    # 现在很多邮箱都需要先开启smtp才能这样发送邮件
+    send_email(u"zmmbb100@163.com",u"zmmbb100@163.com",u"主题",u"SHMILLavender66")
+    """
+
+    msg = MIMEText("Test_2019_4_14",'html','utf-8')
+    msg['From'] = u'<%s>' % from_addr
+    msg['To'] = u'<%s>' % to_addr
+    msg['Subject'] = subject
+
+    smtp = smtplib.SMTP_SSL('smtp.163.com', 465)
+    smtp.set_debuglevel(1)
+    smtp.ehlo("smtp.163.com")
+    smtp.login(from_addr, password)
+    smtp.sendmail(from_addr, [to_addr], msg.as_string())
+
+
+def create_word_cloud(txt_fpath="yxy.txt", font_path="jingboran.ttf"):
+    from wordcloud import WordCloud
+    import jieba
+    import matplotlib.pyplot as plt
+
+    text = open(txt_fpath,'r').read()
+
+    cut_text = jieba.cut(text)
+    result = '/'.join(cut_text)
+
+    wc = WordCloud(font_path=font_path,background_color='white',width=1000,height=800,max_font_size=200,max_words=10000)
+    wc.generate(result)
+    wc.to_file(txt_fpath.replace(".txt",".png"))
+
+    plt.figure()
+    plt.imshow(wc)
+    plt.axis('off')
+    plt.show()
+
+
+
 if __name__ == '__main__':
     # pass
 

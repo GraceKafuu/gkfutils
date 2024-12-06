@@ -3108,6 +3108,37 @@ def cal_mean_std_var(data_path, size=(64, 64)):
     return means, stds, vars
 
 
+def cal_mean_std_var_2(data_path, size=(64, 64), step=1):
+    dir_list = os.listdir(data_path)
+    
+    means = [0 for i in range(3)]
+    stds = [0 for i in range(3)]
+    cnt = 0
+    for idx in tqdm(range(0, len(dir_list), step)):
+        cnt+=1
+        filename = dir_list[idx]
+        img = cv2.imread(os.path.join(data_path, filename)) 
+        img = img /255.0
+        b, g, r = cv2.split(img)
+        means[0] += np.mean(r)
+        means[1] += np.mean(g)
+        means[2] += np.mean(b)
+    means = np.array(means) / cnt
+
+    # std要另外算，计算减去的均值是所有图片的均值，而不是某张图片的均值。
+    for idx in tqdm(range(0, len(dir_list), step)):
+        filename = dir_list[idx]
+        img = cv2.imread(os.path.join(data_path, filename)) 
+        img = img /255.0
+        b, g, r = cv2.split(img)
+        stds[0] += np.mean((r - means[0]) ** 2)
+        stds[1] += np.mean((g - means[1]) ** 2)
+        stds[2] += np.mean((b - means[2]) ** 2)
+    stds = np.sqrt(np.array(stds) / cnt)
+
+    print("RGB MEAN:",means,"RBG STD:",stds) 
+
+
 def convert_to_jpg_format(data_path):
     img_list = sorted(os.listdir(data_path))
 

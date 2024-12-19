@@ -8047,6 +8047,70 @@ def list_module_functions():
     print(sorted(functions))
 
 
+# -------- cal params and flops --------
+class TestConv2dNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 16, 3, 1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(16, 32, 3, 1, padding=1, bias=False)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        return x
+
+class TestLinearNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(10, 20)
+        self.fc2 = nn.Linear(20, 10)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.fc2(x)
+        return x
+
+def cal_params_flops(model, input, bias_flag=True, method="thop"):
+    """
+    https://zhuanlan.zhihu.com/p/387349200
+    https://www.cnblogs.com/picassooo/p/16343737.html
+
+    bias_flag = True
+    bias = 0
+    if bias_flag:
+        bias = 1
+
+    """
+    import torchstat 
+    import thop
+
+    assert method in ["thop", "torchstat", "manual"], 'method should be ["thop", "torchstat", "manual"]!'
+
+    if method == "thop":
+        macs, params = thop.profile(net, inputs=(input, ))
+
+    elif method == "torchstat":
+
+    else:
+
+
+
+
+
+
+
+    
+
+    
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])

@@ -603,6 +603,10 @@ def pytorch_warmup_test2():
         print("Epoch: {}, lr1: {}, lr2: {}".format(e, lr1, lr2))
 
 
+def main_merge_ocr_rec_txt():
+    merge_txt_files(data_path="E:\\GraceKafuu\\Resources\\data\\OCR\\rec_exp\\val\\labels")
+
+
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
@@ -611,7 +615,11 @@ if __name__ == '__main__':
     # det_labels_convertion()
 
     # pytorch_warmup_test1()  # OK
-    pytorch_warmup_test2()  # OK
+    # pytorch_warmup_test2()  # OK
+
+    # main_merge_ocr_rec_txt()
+
+    print("OK!")
 
     
 

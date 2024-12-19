@@ -99,6 +99,7 @@ def createDataset_v2(data_path, checkValid=True, map_size=5073741824, alpha=None
     fname = os.path.splitext(base_name)[0]
 
     save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_lmdb".format(fname)
+    save_path = save_path.replace("\\", "/")
     os.makedirs(save_path, exist_ok=True)
     print("save_path: ", save_path)
 
@@ -203,13 +204,17 @@ def read_ocr_lables(lbl_path):
 
 
 if __name__ == '__main__':
-    MAPSIZE = 10 * 1024 * 1024 * 1024 * 1024 * 2
+    # MAPSIZE = 10 * 1024 * 1024 * 1024 * 1024 * 2  # linux可行
+    MAPSIZE = 1024 * 1024 * 1024 * 10 # windows可行， 太大的话会报错
 
     # alpha = ' ' + '0123456789' + '.:/\\-' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     # createDataset_v2(data_path="/home/disk/disk7/data/000.OpenDatasets/OCR/Merged_train_test/Merged_train.txt", checkValid=True, map_size=MAPSIZE, alpha=alpha)
 
-    alpha_21160 = read_ocr_lables("/home/wujiahu/GraceKafuu/GraceKafuu_v1.0.0/Python/CV_v1.0.0/OCR/PyTorchOCR/Rec/CRNN/CRNN_PyTorch_2024.08.02/words/chinese_chars_v1_21159.txt")
-    createDataset_v2(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/test/txt/merged.txt", checkValid=True, map_size=MAPSIZE, alpha=alpha_21160)
+    # alpha_21160 = read_ocr_lables("/home/wujiahu/GraceKafuu/GraceKafuu_v1.0.0/Python/CV_v1.0.0/OCR/PyTorchOCR/Rec/CRNN/CRNN_PyTorch_2024.08.02/words/chinese_chars_v1_21159.txt")
+    # createDataset_v2(data_path="/home/disk/disk7/wujiahu/data/000.Data/ocr/chn/ChineseOCR/data/v2/horizontal/test/txt/merged.txt", checkValid=True, map_size=MAPSIZE, alpha=alpha_21160)
+
+    digits = " 0123456789."
+    createDataset_v2(data_path="E:\\GraceKafuu\\Resources\\data\\OCR\\rec_exp\\val\\Merged_txt\\labels.txt", checkValid=True, map_size=MAPSIZE, alpha=digits)
 
 
     

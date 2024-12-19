@@ -56,7 +56,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pyclipper
 from shapely.geometry import Polygon
-import torch.nn as nn
+from torch import nn
 
 
 # Base utils ===================================================
@@ -8050,10 +8050,10 @@ def list_module_functions():
 
 # -------- cal params and flops --------
 class TestConv2dNet(nn.Module):
-    def __init__(self):
+    def __init__(self, bias):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 16, 3, 1, padding=1, bias=False)
-        self.conv2 = nn.Conv2d(16, 32, 3, 1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(3, 16, 3, 1, padding=1, bias=bias)
+        self.conv2 = nn.Conv2d(16, 32, 3, 1, padding=1, bias=bias)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -8062,16 +8062,28 @@ class TestConv2dNet(nn.Module):
 
 
 class TestLinearNet(nn.Module):
-    def __init__(self):
+    def __init__(self, bias):
         super().__init__()
-        self.fc1 = nn.Linear(10, 20, bias=False)
-        self.fc2 = nn.Linear(20, 10, bias=False)
+        self.fc1 = nn.Linear(16, 32, bias=bias)
+        self.fc2 = nn.Linear(32, 64, bias=bias)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.fc2(x)
         return x
 
+
+class TestLSTMNet(nn.Module):
+    def __init__(self, bias):
+        super().__init__()
+        self.lstm1 = nn.LSTM(16, 32, bidirectional=False, num_layers=1, bias=bias)
+        self.lstm2 = nn.LSTM(32, 16, bidirectional=False, num_layers=1, bias=bias)
+ 
+    def forward(self, x):
+        x, _ = self.lstm1(x)
+        x, _ = self.lstm2(x)
+        return x
+    
 
 def cal_params_flops(model, input, bias_flag=True, method="thop"):
     """
@@ -8083,21 +8095,45 @@ def cal_params_flops(model, input, bias_flag=True, method="thop"):
     if bias_flag:
         bias = 1
 
+    Params --------------------------------------------------------
+    Conv2d:
+    params = (k_h * k_w * c_in + bias) * c_out
+    
+    Linear -> Conv2d:
+    params = (H_out * W_out * N + bias) * F_out  # N: 卷积核的数量
+
+    Linear -> Linear:
+    params = (F_in + bias) * F_out
+
+
+    FLOPs --------------------------------------------------------
+    Conv2d:
+    flops = ((c_in * k_h * k_w) + (c_in * k_h * k_w - 1) + bias) * c_out * H_feat * W_feat
+
+    Linear:
+    flops = ((2 * I - 1) + bias) * O  #  I是全连接输入的神经元数, O是全连接输出的神经元数
+
     """
-    import torchstat 
     import thop
 
     assert method in ["thop", "torchstat", "manual"], 'method should be ["thop", "torchstat", "manual"]!'
+
+    bias = 0
+    if bias_flag:
+        bias = 1
 
     if method == "thop":
         ops, params = thop.profile(model, inputs=(input, ))
         print("thop -> ops: {}, params: {}".format(ops, params))
 
     elif method == "torchstat":
-        model_stat = torchstat.Stat(model, (input, ))
-        print("torchstat -> {}".format(model_stat))
+        raise NotImplementedError
+    # elif method == "torchstat":
+    #     model_stat = torchstat.stat(model, tuple(input.shape[1:]))
+    #     print("torchstat -> {}".format(model_stat))
 
     else:
+        print("manual, 参考注释手动计算!")
 
 
 
@@ -8193,6 +8229,9 @@ if __name__ == '__main__':
     # check_ocr_train_txt(data_path="")
     # random_select_images_from_ocr_train_txt(data_path="", select_num= 5000)
     # ocr_train_txt_split_to_train_and_test(data_path="", train_percent=0.8)
+
+
+
 
 
 

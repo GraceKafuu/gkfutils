@@ -607,6 +607,22 @@ def main_merge_ocr_rec_txt():
     merge_txt_files(data_path="E:\\GraceKafuu\\Resources\\data\\OCR\\rec_exp\\val\\labels")
 
 
+def cal_params_flops_test():
+    bias_flag = False
+    conv_model = TestConv2dNet(bias=bias_flag)
+    linear_model = TestLinearNet(bias=bias_flag)
+    lstm_model = TestLSTMNet(bias=bias_flag)
+    x1 = torch.randn(1, 3, 224, 224)
+    x2 = torch.randn(1, 128, 16)
+    cal_params_flops(conv_model, x1, bias_flag=bias_flag, method="thop")
+    cal_params_flops(linear_model, x2, bias_flag=bias_flag, method="thop")
+    cal_params_flops(lstm_model, x2, bias_flag=bias_flag, method="thop")
+    
+
+
+
+
+
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
@@ -619,7 +635,8 @@ if __name__ == '__main__':
 
     # main_merge_ocr_rec_txt()
 
-    print("OK!")
+    cal_params_flops_test()
+
 
     
 

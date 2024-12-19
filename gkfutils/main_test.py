@@ -608,7 +608,7 @@ def main_merge_ocr_rec_txt():
 
 
 def cal_params_flops_test():
-    bias_flag = False
+    bias_flag = True
     conv_model = TestConv2dNet(bias=bias_flag)
     linear_model = TestLinearNet(bias=bias_flag)
     lstm_model = TestLSTMNet(bias=bias_flag)

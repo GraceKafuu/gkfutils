@@ -8050,6 +8050,10 @@ def list_module_functions():
 
 # -------- cal params and flops --------
 class TestConv2dNet(nn.Module):
+    """
+    params: (3 * 3 * 3 + bias) * 16 + (16 * 3 * 3 + bias) * 32 = 5040  # 与thop结果一致
+    flops: 
+    """
     def __init__(self, bias):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 16, 3, 1, padding=1, bias=bias)
@@ -8062,6 +8066,10 @@ class TestConv2dNet(nn.Module):
 
 
 class TestLinearNet(nn.Module):
+    """
+    params: (16 + bias) * 32 + (32 + bias) * 64 = 2560  # 与thop结果一致
+    flops: 
+    """
     def __init__(self, bias):
         super().__init__()
         self.fc1 = nn.Linear(16, 32, bias=bias)
@@ -8074,10 +8082,14 @@ class TestLinearNet(nn.Module):
 
 
 class TestLSTMNet(nn.Module):
+    """
+    params: 4 * ((16 + bias + 32 + bias) * 32) + 4 * ((32 + bias + 64 + bias) * 64) = 30720  # 与thop结果一致
+    flops: 
+    """
     def __init__(self, bias):
         super().__init__()
         self.lstm1 = nn.LSTM(16, 32, bidirectional=False, num_layers=1, bias=bias)
-        self.lstm2 = nn.LSTM(32, 16, bidirectional=False, num_layers=1, bias=bias)
+        self.lstm2 = nn.LSTM(32, 64, bidirectional=False, num_layers=1, bias=bias)
  
     def forward(self, x):
         x, _ = self.lstm1(x)
@@ -8104,6 +8116,10 @@ def cal_params_flops(model, input, bias_flag=True, method="thop"):
 
     Linear -> Linear:
     params = (F_in + bias) * F_out
+
+    LSTM:
+    https://baijiahao.baidu.com/s?id=1735032676336476820&wfr=spider&for=pc
+    params = 4 * [(input_dim + hidden_dim + bias) * hidden_dim]
 
 
     FLOPs --------------------------------------------------------

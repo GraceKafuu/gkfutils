@@ -8052,7 +8052,12 @@ def list_module_functions():
 class TestConv2dNet(nn.Module):
     """
     params: (3 * 3 * 3 + bias) * 16 + (16 * 3 * 3 + bias) * 32 = 5040  # 与thop结果一致
-    flops: 
+    flops: (3 * 3 * 3 + 3 * (3 * 3 - 1) + bias) * 16 * 224 * 224
+           +
+           (16 * 3 * 3 + 16 * (3 * 3 - 1) + bias) * 32 * 224 * 224
+           =
+           480083968
+           # 480083968 / 2 = 240041984.0  thop结果为252887040.0 不一致
     """
     def __init__(self, bias):
         super().__init__()
@@ -8068,7 +8073,8 @@ class TestConv2dNet(nn.Module):
 class TestLinearNet(nn.Module):
     """
     params: (16 + bias) * 32 + (32 + bias) * 64 = 2560  # 与thop结果一致
-    flops: 
+    flops: https://blog.csdn.net/qq_37025073/article/details/106735053
+    
     """
     def __init__(self, bias):
         super().__init__()

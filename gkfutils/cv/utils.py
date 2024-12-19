@@ -56,6 +56,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pyclipper
 from shapely.geometry import Polygon
+import torch.nn as nn
 
 
 # Base utils ===================================================
@@ -8059,16 +8060,18 @@ class TestConv2dNet(nn.Module):
         x = self.conv2(x)
         return x
 
+
 class TestLinearNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(10, 20)
-        self.fc2 = nn.Linear(20, 10)
+        self.fc1 = nn.Linear(10, 20, bias=False)
+        self.fc2 = nn.Linear(20, 10, bias=False)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.fc2(x)
         return x
+
 
 def cal_params_flops(model, input, bias_flag=True, method="thop"):
     """
@@ -8087,11 +8090,15 @@ def cal_params_flops(model, input, bias_flag=True, method="thop"):
     assert method in ["thop", "torchstat", "manual"], 'method should be ["thop", "torchstat", "manual"]!'
 
     if method == "thop":
-        macs, params = thop.profile(net, inputs=(input, ))
+        ops, params = thop.profile(model, inputs=(input, ))
+        print("thop -> ops: {}, params: {}".format(ops, params))
 
     elif method == "torchstat":
+        model_stat = torchstat.Stat(model, (input, ))
+        print("torchstat -> {}".format(model_stat))
 
     else:
+
 
 
 

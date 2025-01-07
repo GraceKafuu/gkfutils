@@ -1828,6 +1828,19 @@ def img2byte(img_path):
     return byte_data
 
 
+def connected_components_analysis(img, connectivity=8):
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=connectivity)
+
+    # 不同的连通域赋予不同的颜色
+    output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for i in range(1, num_labels):
+        mask = labels == i
+        output[:, :, 0][mask] = np.random.randint(0, 256)
+        output[:, :, 1][mask] = np.random.randint(0, 256)
+        output[:, :, 2][mask] = np.random.randint(0, 256)
+
+    return output, num_labels, labels, stats, centroids
+
 
 # Object detection utils ===================================================
 def bbox_voc_to_yolo(imgsz, box):
@@ -8284,9 +8297,16 @@ if __name__ == '__main__':
     # img = byte2img(byte_data)
     # cv2.imwrite(r'D:\Gosion\Projects\data\res2.jpg', img)
 
-    img_path = r'D:\Gosion\Projects\data\res2.jpg'
-    byte_data = img2byte(img_path)
-    print(byte_data)
+    # img_path = r'D:\Gosion\Projects\data\res2.jpg'
+    # byte_data = img2byte(img_path)
+    # print(byte_data)
+
+    img = cv2.imread(r'D:\Gosion\Projects\data\202206070916487.png')
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+    output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8)
+    cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output.jpg', output)
+
 
 
 

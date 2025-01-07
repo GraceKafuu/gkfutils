@@ -1801,6 +1801,34 @@ def resize_images(data_path, size=(1920, 1080)):
         cv2.imwrite("{}/{}.jpg".format(save_path, img_name), resz_img)
 
 
+def byte2img(byte_data):
+    """
+    byte_data = b'Your byte data here'
+    byte_io = io.BytesIO(byte_data)
+    image = Image.open(byte_io)
+    ----------------------------------
+
+    with open("1.jpg", "r") as f:
+        data=f.read()
+    base64.b64encode(data)  # 图片转字节
+    base64.b64decode(data)  # 字节转图片
+    """
+    byte_data = base64.b64decode(byte_data)
+    nparr = np.frombuffer(byte_data, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    return img
+
+
+def img2byte(img_path):
+    with open(img_path, "rb") as f:
+        data=f.read()
+    byte_data = base64.b64encode(data)
+
+    return byte_data
+
+
+
 # Object detection utils ===================================================
 def bbox_voc_to_yolo(imgsz, box):
     """
@@ -8251,6 +8279,15 @@ if __name__ == '__main__':
     # check_ocr_train_txt(data_path="")
     # random_select_images_from_ocr_train_txt(data_path="", select_num= 5000)
     # ocr_train_txt_split_to_train_and_test(data_path="", train_percent=0.8)
+
+    # byte_data = ""
+    # img = byte2img(byte_data)
+    # cv2.imwrite(r'D:\Gosion\Projects\data\res2.jpg', img)
+
+    img_path = r'D:\Gosion\Projects\data\res2.jpg'
+    byte_data = img2byte(img_path)
+    print(byte_data)
+
 
 
 

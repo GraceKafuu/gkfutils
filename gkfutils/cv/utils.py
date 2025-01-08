@@ -1828,8 +1828,19 @@ def img2byte(img_path):
     return byte_data
 
 
-def connected_components_analysis(img, connectivity=8):
+def connected_components_analysis(img, connectivity=8, area_thr=100, h_thr=8, w_thr=8):
+    """
+    stats: [x, y, w, h, area]
+    """
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=connectivity)
+    
+    areas = stats[:, -1]  # stats[:, cv2.CC_STAT_AREA]
+    for i in range(1, num_labels):
+        if areas[i] < area_thr:
+            labels[labels == i] = 0
+        else:
+            if stats[i, 2] < w_thr or stats[i, 3] < h_thr:
+                labels[labels == i] = 0
 
     # 不同的连通域赋予不同的颜色
     output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
@@ -1841,6 +1852,123 @@ def connected_components_analysis(img, connectivity=8):
 
     return output, num_labels, labels, stats, centroids
 
+
+def write_video(video, video_path, save_path):
+    width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(video.get(cv2.CAP_PROP_FPS))
+    if save_path is None or save_path == "":
+        save_path = video_path + ".avi"
+    out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc('M','J','P','G'), fps, (width * 2,  height))
+
+    return out
+
+
+def draw_rect(frameDet, frameNowBGR, area_thresh=100):
+    contours, hierarchy = cv2.findContours(frameDet, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    for c in contours:
+        x, y, w, h = cv2.boundingRect(c)
+        if w * h < area_thresh: continue
+        cv2.rectangle(frameNowBGR, (x, y), (x + w, y + h), (255, 0, 255), 2)
+
+    return frameNowBGR
+
+
+def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, save_path=None, debug=False):
+    """
+    [2, 3]: [两帧帧间差分法, 三帧帧间差分法]
+    """
+    assert m in [2, 3], "m should be one of [2, 3]!"
+    base_name = os.path.basename(video_path)
+    suffix = os.path.splitext(base_name)[1]
+    video = cv2.VideoCapture(video_path)
+    if not video.isOpened():
+        print("Open {} failed!".format(video_path))
+        return -1
+    
+    if vis_result:
+        out = write_video(video, video_path, save_path)
+
+    # 为了效率没有将判断放进while True里面
+    if m == 2:
+        retPre, framePre = video.read()  # 上一帧
+        framePre = cv2.cvtColor(framePre, cv2.COLOR_BGR2GRAY)
+
+        while True:
+            ret, frameNow = video.read()  # 当前帧
+            if not ret: break
+
+            frameNowBGR = frameNow.copy()
+            frameNow = cv2.cvtColor(frameNow, cv2.COLOR_BGR2GRAY)
+            frameDet = cv2.absdiff(framePre, frameNow)
+            framePre = frameNow
+
+            _, frameDet = cv2.threshold(frameDet, 127, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+            # e = cv2.getStructuringElement(0, (3, 3))
+            # frameDet = cv2.erode(frameDet, e)
+            # frameDet = cv2.dilate(frameDet, e)
+
+            analysis_output = connected_components_analysis(frameDet, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
+            output = analysis_output[0]  # output, num_labels, labels, stats, centroids
+            output_gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+            _, frameDet = cv2.threshold(output_gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+
+            frameNowBGR = draw_rect(frameDet, frameNowBGR, area_thresh=100)
+
+            if vis_result:
+                frameDet_3c = cv2.merge([frameDet, frameDet, frameDet])
+                dst = np.hstack((frameNowBGR, frameDet_3c))
+                out.write(dst)
+
+            if debug:
+                cv2.imshow("frameDet", frameDet)
+                cv2.waitKey(1)
+    else:
+        retPrePre, framePrePre = video.read()  # 上上帧
+        retPre, framePre = video.read()  # 上一帧
+        framePrePre = cv2.cvtColor(framePrePre, cv2.COLOR_BGR2GRAY)
+        framePre = cv2.cvtColor(framePre, cv2.COLOR_BGR2GRAY)
+
+        while True:
+            ret, frameNow = video.read()  # 当前帧
+            if not ret: break
+
+            frameNowBGR = frameNow.copy()
+            frameNow = cv2.cvtColor(frameNow, cv2.COLOR_BGR2GRAY)
+            d1 = cv2.absdiff(framePrePre, framePre)
+            d2 = cv2.absdiff(framePre, frameNow)
+            _, thresh1 = cv2.threshold(d1, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+            _, thresh2 = cv2.threshold(d2, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+            e = cv2.getStructuringElement(0, (3, 3))
+            thresh1 = cv2.dilate(thresh1, e)
+            thresh2 = cv2.dilate(thresh2, e)
+            frameDet = cv2.bitwise_and(thresh1, thresh2)
+
+            analysis_output = connected_components_analysis(frameDet, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
+            output = analysis_output[0]  # output, num_labels, labels, stats, centroids
+            output_gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+            _, frameDet = cv2.threshold(output_gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+
+            frameNowBGR = draw_rect(frameDet, frameNowBGR, area_thresh=100)
+
+            framePrePre = framePre
+            framePre = frameNow
+
+            if vis_result:
+                frameDet_3c = cv2.merge([frameDet, frameDet, frameDet])
+                dst = np.hstack((frameNowBGR, frameDet_3c))
+                out.write(dst)
+
+            if debug:
+                cv2.imshow("frameDet", frameDet)
+                cv2.waitKey(1)
+
+    video.release()
+    if vis_result:
+        out.release()
+    cv2.destroyAllWindows()
+
+    return 0
 
 # Object detection utils ===================================================
 def bbox_voc_to_yolo(imgsz, box):
@@ -8304,8 +8432,8 @@ if __name__ == '__main__':
     img = cv2.imread(r'D:\Gosion\Projects\data\202206070916487.png')
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
-    output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8)
-    cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output.jpg', output)
+    output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
+    cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output2.jpg', output)
 
 
 

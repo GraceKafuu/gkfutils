@@ -1864,12 +1864,52 @@ def write_video(video, video_path, save_path):
     return out
 
 
-def draw_rect(frameDet, frameNowBGR, area_thresh=100):
+def x1y1wh_to_x1y1x2y2(x):
+    """
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = x[:, 0]  # top left x
+    y[:, 1] = x[:, 1]  # top left y
+    y[:, 2] = x[:, 0] + x[:, 2] # bottom right x
+    y[:, 3] = x[:, 1] + x[:, 3] # bottom right y
+    """
+    y = [x[0], x[1], x[0] + x[2], x[1] + x[3]]
+
+    return y
+
+
+def merge_bboxes(b1, b2):
+    xmin = min(b1[0], b2[0])
+    ymin = min(b1[1], b2[1])
+    xmax = max(b1[2], b2[2])
+    ymax = max(b1[3], b2[3])
+
+    assert xmin <= xmax and ymin <= ymax, "Merge bboxes error!"
+
+    return [xmin, ymin, xmax, ymax]
+
+
+
+def draw_rect(frameDet, frameNowBGR, area_thresh=100, iou_thresh=0.0):
     contours, hierarchy = cv2.findContours(frameDet, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    tmp_bboxes = []
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         if w * h < area_thresh: continue
-        cv2.rectangle(frameNowBGR, (x, y), (x + w, y + h), (255, 0, 255), 2)
+        x1y1x2y2 = x1y1wh_to_x1y1x2y2([x, y, w, h])
+        tmp_bboxes.append(x1y1x2y2)
+    
+    len_boxes = len(tmp_bboxes)
+    final_bboxes = []
+    for i in range(len_boxes - 1):
+        for j in range(len_boxes - 1 - i):
+            iou = cal_iou(tmp_bboxes[j], tmp_bboxes[j + 1])
+            if iou > iou_thresh:
+                merged_box = merge_bboxes(tmp_bboxes[j], tmp_bboxes[j + 1])
+                final_bboxes.append(merged_box)
+
+    for b in final_bboxes:
+        x1, y1, x2, y2 = b[0], b[1], b[2], b[3]
+        cv2.rectangle(frameNowBGR, (x1, y1), (x2, y2), (255, 0, 255), 2)
 
     return frameNowBGR
 
@@ -1969,6 +2009,7 @@ def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, sav
     cv2.destroyAllWindows()
 
     return 0
+
 
 # Object detection utils ===================================================
 def bbox_voc_to_yolo(imgsz, box):
@@ -8429,11 +8470,13 @@ if __name__ == '__main__':
     # byte_data = img2byte(img_path)
     # print(byte_data)
 
-    img = cv2.imread(r'D:\Gosion\Projects\data\202206070916487.png')
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
-    output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
-    cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output2.jpg', output)
+    # img = cv2.imread(r'D:\Gosion\Projects\data\202206070916487.png')
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+    # output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
+    # cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output2.jpg', output)
+
+    moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
 
 
 

@@ -242,12 +242,15 @@ class YOLOv5_ONNX(object):
     
 
 if __name__ == '__main__':
-    onnx_path = r"/home/zengyifan/wujiahu/yolo/yolov5-6.2/runs/train/006_768_20230313_2_cls/weights/best.onnx"
+    # onnx_path = r"/home/zengyifan/wujiahu/yolo/yolov5-6.2/runs/train/006_768_20230313_2_cls/weights/best.onnx"
+    onnx_path = r"D:\Gosion\Projects\coal_conveying_corridor\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.0.onnx"
     # onnx_path = r"E:\GraceKafuu\Python\ultralytics-main\yolov8s.onnx"
-    img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685.jpg"
+    # img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685.jpg"
+    img_path = r"D:\Gosion\Projects\data\images\southeast.jpg"
 
     model = YOLOv5_ONNX(onnx_path)
-    model_input_size = (448, 768)
+    # model_input_size = (448, 768)
+    model_input_size = (640, 640)
     img0, img, src_size = model.pre_process(img_path, img_size=model_input_size)
     print("src_size: ", src_size)
 
@@ -272,7 +275,8 @@ if __name__ == '__main__':
         cv2.rectangle(img0, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
         # cv2.putText(img0, "smoke: {:.2f} concentration: {}".format(b[4], 2), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
 
-    cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685_pred.jpg", img0)
+    # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685_pred.jpg", img0)
+    cv2.imwrite(r"D:\Gosion\Projects\data\images\southeast_pred.jpg", img0)
     cv2.imshow("test", img0)
     cv2.waitKey(0)
     

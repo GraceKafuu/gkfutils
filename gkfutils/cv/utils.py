@@ -1877,7 +1877,7 @@ def x1y1wh_to_x1y1x2y2(x):
     return y
 
 
-def merge_bboxes(b1, b2):
+def merge_two_bboxes(b1, b2):
     xmin = min(b1[0], b2[0])
     ymin = min(b1[1], b2[1])
     xmax = max(b1[2], b2[2])
@@ -1886,6 +1886,57 @@ def merge_bboxes(b1, b2):
     assert xmin <= xmax and ymin <= ymax, "Merge bboxes error!"
 
     return [xmin, ymin, xmax, ymax]
+
+
+def merge_bboxes_base(bboxes, id, merge_idxes, iou_thresh=0.0):
+    out_bboxes = []
+    # merge_idxes = []
+    len_boxes = len(bboxes)
+
+    print("0000000000000000000")
+
+    # while True:
+    for l in range(len_boxes):
+        print("111111111111111111111")
+        if id > 0 and merge_idxes == []: break
+        for i in range(len_boxes - 1):
+            for j in range(i + 1, len_boxes):
+                iou = cal_iou(bboxes[i], bboxes[j])
+                if iou > iou_thresh:
+                    merge_idxes.append([i, j])
+        
+        for idx, mi in enumerate(merge_idxes):
+            merged_box = merge_two_bboxes(bboxes[mi[0]], bboxes[mi[1]])
+            out_bboxes.append(merged_box)
+            
+        mi_list = []  # merge_idxes_list
+        all_list = list(range(len_boxes))
+        for idx, mi in enumerate(merge_idxes):
+            mi_list.append(mi[0])
+            mi_list.append(mi[1])
+
+        for idx, mi in enumerate(merge_idxes):
+            merge_idxes.remove(merge_idxes[idx])
+
+        nmi_list = list(set(mi_list) ^ set(all_list))  # not_merge_idxes_list
+        for nmi in nmi_list:
+            out_bboxes.append(bboxes[nmi])
+
+        id += 1
+
+    return out_bboxes, id, merge_idxes
+
+def merge_bboxes(bboxes, id, merge_idxes, iou_thresh=0.0):
+    print("+++++++++++++++++++++")
+    bboxes, id, merge_idxes = merge_bboxes_base(bboxes, id=id, merge_idxes=merge_idxes, iou_thresh=iou_thresh)
+
+    if bboxes != [] and id > 0 and merge_idxes == []:
+        print("=================")
+        return bboxes, id, merge_idxes
+    else:
+        print("-------")
+        bboxes, id, merge_idxes = merge_bboxes(bboxes, id=id, merge_idxes=merge_idxes, iou_thresh=iou_thresh)
+
 
 
 
@@ -1897,19 +1948,28 @@ def draw_rect(frameDet, frameNowBGR, area_thresh=100, iou_thresh=0.0):
         if w * h < area_thresh: continue
         x1y1x2y2 = x1y1wh_to_x1y1x2y2([x, y, w, h])
         tmp_bboxes.append(x1y1x2y2)
-    
-    len_boxes = len(tmp_bboxes)
-    final_bboxes = []
-    for i in range(len_boxes - 1):
-        for j in range(len_boxes - 1 - i):
-            iou = cal_iou(tmp_bboxes[j], tmp_bboxes[j + 1])
-            if iou > iou_thresh:
-                merged_box = merge_bboxes(tmp_bboxes[j], tmp_bboxes[j + 1])
-                final_bboxes.append(merged_box)
 
-    for b in final_bboxes:
+    frameNowBGR_tmp = np.copy(frameNowBGR)
+    for b_tmp in tmp_bboxes:
+        x1_tmp, y1_tmp, x2_tmp, y2_tmp = b_tmp[0], b_tmp[1], b_tmp[2], b_tmp[3]
+        cv2.rectangle(frameNowBGR_tmp, (x1_tmp, y1_tmp), (x2_tmp, y2_tmp), (255, 0, 255), 2)
+    cv2.imshow('frameNowBGR_tmp', frameNowBGR_tmp)
+    cv2.waitKey(1)
+    
+    id = 0
+    merge_idxes = []
+    # final_bboxes = tmp_bboxes
+    # final_bboxes, id, merge_idxes = merge_bboxes(final_bboxes, id, merge_idxes, iou_thresh=0.0)
+    # [[633, 242, 674, 316], [640, 276, 648, 292], [647, 253, 661, 302], [260, 219, 308, 302], [281, 235, 291, 271], [266, 233, 283, 277]]
+    # final_bboxes, id, merge_idxes = merge_bboxes(tmp_bboxes, id, merge_idxes, iou_thresh=0.0)
+
+    for b in tmp_bboxes:
+    # for b in final_bboxes:
         x1, y1, x2, y2 = b[0], b[1], b[2], b[3]
         cv2.rectangle(frameNowBGR, (x1, y1), (x2, y2), (255, 0, 255), 2)
+    cv2.imshow('frameNowBGR', frameNowBGR)
+    cv2.waitKey(1)
+
 
     return frameNowBGR
 
@@ -8476,7 +8536,8 @@ if __name__ == '__main__':
     # output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
     # cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output2.jpg', output)
 
-    moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
+    # moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
+    moving_object_detect(video_path=r"D:\Gosion\Projects\data\project_data\6870\4670\192.168.45.192_01_20250109115957731.mp4", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
 
 
 

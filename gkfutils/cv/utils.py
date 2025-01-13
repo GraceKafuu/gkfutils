@@ -1962,10 +1962,28 @@ def draw_rect(frameDet, frameNowBGR, area_thresh=100, iou_thresh=0.0, object_thr
     return frameNowBGR
 
 
-def moving_object_detect(video_path, m=3, area_thresh=100, cca=True, flag_merge_bboxes=True, vis_result=False, save_path=None, debug=False):
+def shield_time_watermark(img, time_watermark):
+    imgsz = img.shape
+    if time_watermark is not None:
+        for twm in time_watermark:
+            x, y, w, h = twm
+            x = int(round(x * imgsz[1]))
+            y = int(round(y * imgsz[0]))
+            w = int(round(w * imgsz[1]))
+            h = int(round(h * imgsz[0]))
+            if len(imgsz) == 2:
+                img[y:y + h, x:x + w] = 0
+            else:
+                img[y:y + h, x:x + w] = (0, 0, 0)
+
+    return img
+
+
+def moving_object_detect(video_path, m=3, area_thresh=100, time_watermark=None, cca=True, flag_merge_bboxes=True, vis_result=False, save_path=None, debug=False):
     """
     param m: [2, 3], [两帧帧间差分法, 三帧帧间差分法]
     param cca: connected components analysis
+    param time_watermark: [[x, y, w, h], [x, y, w, h]], ratio not pixel value! e.g. [[0, 0.0488, 0.4370, 0.0651]]
     """
     assert m in [2, 3], "m should be one of [2, 3]!"
     base_name = os.path.basename(video_path)
@@ -1983,6 +2001,7 @@ def moving_object_detect(video_path, m=3, area_thresh=100, cca=True, flag_merge_
         retPre, framePre = video.read()  # 上一帧
         framePreBGR = framePre.copy()
         framePre = cv2.cvtColor(framePre, cv2.COLOR_BGR2GRAY)
+        framePre = shield_time_watermark(framePre, time_watermark)
 
         while True:
             ret, frameNow = video.read()  # 当前帧
@@ -1990,6 +2009,7 @@ def moving_object_detect(video_path, m=3, area_thresh=100, cca=True, flag_merge_
 
             frameNowBGR = frameNow.copy()
             frameNow = cv2.cvtColor(frameNow, cv2.COLOR_BGR2GRAY)
+            frameNow = shield_time_watermark(frameNow, time_watermark)
             frameDet = cv2.absdiff(framePre, frameNow)
             framePre = frameNow
 
@@ -2024,13 +2044,16 @@ def moving_object_detect(video_path, m=3, area_thresh=100, cca=True, flag_merge_
         framePreBGR = framePre.copy()
         framePrePre = cv2.cvtColor(framePrePre, cv2.COLOR_BGR2GRAY)
         framePre = cv2.cvtColor(framePre, cv2.COLOR_BGR2GRAY)
-
+        framePrePre = shield_time_watermark(framePrePre, time_watermark)
+        framePre = shield_time_watermark(framePre, time_watermark)
+        
         while True:
             ret, frameNow = video.read()  # 当前帧
             if not ret: break
 
             frameNowBGR = frameNow.copy()
             frameNow = cv2.cvtColor(frameNow, cv2.COLOR_BGR2GRAY)
+            frameNow = shield_time_watermark(frameNow, time_watermark)
             d1 = cv2.absdiff(framePrePre, framePre)
             d2 = cv2.absdiff(framePre, frameNow)
             _, thresh1 = cv2.threshold(d1, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
@@ -8535,7 +8558,8 @@ if __name__ == '__main__':
     # output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
     # cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output2.jpg', output)
 
-    moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, cca=True, flag_merge_bboxes=True, vis_result=True, save_path=None, debug=True)
+    # moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, time_watermark=[[0, 0.0488, 0.4370, 0.0651]], cca=True, flag_merge_bboxes=True, vis_result=True, save_path=None, debug=True)
+    moving_object_detect(video_path=r"D:\Gosion\Projects\data\project_data\6870\270\192.168.45.192_01_20250109093741369.mp4", m=3, area_thresh=100, time_watermark=[[0, 0.0488, 0.4370, 0.0651]], cca=True, flag_merge_bboxes=True, vis_result=True, save_path=None, debug=True)
     # moving_object_detect(video_path=r"D:\Gosion\Projects\data\project_data\6870\4670\192.168.45.192_01_20250109115957731.mp4", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
 
 

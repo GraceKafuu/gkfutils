@@ -1888,59 +1888,37 @@ def merge_two_bboxes(b1, b2):
     return [xmin, ymin, xmax, ymax]
 
 
-def merge_bboxes_base(bboxes, id, merge_idxes, iou_thresh=0.0):
+def merge_bboxes(bboxes, iou_thresh=0.0):
     out_bboxes = []
-    # merge_idxes = []
     len_boxes = len(bboxes)
+    merge_idxes = []
 
-    print("0000000000000000000")
-
-    # while True:
-    for l in range(len_boxes):
-        print("111111111111111111111")
-        if id > 0 and merge_idxes == []: break
-        for i in range(len_boxes - 1):
-            for j in range(i + 1, len_boxes):
-                iou = cal_iou(bboxes[i], bboxes[j])
-                if iou > iou_thresh:
-                    merge_idxes.append([i, j])
+    for i in range(len_boxes - 1):
+        for j in range(i + 1, len_boxes):
+            iou = cal_iou(bboxes[i], bboxes[j])
+            if iou > iou_thresh and bboxes[i] != bboxes[j]:
+                merge_idxes.append([i, j])
+    
+    for idx, mi in enumerate(merge_idxes):
+        merged_box = merge_two_bboxes(bboxes[mi[0]], bboxes[mi[1]])
+        out_bboxes.append(merged_box)
         
-        for idx, mi in enumerate(merge_idxes):
-            merged_box = merge_two_bboxes(bboxes[mi[0]], bboxes[mi[1]])
-            out_bboxes.append(merged_box)
-            
-        mi_list = []  # merge_idxes_list
-        all_list = list(range(len_boxes))
-        for idx, mi in enumerate(merge_idxes):
+    mi_list = []  # merge_idxes_list
+    all_list = list(range(len_boxes))
+    for idx, mi in enumerate(merge_idxes):
+        if mi[0] not in mi_list:
             mi_list.append(mi[0])
+        if mi[1] not in mi_list:
             mi_list.append(mi[1])
 
-        for idx, mi in enumerate(merge_idxes):
-            merge_idxes.remove(merge_idxes[idx])
+    nmi_list = list(set(mi_list) ^ set(all_list))  # not_merge_idxes_list
+    for nmi in nmi_list:
+        out_bboxes.append(bboxes[nmi])
 
-        nmi_list = list(set(mi_list) ^ set(all_list))  # not_merge_idxes_list
-        for nmi in nmi_list:
-            out_bboxes.append(bboxes[nmi])
-
-        id += 1
-
-    return out_bboxes, id, merge_idxes
-
-def merge_bboxes(bboxes, id, merge_idxes, iou_thresh=0.0):
-    print("+++++++++++++++++++++")
-    bboxes, id, merge_idxes = merge_bboxes_base(bboxes, id=id, merge_idxes=merge_idxes, iou_thresh=iou_thresh)
-
-    if bboxes != [] and id > 0 and merge_idxes == []:
-        print("=================")
-        return bboxes, id, merge_idxes
-    else:
-        print("-------")
-        bboxes, id, merge_idxes = merge_bboxes(bboxes, id=id, merge_idxes=merge_idxes, iou_thresh=iou_thresh)
+    return out_bboxes, len(merge_idxes)
 
 
-
-
-def draw_rect(frameDet, frameNowBGR, area_thresh=100, iou_thresh=0.0):
+def draw_rect(frameDet, frameNowBGR, area_thresh=100, iou_thresh=0.0, object_thresh=200, flag_merge_bboxes=True):
     contours, hierarchy = cv2.findContours(frameDet, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     tmp_bboxes = []
     for c in contours:
@@ -1949,34 +1927,45 @@ def draw_rect(frameDet, frameNowBGR, area_thresh=100, iou_thresh=0.0):
         x1y1x2y2 = x1y1wh_to_x1y1x2y2([x, y, w, h])
         tmp_bboxes.append(x1y1x2y2)
 
+    """
+    # 显示未合并目标框的效果
     frameNowBGR_tmp = np.copy(frameNowBGR)
     for b_tmp in tmp_bboxes:
         x1_tmp, y1_tmp, x2_tmp, y2_tmp = b_tmp[0], b_tmp[1], b_tmp[2], b_tmp[3]
         cv2.rectangle(frameNowBGR_tmp, (x1_tmp, y1_tmp), (x2_tmp, y2_tmp), (255, 0, 255), 2)
     cv2.imshow('frameNowBGR_tmp', frameNowBGR_tmp)
     cv2.waitKey(1)
+    """
     
-    id = 0
-    merge_idxes = []
-    # final_bboxes = tmp_bboxes
-    # final_bboxes, id, merge_idxes = merge_bboxes(final_bboxes, id, merge_idxes, iou_thresh=0.0)
-    # [[633, 242, 674, 316], [640, 276, 648, 292], [647, 253, 661, 302], [260, 219, 308, 302], [281, 235, 291, 271], [266, 233, 283, 277]]
-    # final_bboxes, id, merge_idxes = merge_bboxes(tmp_bboxes, id, merge_idxes, iou_thresh=0.0)
+    final_bboxes = tmp_bboxes
+    if flag_merge_bboxes:
+        id = 0
+        len_mi = 0
+        while True:
+            if id > 0 and len_mi == 0 or len_mi > object_thresh or len(final_bboxes) > object_thresh: break
+            final_bboxes, len_mi = merge_bboxes(final_bboxes, iou_thresh=iou_thresh)
+            id += 1
 
-    for b in tmp_bboxes:
-    # for b in final_bboxes:
+    """
+    # 显示合并目标框的效果
+    for b in final_bboxes:
         x1, y1, x2, y2 = b[0], b[1], b[2], b[3]
         cv2.rectangle(frameNowBGR, (x1, y1), (x2, y2), (255, 0, 255), 2)
-    cv2.imshow('frameNowBGR', frameNowBGR)
+    cv2.imshow('frameNowBGR_merge_bboxes', frameNowBGR)
     cv2.waitKey(1)
+    """
 
+    for b in final_bboxes:
+        x1, y1, x2, y2 = b[0], b[1], b[2], b[3]
+        cv2.rectangle(frameNowBGR, (x1, y1), (x2, y2), (255, 0, 255), 2)
 
     return frameNowBGR
 
 
-def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, save_path=None, debug=False):
+def moving_object_detect(video_path, m=3, area_thresh=100, cca=True, flag_merge_bboxes=True, vis_result=False, save_path=None, debug=False):
     """
-    [2, 3]: [两帧帧间差分法, 三帧帧间差分法]
+    param m: [2, 3], [两帧帧间差分法, 三帧帧间差分法]
+    param cca: connected components analysis
     """
     assert m in [2, 3], "m should be one of [2, 3]!"
     base_name = os.path.basename(video_path)
@@ -1992,6 +1981,7 @@ def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, sav
     # 为了效率没有将判断放进while True里面
     if m == 2:
         retPre, framePre = video.read()  # 上一帧
+        framePreBGR = framePre.copy()
         framePre = cv2.cvtColor(framePre, cv2.COLOR_BGR2GRAY)
 
         while True:
@@ -2008,16 +1998,20 @@ def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, sav
             # frameDet = cv2.erode(frameDet, e)
             # frameDet = cv2.dilate(frameDet, e)
 
-            analysis_output = connected_components_analysis(frameDet, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
-            output = analysis_output[0]  # output, num_labels, labels, stats, centroids
-            output_gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
-            _, frameDet = cv2.threshold(output_gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+            if cca:
+                analysis_output = connected_components_analysis(frameDet, connectivity=8, area_thr=area_thresh, h_thr=8, w_thr=8)
+                output = analysis_output[0]  # output, num_labels, labels, stats, centroids
+                output_gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+                _, frameDet = cv2.threshold(output_gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
 
-            frameNowBGR = draw_rect(frameDet, frameNowBGR, area_thresh=100)
+            framePreBGR = frameNowBGR
+            framePre = frameNow
+
+            framePreBGR = draw_rect(frameDet, framePreBGR, area_thresh, 0.0, 200, flag_merge_bboxes)
 
             if vis_result:
                 frameDet_3c = cv2.merge([frameDet, frameDet, frameDet])
-                dst = np.hstack((frameNowBGR, frameDet_3c))
+                dst = np.hstack((framePreBGR, frameDet_3c))
                 out.write(dst)
 
             if debug:
@@ -2026,6 +2020,8 @@ def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, sav
     else:
         retPrePre, framePrePre = video.read()  # 上上帧
         retPre, framePre = video.read()  # 上一帧
+        framePrePreBGR = framePrePre.copy()
+        framePreBGR = framePre.copy()
         framePrePre = cv2.cvtColor(framePrePre, cv2.COLOR_BGR2GRAY)
         framePre = cv2.cvtColor(framePre, cv2.COLOR_BGR2GRAY)
 
@@ -2044,19 +2040,22 @@ def moving_object_detect(video_path, m=3, area_thresh=100, vis_result=False, sav
             thresh2 = cv2.dilate(thresh2, e)
             frameDet = cv2.bitwise_and(thresh1, thresh2)
 
-            analysis_output = connected_components_analysis(frameDet, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
-            output = analysis_output[0]  # output, num_labels, labels, stats, centroids
-            output_gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
-            _, frameDet = cv2.threshold(output_gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
+            if cca:
+                analysis_output = connected_components_analysis(frameDet, connectivity=8, area_thr=area_thresh, h_thr=8, w_thr=8)
+                output = analysis_output[0]  # output, num_labels, labels, stats, centroids
+                output_gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+                _, frameDet = cv2.threshold(output_gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY)
 
-            frameNowBGR = draw_rect(frameDet, frameNowBGR, area_thresh=100)
-
+            framePrePreBGR = framePreBGR
+            framePreBGR = frameNowBGR
             framePrePre = framePre
             framePre = frameNow
 
+            framePrePreBGR = draw_rect(frameDet, framePrePreBGR, area_thresh, 0.0, 200, flag_merge_bboxes)
+            
             if vis_result:
                 frameDet_3c = cv2.merge([frameDet, frameDet, frameDet])
-                dst = np.hstack((frameNowBGR, frameDet_3c))
+                dst = np.hstack((framePrePreBGR, frameDet_3c))
                 out.write(dst)
 
             if debug:
@@ -8536,8 +8535,8 @@ if __name__ == '__main__':
     # output, num_labels, labels, stats, centroids = connected_components_analysis(thresh, connectivity=8, area_thr=100, h_thr=8, w_thr=8)
     # cv2.imwrite(r'D:\Gosion\Projects\data\202206070916487_output2.jpg', output)
 
-    # moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
-    moving_object_detect(video_path=r"D:\Gosion\Projects\data\project_data\6870\4670\192.168.45.192_01_20250109115957731.mp4", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
+    moving_object_detect(video_path=r"D:\GraceKafuu\Resources\vtest.avi", m=3, area_thresh=100, cca=True, flag_merge_bboxes=True, vis_result=True, save_path=None, debug=True)
+    # moving_object_detect(video_path=r"D:\Gosion\Projects\data\project_data\6870\4670\192.168.45.192_01_20250109115957731.mp4", m=3, area_thresh=100, vis_result=True, save_path=None, debug=True)
 
 
 

@@ -1110,11 +1110,14 @@ def create_word_cloud(txt_fpath="yxy.txt", font_path="jingboran.ttf"):
 if __name__ == '__main__':
     # pass
 
-    # words = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?`~"
-    words='0123456789'
-    for n in range(1, 9):
-        print(n)
-        crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
+    # # words = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?`~"
+    # words='0123456789'
+    # for n in range(1, 9):
+    #     print(n)
+    #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
+
+    # merge_txt_content(path1=r"D:\Gosion\Projects\002.Smoking_Det\001\New\labels_new", path2=r"D:\Gosion\Projects\002.Smoking_Det\001\New\labels_person")
+    rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\000\labels", start_num=6000)
 
     
 

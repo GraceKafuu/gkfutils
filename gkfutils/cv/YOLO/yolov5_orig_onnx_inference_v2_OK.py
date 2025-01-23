@@ -241,44 +241,124 @@ class YOLOv5_ONNX(object):
         return out_bbx
     
 
-if __name__ == '__main__':
-    # onnx_path = r"/home/zengyifan/wujiahu/yolo/yolov5-6.2/runs/train/006_768_20230313_2_cls/weights/best.onnx"
-    onnx_path = r"D:\Gosion\Projects\coal_conveying_corridor\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.0.onnx"
-    # onnx_path = r"E:\GraceKafuu\Python\ultralytics-main\yolov8s.onnx"
-    # img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685.jpg"
-    img_path = r"D:\Gosion\Projects\data\images\southeast.jpg"
+def bbox_voc_to_yolo(imgsz, box):
+    """
+    VOC --> YOLO
+    :param imgsz: [H, W]
+    :param box:
+    orig: [xmin, xmax, ymin, ymax], deprecated;
+    new:  [xmin, ymin, xmax, ymax], 2024.03.29, WJH.
+    :return: [x, y, w, h]
+    """
+    dh = 1. / (imgsz[0])
+    dw = 1. / (imgsz[1])
+    # x = (box[0] + box[1]) / 2.0
+    # y = (box[2] + box[3]) / 2.0
+    # w = box[1] - box[0]
+    # h = box[3] - box[2]
+    x = (box[0] + box[2]) / 2.0
+    y = (box[1] + box[3]) / 2.0
+    w = box[2] - box[0]
+    h = box[3] - box[1]
+    x = int(round(x)) * dw
+    w = int(round(w)) * dw
+    y = int(round(y)) * dh
+    h = int(round(h)) * dh
 
-    model = YOLOv5_ONNX(onnx_path)
-    # model_input_size = (448, 768)
+    if x < 0: x = 0
+    if y < 0: y = 0
+    if w > 1: w = 1
+    if h > 1: h = 1
+    assert x <= 1, "x: {}".format(x)
+    assert y <= 1, "y: {}".format(y)
+    assert w >= 0, "w: {}".format(w)
+    assert h >= 0, "h: {}".format(h)
+
+    return [x, y, w, h]
+
+
+def yolo_inference_save_labels(data_path, model_path):
+    base_name = os.path.basename(data_path)
+    save_path = os.path.abspath(os.path.join(data_path, "../labels".format(base_name)))
+    os.makedirs(save_path, exist_ok=True)
+    file_list = os.listdir(data_path)
+    
+    model = YOLOv5_ONNX(model_path)
     model_input_size = (640, 640)
-    img0, img, src_size = model.pre_process(img_path, img_size=model_input_size)
-    print("src_size: ", src_size)
 
-    t1 = time.time()
-    pred = model.inference(img)
-    t2 = time.time()
-    print("{:.12f}s".format(t2 - t1))
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        # img = cv2.imread(f_abs_path)
+        # imgsz = img.shape[:2]
 
-    # tt = []
-    # for i in range(100):
-    #     t1 = time.time()
-    #     pred = model.inference(img)
-    #     t2 = time.time()
-    #     print(t2 - t2)
-    #     tt.append(t2 - t1)
-    #
-    # print(np.mean(tt))
+        txt_save_path = save_path + "/{}.txt".format(fname)
 
-    out_bbx = model.post_process(pred, src_size, img_size=model_input_size)
-    print("out_bbx: ", out_bbx)
-    for b in out_bbx:
-        cv2.rectangle(img0, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
-        # cv2.putText(img0, "smoke: {:.2f} concentration: {}".format(b[4], 2), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+        try:
+            img0, img, src_size = model.pre_process(f_abs_path, img_size=model_input_size)
+            pred = model.inference(img)
+            out_bbx = model.post_process(pred, src_size, img_size=model_input_size)
 
-    # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685_pred.jpg", img0)
-    cv2.imwrite(r"D:\Gosion\Projects\data\images\southeast_pred.jpg", img0)
-    cv2.imshow("test", img0)
-    cv2.waitKey(0)
+            with open(txt_save_path, "w", encoding="utf-8") as fw:
+                for b in out_bbx:
+                    x1, y1, x2, y2, conf, cls = b
+                    bbox_yolo = bbox_voc_to_yolo(src_size, [x1, y1, x2, y2])
+                    txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                    fw.write(txt_content)
+
+        except Exception as e:
+            print(e)
+                
+
+
+
+
+
+
+    
+
+if __name__ == '__main__':
+    # # onnx_path = r"/home/zengyifan/wujiahu/yolo/yolov5-6.2/runs/train/006_768_20230313_2_cls/weights/best.onnx"
+    # onnx_path = r"D:\Gosion\Projects\coal_conveying_corridor\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.0.onnx"
+    # # onnx_path = r"E:\GraceKafuu\Python\ultralytics-main\yolov8s.onnx"
+    # # img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685.jpg"
+    # img_path = r"D:\Gosion\Projects\data\images\southeast.jpg"
+
+    # model = YOLOv5_ONNX(onnx_path)
+    # # model_input_size = (448, 768)
+    # model_input_size = (640, 640)
+    # img0, img, src_size = model.pre_process(img_path, img_size=model_input_size)
+    # print("src_size: ", src_size)
+
+    # t1 = time.time()
+    # pred = model.inference(img)
+    # t2 = time.time()
+    # print("{:.12f}s".format(t2 - t1))
+
+    # # tt = []
+    # # for i in range(100):
+    # #     t1 = time.time()
+    # #     pred = model.inference(img)
+    # #     t2 = time.time()
+    # #     print(t2 - t2)
+    # #     tt.append(t2 - t1)
+    # #
+    # # print(np.mean(tt))
+
+    # out_bbx = model.post_process(pred, src_size, img_size=model_input_size)
+    # print("out_bbx: ", out_bbx)
+    # for b in out_bbx:
+    #     cv2.rectangle(img0, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
+    #     # cv2.putText(img0, "smoke: {:.2f} concentration: {}".format(b[4], 2), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+
+    # # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685_pred.jpg", img0)
+    # cv2.imwrite(r"D:\Gosion\Projects\data\images\southeast_pred.jpg", img0)
+    # cv2.imshow("test", img0)
+    # cv2.waitKey(0)
+
+    data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\demo\images"
+    model_path=r"D:\Gosion\Python\yolov5-master\runs\train\002.smoking_v3_20250119\weights\best.onnx"
+    yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     
 
 

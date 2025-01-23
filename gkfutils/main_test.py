@@ -170,22 +170,61 @@ def image_processing_aug():
 
 
 def make_border():
-    # img_path = "./data/images/3.jpg"
-    # dst_path = img_path.replace(".jpg", "_res.jpg")
-    img_path = "./data/images/long.png"
-    dst_path = img_path.replace(".png", "_res.png")
-    img = cv2.imread(img_path)
-    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    # cv2.imwrite(dst_path, res)
+    # # img_path = "./data/images/3.jpg"
+    # # dst_path = img_path.replace(".jpg", "_res.jpg")
+    # img_path = "./data/images/long.png"
+    # dst_path = img_path.replace(".png", "_res.png")
+    # img = cv2.imread(img_path)
+    # # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # # res = make_border_v7(img, (256, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # # res = make_border_v7(img, (64, 256), random=False, base_side="H", ppocr_format=True, r1=0.75, r2=0.25, sliding_window=False, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # # cv2.imwrite(dst_path, res)
 
-    res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
-    if isinstance(res, list):
-        for i in range(len(res)):
-            cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
-    else:
-        cv2.imwrite(dst_path, res)
+    # res = make_border_v7(img, (64, 256), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+    # if isinstance(res, list):
+    #     for i in range(len(res)):
+    #         cv2.imwrite(dst_path.replace(".png", "_res_{}.png".format(i)), res[i])
+    # else:
+    #     cv2.imwrite(dst_path, res)
+
+    
+    data_path = r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images-orig"
+    save_path = make_save_path(data_path, relative=".", add_str="make_border")
+    file_list = os.listdir(data_path)
+
+    rs = list(range(10, 30))
+    rs = [i * 0.01 for i in rs]
+    print(rs)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        f_dst_path = save_path + "/{}.jpg".format(fname)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        # r = np.random.uniform(0.50, 0.99)
+        r = np.random.choice(rs)
+        # img = cv2.resize(img, (int(imgsz[1] * np.random.uniform(0.50, 0.99)), int(imgsz[0] * np.random.uniform(0.50, 0.99))))
+        img = cv2.resize(img, (int(imgsz[1] * r), int(imgsz[0] * r)))
+        imgsz_new = img.shape[:2]
+
+        # color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
+        color = (0, 0, 0)
+        top = (1080 - imgsz_new[0]) // 2
+        bottom = 1080 - top - imgsz_new[0]
+        left = (1920 - imgsz_new[1]) // 2
+        right = 1920 - left - imgsz_new[1]
+
+        res = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+        cv2.imwrite(f_dst_path, res)
+
+
+        # res = make_border_v7(img, (1080, 1920), random=True, base_side="H", ppocr_format=False, r1=0.75, r2=0.25, sliding_window=True, specific_color=True, gap_r=(0, 7 / 8), last_img_make_border=True)
+        # if isinstance(res, list):
+        #     for i in range(len(res)):
+        #         cv2.imwrite(f_dst_path.replace(".jpg", "_res_{}.jpg".format(i)), res[i])
+        # else:
+        #     cv2.imwrite(f_dst_path, res)
 
 
 def yolov5_inference():
@@ -626,7 +665,7 @@ def cal_params_flops_test():
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
-    # make_border()
+    make_border()
 
     # det_labels_convertion()
 
@@ -635,7 +674,7 @@ if __name__ == '__main__':
 
     # main_merge_ocr_rec_txt()
 
-    cal_params_flops_test()
+    # cal_params_flops_test()
 
 
     

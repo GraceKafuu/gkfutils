@@ -216,7 +216,8 @@ def unzip_many_files(data_path):
 
 
 def merge_dirs(data_path, use_glob=False, n_subdir=2):
-    dst_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_merged".format(data_path.split("/")[-1])
+    dir_name = get_dir_name(data_path)
+    dst_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_merged".format(dir_name)
     os.makedirs(dst_path, exist_ok=True)
 
     if use_glob:
@@ -755,13 +756,13 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="dif
                 f_dst_path2 = diff_path2 + "/{}".format(fname_ws)
                 
                 if mvcp == "move" or mvcp == "mv":
-                    if os.path.exists(f_src_path1):
-                        shutil.move(f_src_path1, f_dst_path1)
+                    # if os.path.exists(f_src_path1):
+                    #     shutil.move(f_src_path1, f_dst_path1)
                     if os.path.exists(f_src_path2):
                         shutil.move(f_src_path2, f_dst_path2)
                 else:
-                    if os.path.exists(f_src_path1):
-                        shutil.copy(f_src_path1, f_dst_path1)
+                    # if os.path.exists(f_src_path1):
+                    #     shutil.copy(f_src_path1, f_dst_path1)
                     if os.path.exists(f_src_path2):
                         shutil.copy(f_src_path2, f_dst_path2)
 
@@ -1106,9 +1107,20 @@ def create_word_cloud(txt_fpath="yxy.txt", font_path="jingboran.ttf"):
     plt.show()
 
 
+def remove_corrupt_img(data_path):
+    file_list = get_file_list(data_path)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        if img is None:
+            print("{} is corrupt".format(f_abs_path))
+            os.remove(f_abs_path)
+
 
 if __name__ == '__main__':
-    # pass
+    pass
 
     # # words = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?`~"
     # words='0123456789'
@@ -1116,9 +1128,31 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    # merge_txt_content(path1=r"D:\Gosion\Projects\002.Smoking_Det\001\New\labels_new", path2=r"D:\Gosion\Projects\002.Smoking_Det\001\New\labels_person")
-    rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\000\labels", start_num=6000)
+    # merge_txt_content(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format\labels_new", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format\labels")
+    rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\demo_labelbee_format_yolo_format\labels", new_name_prefix="smoking_v4_20250123", start_num=0)
+    # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
 
+    # data_path = r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\merged_2"
+    # dir_list = os.listdir(data_path)
+    # for i, d in enumerate(dir_list):
+    #     dir_path = data_path + "/{}".format(d)
+    #     rename_files(data_path=dir_path, new_name_prefix="smoking_v3_from_YanDajun_make_border_2_{}".format(i), start_num=0)
+
+
+    # remove_corrupt_img(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\New_All\Add\Det\v1_add\v2\train\images")
+
+    # move_same_file(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001\images")
+
+    # merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\checked\images\新建文件夹")
+
+    # for i in range(2, 11):
+    #     merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\checked\images\新建文件夹 ({})".format(i))
+
+    # random_select_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images", mvcp="copy", select_num=100)
+
+    # process_via_filename(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001\images", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001\labels", save_path="", with_suffix=False, flag="diff", mvcp="mv")
+
+    
     
 
 

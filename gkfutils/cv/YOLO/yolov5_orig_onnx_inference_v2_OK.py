@@ -356,7 +356,7 @@ if __name__ == '__main__':
     # cv2.imshow("test", img0)
     # cv2.waitKey(0)
 
-    data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\demo\images"
+    data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train\images"
     model_path=r"D:\Gosion\Python\yolov5-master\runs\train\002.smoking_v3_20250119\weights\best.onnx"
     yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     

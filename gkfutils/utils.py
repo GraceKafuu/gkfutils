@@ -1129,7 +1129,7 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format\labels_new", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format\labels")
-    # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\demo_labelbee_format_yolo_format\labels", new_name_prefix="smoking_v4_20250123", start_num=0)
+    # rename_files(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_add\labels", new_name_prefix="GuanWangLNG_sitting_det_1", start_num=0)
     # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\merged_2"
@@ -1150,7 +1150,7 @@ if __name__ == '__main__':
 
     # random_select_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images", mvcp="copy", select_num=100)
 
-    process_via_filename(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\images", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\labels", save_path="", with_suffix=False, flag="diff", mvcp="mv")
+    # process_via_filename(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\images", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\labels", save_path="", with_suffix=False, flag="diff", mvcp="mv")
 
     
     

@@ -9145,28 +9145,28 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001\labels")
+    # change_txt_content(txt_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_add\labels")
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Resources\Det\make_border_test")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\v1\train".replace("\\", "/"), select_num=148, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train".replace("\\", "/"), select_num=81, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\192.168.45.192_01_20250115163057108")
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\val", CLS=(0, 1), crop_ratio=(1, ))
 
-    vis_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Resources\Det\make_border_test_yolo_format_make_border_results")
+    vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")
 
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
 
-    # remove_yolo_label_specific_class(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format", rm_cls=(0,))
+    # remove_yolo_label_specific_class(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_add", rm_cls=(1,))
 
-    # make_border_and_change_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Resources\Det\make_border_test_yolo_format", dstsz=(1920 + 1080, 1920 + 1920))
+    # make_border_and_change_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4_exp_make_border\train_base", dstsz=(1080 + 1920, 1920 + 1920))
 
 
 

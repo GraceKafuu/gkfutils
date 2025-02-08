@@ -9175,6 +9175,7 @@ def check_yolo_labels(data_path):
         fname = os.path.splitext(f)[0]
         lbl_src_path = lbl_path + "/{}".format(f)
 
+        # 1 ------------------------
         sum_object = 0
         sum_all = 0
         with open(lbl_src_path, "r", encoding="utf-8") as f_read:
@@ -9185,13 +9186,15 @@ def check_yolo_labels(data_path):
                 if cls == 0:
                     sum_object += 1
                 sum_all += 1
-
+        
         if sum_all != 2 or sum_object > 1:
             img_src_path = img_path + "/{}.jpg".format(fname)
             img_dst_path = img_save_path + "/{}.jpg".format(fname)
             lbl_dst_path = lbl_save_path + "/{}".format(f)
             shutil.move(img_src_path, img_dst_path)
             shutil.move(lbl_src_path, lbl_dst_path)
+
+        
 
 
 
@@ -9317,7 +9320,7 @@ if __name__ == '__main__':
     # change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\labels")
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    yolo_to_labelbee(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\train")  # yolo_format 路径下是 images 和 labels
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\train")  # yolo_format 路径下是 images 和 labels
     # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\abnormal_images_labels_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
@@ -9327,7 +9330,7 @@ if __name__ == '__main__':
 
     # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\192.168.45.192_01_20250115163057108")
 
-    # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\val", CLS=(0, 1), crop_ratio=(1, ))
+    crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train", CLS=(0, 1), crop_ratio=(1, ))
 
     # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")
 
@@ -9348,7 +9351,7 @@ if __name__ == '__main__':
 
     # jitter_bbox(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\train", classes=(0, 1), p=3)
 
-    # check_yolo_labels(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\val")
+    # check_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train")
 
     
     

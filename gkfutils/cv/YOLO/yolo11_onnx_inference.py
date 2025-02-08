@@ -8,101 +8,6 @@ from PIL import Image
 from tqdm import tqdm
 
 
-def cv2pil(image):
-    assert isinstance(image, np.ndarray), f'Input image type is not cv2 and is {type(image)}!'
-    if len(image.shape) == 2:
-        return Image.fromarray(image)
-    elif len(image.shape) == 3:
-        return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    else:
-        return None
-
-
-def pil2cv(image):
-    assert isinstance(image, Image.Image), f'Input image type is not PIL.image and is {type(image)}!'
-    if len(image.split()) == 1:
-        return np.asarray(image)
-    elif len(image.split()) == 3:
-        return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
-    elif len(image.split()) == 4:
-        return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGBA2BGR)
-    else:
-        return None
-    
-
-def xywh2xyxy(xywh):
-    xyxy = np.copy(xywh)
-    xyxy[:, 0] = xywh[:, 0] - xywh[:, 2] / 2
-    xyxy[:, 1] = xywh[:, 1] - xywh[:, 3] / 2
-    xyxy[:, 2] = xywh[:, 0] + xywh[:, 2] / 2
-    xyxy[:, 3] = xywh[:, 1] + xywh[:, 3] / 2
-    return xyxy
-
-
-def nms(boxes, scores, keypoints, iou_threshold=0.45, candidate_size=200):
-    """
-    Args:
-        boxex (N, 4): boxes in corner-form.
-        scores (N, 1): scores.
-        iou_threshold: intersection over union threshold.
-        candidate_size: only consider the candidates with the highest scores.
-    Returns:
-         picked: a list of indexes of the kept boxes
-    """
-    picked = []
-    indexes = np.argsort(scores)
-    indexes = indexes[::-1]
-    indexes = indexes[:candidate_size]
-
-    while len(indexes) > 0:
-        current = indexes[0]
-        picked.append(current)
-        if len(indexes) == 1:
-            break
-        current_box = boxes[current, :]
-        indexes = indexes[1:]
-        rest_boxes = boxes[indexes, :]
-        iou = iou_of(
-            rest_boxes,
-            np.expand_dims(current_box, axis=0),
-        )
-        indexes = indexes[iou <= iou_threshold]
-
-    return boxes[picked, :], scores[picked], keypoints[picked, :]
-
-
-def iou_of(boxes0, boxes1, eps=1e-5):
-    """Return intersection-over-union (Jaccard index) of boxes.
-    Args:
-        boxes0 (N, 4): ground truth boxes.
-        boxes1 (N or 1, 4): predicted boxes.
-        eps: a small number to avoid 0 as denominator.
-    Returns:
-        iou (N): IoU values.
-    """
-    overlap_left_top = np.maximum(boxes0[..., :2], boxes1[..., :2])
-    overlap_right_bottom = np.minimum(boxes0[..., 2:], boxes1[..., 2:])
-
-    overlap_area = area_of(overlap_left_top, overlap_right_bottom)
-    area0 = area_of(boxes0[..., :2], boxes0[..., 2:])
-    area1 = area_of(boxes1[..., :2], boxes1[..., 2:])
-    return overlap_area / (area0 + area1 - overlap_area + eps)
-
-
-def area_of(left_top, right_bottom):
-    """Compute the areas of rectangles given two corners.
-    Args:
-        left_top (N, 2): left top corner.
-        right_bottom (N, 2): right bottom corner.
-
-    Returns:
-        area (N): return the area.
-    """
-    hw = np.clip((right_bottom - left_top), a_min=0.0, a_max=1.0)
-    return hw[..., 0] * hw[..., 1]
-
-
-
 class Colors:
     """
     Ultralytics default color palette https://ultralytics.com/.
@@ -179,8 +84,8 @@ class Colors:
         return tuple(int(h[1 + i : 1 + i + 2], 16) for i in (0, 2, 4))
 
 
-class YOLO:
-    """YOLO model class for handling inference and visualization."""
+class YOLO11_ORT:
+    """YOLO model for handling inference and visualization."""
     def __init__(self, onnx_model, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
         """
         Initializes an instance of the YOLOv8 class.
@@ -260,7 +165,8 @@ class YOLO:
         cv2.rectangle(img, (int(x1), int(y1)), (int(x1 + w), int(y1 + h)), color, 2)
 
         # Create the label text with class name and score
-        label = f"{self.classes[class_id]}: {score:.2f}"
+        # label = f"{self.classes[class_id]}: {score:.2f}"
+        label = f"{class_id}: {score:.2f}"
 
         # Calculate the dimensions of the label text
         (label_width, label_height), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -287,7 +193,7 @@ class YOLO:
         if isinstance(input, str):
             self.img = cv2.imread(input)
         elif isinstance(input, Image.Image):
-            self.img = pil2cv(input)
+            self.img = self.pil2cv(input)
         else:
             assert isinstance(input, np.ndarray), f'input is not np.ndarray and is {type(input)}!'
             self.img = input
@@ -382,17 +288,124 @@ class YOLO:
         # Return the modified input image
         return input_image
     
+    def det_detect(self, img_path):
+        """
+        Performs inference using an ONNX model and returns the output image with drawn detections.
+
+        Returns:
+            output_img: The output image with drawn detections.
+        """
+        
+        # Preprocess the image data
+        img_data = self.preprocess(img_path)
+
+        # Run inference using the preprocessed image data
+        outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+        output = self.det_postprocess(self.img, outputs)
+
+        return output
+    
+    def cv2pil(self, image):
+        assert isinstance(image, np.ndarray), f'Input image type is not cv2 and is {type(image)}!'
+        if len(image.shape) == 2:
+            return Image.fromarray(image)
+        elif len(image.shape) == 3:
+            return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        else:
+            return None
+
+    def pil2cv(self, image):
+        assert isinstance(image, Image.Image), f'Input image type is not PIL.image and is {type(image)}!'
+        if len(image.split()) == 1:
+            return np.asarray(image)
+        elif len(image.split()) == 3:
+            return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+        elif len(image.split()) == 4:
+            return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGBA2BGR)
+        else:
+            return None
+        
+    def xywh2xyxy(self, xywh):
+        xyxy = np.copy(xywh)
+        xyxy[:, 0] = xywh[:, 0] - xywh[:, 2] / 2
+        xyxy[:, 1] = xywh[:, 1] - xywh[:, 3] / 2
+        xyxy[:, 2] = xywh[:, 0] + xywh[:, 2] / 2
+        xyxy[:, 3] = xywh[:, 1] + xywh[:, 3] / 2
+        return xyxy
+
+    def nms(self, boxes, scores, keypoints, iou_threshold=0.45, candidate_size=200):
+        """
+        Args:
+            boxex (N, 4): boxes in corner-form.
+            scores (N, 1): scores.
+            iou_threshold: intersection over union threshold.
+            candidate_size: only consider the candidates with the highest scores.
+        Returns:
+            picked: a list of indexes of the kept boxes
+        """
+        picked = []
+        indexes = np.argsort(scores)
+        indexes = indexes[::-1]
+        indexes = indexes[:candidate_size]
+
+        while len(indexes) > 0:
+            current = indexes[0]
+            picked.append(current)
+            if len(indexes) == 1:
+                break
+            current_box = boxes[current, :]
+            indexes = indexes[1:]
+            rest_boxes = boxes[indexes, :]
+            iou = self.iou_of(
+                rest_boxes,
+                np.expand_dims(current_box, axis=0),
+            )
+            indexes = indexes[iou <= iou_threshold]
+
+        return boxes[picked, :], scores[picked], keypoints[picked, :]
+
+
+    def iou_of(self, boxes0, boxes1, eps=1e-5):
+        """Return intersection-over-union (Jaccard index) of boxes.
+        Args:
+            boxes0 (N, 4): ground truth boxes.
+            boxes1 (N or 1, 4): predicted boxes.
+            eps: a small number to avoid 0 as denominator.
+        Returns:
+            iou (N): IoU values.
+        """
+        overlap_left_top = np.maximum(boxes0[..., :2], boxes1[..., :2])
+        overlap_right_bottom = np.minimum(boxes0[..., 2:], boxes1[..., 2:])
+
+        overlap_area = self.area_of(overlap_left_top, overlap_right_bottom)
+        area0 = self.area_of(boxes0[..., :2], boxes0[..., 2:])
+        area1 = self.area_of(boxes1[..., :2], boxes1[..., 2:])
+        return overlap_area / (area0 + area1 - overlap_area + eps)
+
+
+    def area_of(self, left_top, right_bottom):
+        """Compute the areas of rectangles given two corners.
+        Args:
+            left_top (N, 2): left top corner.
+            right_bottom (N, 2): right bottom corner.
+
+        Returns:
+            area (N): return the area.
+        """
+        hw = np.clip((right_bottom - left_top), a_min=0.0, a_max=1.0)
+        return hw[..., 0] * hw[..., 1]
+    
     def pose_postprocess(self, preds, width_radio, height_radio, filter_threshold=0.25, iou_threshold=0.45):
         preds = preds.transpose([1, 0])
 
         preds = preds[preds[:, 4] > filter_threshold]
         if len(preds) > 0:
             boxes = preds[:, :4]
-            boxes = xywh2xyxy(boxes)
+            boxes = self.xywh2xyxy(boxes)
             scores = preds[:, 4]
             keypoints = preds[:, 5:]
 
-            boxes, scores, keypoints = nms(boxes, scores, keypoints, iou_threshold=iou_threshold)
+            boxes, scores, keypoints = self.nms(boxes, scores, keypoints, iou_threshold=iou_threshold)
 
             boxes[:, 0] *= width_radio
             boxes[:, 1] *= height_radio
@@ -483,7 +496,6 @@ class YOLO:
         angle_13_11_15 = self.cal_angle_via_vector_cross(k[13], k[11], k[15])
         angle_12_6_14 = self.cal_angle_via_vector_cross(k[12], k[6], k[14])
         angle_14_12_16 = self.cal_angle_via_vector_cross(k[14], k[12], k[16])
-        print("angle_11_5_13: {}, angle_13_11_15: {}, angle_12_6_14: {}, angle_14_12_16: {}".format(angle_11_5_13, angle_13_11_15, angle_12_6_14, angle_14_12_16))
 
         sum = 0
         if angle_11_5_13 > angle_thr:
@@ -500,8 +512,7 @@ class YOLO:
         else:
             return "Sitting"
 
-
-    def main(self, img_path):
+    def pose_detect(self, img_path):
         """
         Performs inference using an ONNX model and returns the output image with drawn detections.
 
@@ -535,22 +546,28 @@ class YOLO:
 
 
 if __name__ == "__main__":
+    # model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s.onnx"
     model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
-    model = YOLO(model_path)
+    model = YOLO11_ORT(model_path)
 
-    # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images"
-    # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_images"
-    data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_2"
-    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/sitting_or_standing_results"
-    os.makedirs(save_path, exist_ok=True)
+    # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images"
+    # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_images"
+    # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_2"
+    # save_path = os.path.abspath(os.path.join(data_path, "..")) + "/sitting_or_standing_results"
+    # os.makedirs(save_path, exist_ok=True)
 
-    file_list = sorted(os.listdir(data_path))
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        f_dst_path = save_path + "/{}".format(f)
-        output= model.main(f_abs_path)
-        cv2.imwrite(f_dst_path, output)
+    # file_list = sorted(os.listdir(data_path))
+    # for f in tqdm(file_list):
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     f_dst_path = save_path + "/{}".format(f)
+    #     output = model.pose_detect(f_abs_path)
+    #     cv2.imwrite(f_dst_path, output)
 
-    # cv2.namedWindow("Output", cv2.WINDOW_NORMAL)
-    # cv2.imshow("Output", output_image)
-    # cv2.waitKey(0)
+
+    f_abs_path = r"D:\Gosion\Projects\003.Sitting_Det\data\v1\val\images\192.168.45.192_01_20250117112730288.jpg"
+    output = model.pose_detect(f_abs_path)
+    # output = model.det_detect(f_abs_path)
+
+    cv2.namedWindow("output", cv2.WINDOW_NORMAL)
+    cv2.imshow("output", output)
+    cv2.waitKey(0)

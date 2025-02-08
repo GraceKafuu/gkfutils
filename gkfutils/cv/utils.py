@@ -8848,7 +8848,7 @@ def change_txt_content(txt_path):
         with open(f_dst_path, "w", encoding="utf-8") as fw:
             for line in txt_content:
                 l = line.strip().split(" ")
-                cls_new = int(l[0]) + 1
+                cls_new = int(l[0]) - 1
                 l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
                 fw.write(l_new)
 
@@ -9030,6 +9030,175 @@ def make_border_and_change_yolo_labels(data_path, dstsz=(-1, 1920)):
                 fw.write(txt_content)
 
 
+def norm_vector_3d(p1, p2, p3):
+    """
+    https://blog.51cto.com/u_16213405/12842859
+    
+    p1 = np.array([0, 0, 0])
+    p2 = np.array([1, 0, 0])
+    p3 = np.array([0, 1, 0])
+    n = norm_vector(p1, p2, p3)
+    print(n)  # [0 0 1]
+
+    """
+    v12 = p2 - p1
+    v13 = p3 - p1
+
+    n = np.cross(v12, v13)
+    return n
+
+
+def cal_angle_via_vector_cross(p1, p2, p3):
+    """
+    通过向量叉乘计算角度
+    """
+
+    v12 = p2 - p1
+    v13 = p3 - p1
+
+    v = v12[0] * v13[0] + v12[1] * v13[1]
+    len_v12 = np.sqrt(v12[0] ** 2 + v12[1] ** 2)
+    len_v13 = np.sqrt(v13[0] ** 2 + v13[1] ** 2)
+    angle = np.arccos(v / (len_v12 * len_v13))
+    angle = angle * 180 / np.pi
+
+    return angle
+
+
+def append_content_to_txt_test():
+
+    # ss = [0, 1, 2]
+
+    # for s in ss:
+    #     path1 = r"D:\Gosion\Projects\003.Sitting_Det\v1\1_yolo_format\labels\{}".format(s)
+    #     file = os.listdir(path1)[0]
+    #     f_abs_path = path1 + "/{}".format(file)
+
+    #     with open(f_abs_path, "r") as f:
+    #         line_src = f.readlines()[0]
+            
+
+    #     path2 = r"D:\Gosion\Projects\003.Sitting_Det\v1\train\labels\{}".format(s)
+    #     files = os.listdir(path2)
+
+    #     for f in files:
+    #         f_abs_path2 = path2 + "/{}".format(f)
+    #         with open(f_abs_path2, "a") as fa:
+    #             fa.write(line_src)
+
+
+    path1 = r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\1_yolo_format\labels"
+    file = os.listdir(path1)[0]
+    f_abs_path = path1 + "/{}".format(file)
+
+    with open(f_abs_path, "r") as f:
+        line_src = f.readlines()[0]
+        
+
+    path2 = r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\2\labels"
+    files = os.listdir(path2)
+
+    for f in files:
+        f_abs_path2 = path2 + "/{}".format(f)
+        with open(f_abs_path2, "a") as fa:
+            fa.write(line_src)
+
+
+def jitter_bbox(data_path, classes=(2, ), p=5):
+    """
+    input is yolo format
+    p: jitter pixels
+    """
+    img_path = data_path + "/images"
+    lbl_path = data_path + "/labels"
+    lbl_path_new = data_path + "/labels_new"
+    os.makedirs(lbl_path_new, exist_ok=True)
+
+    file_list = get_file_list(lbl_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = lbl_path + "/{}".format(f)
+        f_abs_path_new = lbl_path_new + "/{}".format(f)
+        img_abs_path = img_path + "/{}.jpg".format(fname)
+        img = cv2.imread(img_abs_path)
+        imgsz = img.shape[:2]
+
+        with open(f_abs_path, "r") as f_read:
+            with open(f_abs_path_new, "w") as f_write:
+                lines = f_read.readlines()
+                for line in lines:
+                    l = line.strip().split(" ")
+                    cls = int(l[0])
+
+                    if cls in classes:
+                         bbox_yolo = list(map(float, l[1:]))
+                         bbox_voc = bbox_yolo_to_voc(imgsz, bbox_yolo)
+                         bbox_voc_new = [
+                             bbox_voc[0] + np.random.randint(-p, p + 1),
+                             bbox_voc[1] + np.random.randint(-p, p + 1),
+                             bbox_voc[2] + np.random.randint(-p, p + 1),
+                             bbox_voc[3] + np.random.randint(-p, p + 1)
+                         ]
+
+                         if bbox_voc_new[0] < 0: bbox_voc_new[0] = 0
+                         if bbox_voc_new[1] < 0: bbox_voc_new[1] = 0
+                         if bbox_voc_new[2] < 0: bbox_voc_new[2] = 0
+                         if bbox_voc_new[3] < 0: bbox_voc_new[3] = 0
+                         if bbox_voc_new[0] > imgsz[1]: bbox_voc_new[0] = imgsz[1]
+                         if bbox_voc_new[1] > imgsz[0]: bbox_voc_new[1] = imgsz[0]
+                         if bbox_voc_new[2] > imgsz[1]: bbox_voc_new[2] = imgsz[1]
+                         if bbox_voc_new[3] > imgsz[0]: bbox_voc_new[3] = imgsz[0]
+
+                         bbox_yolo_new = bbox_voc_to_yolo(imgsz, bbox_voc_new)
+                         txt_content_new = "{} ".format(cls) + " ".join([str(b) for b in bbox_yolo_new]) + "\n"
+                         f_write.write(txt_content_new)
+                    else:
+                        f_write.write(line)
+
+
+    os.rename(lbl_path, lbl_path + "-old")
+    os.rename(lbl_path_new, lbl_path_new.replace("/labels_new", "/labels"))
+
+                    
+def check_yolo_labels(data_path):
+    img_path = data_path + "/images"
+    lbl_path = data_path + "/labels"
+
+    save_path = data_path + "/abnormal_images_labels"
+    img_save_path = save_path + "/images"
+    lbl_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(lbl_save_path, exist_ok=True)
+
+    file_list = sorted(os.listdir(lbl_path))
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        lbl_src_path = lbl_path + "/{}".format(f)
+
+        sum_object = 0
+        sum_all = 0
+        with open(lbl_src_path, "r", encoding="utf-8") as f_read:
+            lines = f_read.readlines()
+            for line in lines:
+                l = line.strip().split(" ")
+                cls = int(l[0])
+                if cls == 0:
+                    sum_object += 1
+                sum_all += 1
+
+        if sum_all != 2 or sum_object > 1:
+            img_src_path = img_path + "/{}.jpg".format(fname)
+            img_dst_path = img_save_path + "/{}.jpg".format(fname)
+            lbl_dst_path = lbl_save_path + "/{}".format(f)
+            shutil.move(img_src_path, img_dst_path)
+            shutil.move(lbl_src_path, lbl_dst_path)
+
+
+
+
+
+
+
 
 
 
@@ -9145,22 +9314,22 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_add\labels")
+    # change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\labels")
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    yolo_to_labelbee(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\train")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\abnormal_images_labels_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train".replace("\\", "/"), select_num=81, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train".replace("\\", "/"), select_num=54, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\192.168.45.192_01_20250115163057108")
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\val", CLS=(0, 1), crop_ratio=(1, ))
 
-    vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")
+    # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")
 
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
 
@@ -9168,6 +9337,21 @@ if __name__ == '__main__':
 
     # make_border_and_change_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4_exp_make_border\train_base", dstsz=(1080 + 1920, 1920 + 1920))
 
+    
+    # p1 = np.array([0, 0])
+    # p2 = np.array([1, 0])
+    # p3 = np.array([1, 1])
+    # n = cal_angle_via_vector_cross(p1, p2, p3)
+    # print(n)
+
+    # append_content_to_txt_test()
+
+    # jitter_bbox(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\DET\v1\train", classes=(0, 1), p=3)
+
+    # check_yolo_labels(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\val")
+
+    
+    
 
 
     

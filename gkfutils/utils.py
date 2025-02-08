@@ -1141,7 +1141,7 @@ if __name__ == '__main__':
 
     # remove_corrupt_img(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\New_All\Add\Det\v1_add\v2\train\images")
 
-    # move_same_file(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\images")
+    # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
     # merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\checked\images\新建文件夹")
 

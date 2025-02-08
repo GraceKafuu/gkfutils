@@ -1,11 +1,34 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-import argparse
+import os
 import cv2
 import numpy as np
 import onnxruntime as ort
-import time
+from PIL import Image
+from tqdm import tqdm
 
+
+def cv2pil(image):
+    assert isinstance(image, np.ndarray), f'Input image type is not cv2 and is {type(image)}!'
+    if len(image.shape) == 2:
+        return Image.fromarray(image)
+    elif len(image.shape) == 3:
+        return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    else:
+        return None
+
+
+def pil2cv(image):
+    assert isinstance(image, Image.Image), f'Input image type is not PIL.image and is {type(image)}!'
+    if len(image.split()) == 1:
+        return np.asarray(image)
+    elif len(image.split()) == 3:
+        return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+    elif len(image.split()) == 4:
+        return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGBA2BGR)
+    else:
+        return None
+    
 
 def xywh2xyxy(xywh):
     xyxy = np.copy(xywh)
@@ -158,7 +181,7 @@ class Colors:
 
 class YOLO:
     """YOLO model class for handling inference and visualization."""
-    def __init__(self, onnx_model, input_image, confidence_thres, iou_thres, num_classes=80):
+    def __init__(self, onnx_model, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
         """
         Initializes an instance of the YOLOv8 class.
 
@@ -169,7 +192,6 @@ class YOLO:
             iou_thres: IoU (Intersection over Union) threshold for non-maximum suppression.
         """
         self.onnx_model = onnx_model
-        self.input_image = input_image
         self.confidence_thres = confidence_thres
         self.iou_thres = iou_thres
 
@@ -255,15 +277,20 @@ class YOLO:
         # Draw the label text on the image
         cv2.putText(img, label, (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
-    def preprocess(self):
+    def preprocess(self, input):
         """
         Preprocesses the input image before performing inference.
 
         Returns:
             image_data: Preprocessed image data ready for inference.
         """
-        # Read the input image using OpenCV
-        self.img = cv2.imread(self.input_image)
+        if isinstance(input, str):
+            self.img = cv2.imread(input)
+        elif isinstance(input, Image.Image):
+            self.img = pil2cv(input)
+        else:
+            assert isinstance(input, np.ndarray), f'input is not np.ndarray and is {type(input)}!'
+            self.img = input
 
         # Get the height and width of the input image
         self.img_height, self.img_width = self.img.shape[:2]
@@ -428,8 +455,53 @@ class YOLO:
                 cv2.line(img, pos1, pos2, [int(x) for x in self.limb_color[i]], thickness=2, lineType=cv2.LINE_AA)
 
         return img
+    
+    def cal_angle_via_vector_cross(self, p1, p2, p3):
+        """
+        通过向量叉乘计算角度
+        """
 
-    def main(self):
+        v12 = p2 - p1
+        v13 = p3 - p1
+
+        v = v12[0] * v13[0] + v12[1] * v13[1]
+        len_v12 = np.sqrt(v12[0] ** 2 + v12[1] ** 2)
+        len_v13 = np.sqrt(v13[0] ** 2 + v13[1] ** 2)
+        angle = np.arccos(v / (len_v12 * len_v13))
+        angle = angle * 180 / np.pi
+
+        return angle
+    
+    def sitting_or_standing(self, k, angle_thr=165):
+        """
+        -1: 判断不了 0: 坐着 1: 站着
+        假如身体与双腿的夹角大于45°则认为是坐着
+        """
+        if k.shape[0] != 17: return -1
+        k = k[:, :-1]
+        angle_11_5_13 = self.cal_angle_via_vector_cross(k[11], k[5], k[13])
+        angle_13_11_15 = self.cal_angle_via_vector_cross(k[13], k[11], k[15])
+        angle_12_6_14 = self.cal_angle_via_vector_cross(k[12], k[6], k[14])
+        angle_14_12_16 = self.cal_angle_via_vector_cross(k[14], k[12], k[16])
+        print("angle_11_5_13: {}, angle_13_11_15: {}, angle_12_6_14: {}, angle_14_12_16: {}".format(angle_11_5_13, angle_13_11_15, angle_12_6_14, angle_14_12_16))
+
+        sum = 0
+        if angle_11_5_13 > angle_thr:
+            sum += 1
+        if angle_13_11_15 > angle_thr:
+            sum += 1
+        if angle_12_6_14 > angle_thr:
+            sum += 1
+        if angle_14_12_16 > angle_thr:
+            sum += 1
+
+        if sum >= 3:
+            return "Standing"
+        else:
+            return "Sitting"
+
+
+    def main(self, img_path):
         """
         Performs inference using an ONNX model and returns the output image with drawn detections.
 
@@ -438,7 +510,7 @@ class YOLO:
         """
         
         # Preprocess the image data
-        img_data = self.preprocess()
+        img_data = self.preprocess(img_path)
 
         # Run inference using the preprocessed image data
         outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
@@ -449,34 +521,36 @@ class YOLO:
             height_radio=self.img_height / self.input_height,
         )
 
-        for k in reversed(keypoints):
+        for b, s, k in zip(boxes, scores, keypoints):
+            b = list(map(round, b))
             self.img = self.draw_kpts(self.img, k, self.img.shape[:-1], radius=5, kpt_line=True)
 
-        # for b, s in zip(boxes, scores):
-        #     cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
-        #     cv2.putText(self.img, "person: {:.2f}".format(b[4]), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+            print("img_path: {}".format(img_path))
+            res = self.sitting_or_standing(k, angle_thr=145)
+            print("Res: {}\n".format(res))
+            cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
+            cv2.putText(self.img, "Person: {:.2f} {}".format(s, res), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
 
         return self.img
 
 
 if __name__ == "__main__":
-    # Create an argument parser to handle command-line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default=r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx", help="Input your ONNX model.")
-    parser.add_argument("--img", type=str, default=r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images\192.168.45.192_01_20250117112527578.jpg", help="Path to input image.")
-    parser.add_argument("--conf-thres", type=float, default=0.5, help="Confidence threshold")
-    parser.add_argument("--iou-thres", type=float, default=0.5, help="NMS IoU threshold")
-    args = parser.parse_args()
+    model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
+    model = YOLO(model_path)
 
-    # Create an instance of the YOLOv8 class with the specified arguments
-    detection = YOLO(args.model, args.img, args.conf_thres, args.iou_thres)
+    # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images"
+    # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_images"
+    data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_2"
+    save_path = os.path.abspath(os.path.join(data_path, "..")) + "/sitting_or_standing_results"
+    os.makedirs(save_path, exist_ok=True)
 
-    # Perform object detection and obtain the output image
-    output_image = detection.main()
+    file_list = sorted(os.listdir(data_path))
+    for f in tqdm(file_list):
+        f_abs_path = data_path + "/{}".format(f)
+        f_dst_path = save_path + "/{}".format(f)
+        output= model.main(f_abs_path)
+        cv2.imwrite(f_dst_path, output)
 
-    # Display the output image in a window
-    cv2.namedWindow("Output", cv2.WINDOW_NORMAL)
-    cv2.imshow("Output", output_image)
-
-    # Wait for a key press to exit
-    cv2.waitKey(0)
+    # cv2.namedWindow("Output", cv2.WINDOW_NORMAL)
+    # cv2.imshow("Output", output_image)
+    # cv2.waitKey(0)

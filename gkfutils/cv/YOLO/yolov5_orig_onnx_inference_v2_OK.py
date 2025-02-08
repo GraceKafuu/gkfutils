@@ -303,8 +303,10 @@ def yolo_inference_save_labels(data_path, model_path):
                 for b in out_bbx:
                     x1, y1, x2, y2, conf, cls = b
                     bbox_yolo = bbox_voc_to_yolo(src_size, [x1, y1, x2, y2])
-                    txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
-                    fw.write(txt_content)
+
+                    if int(cls) == 0:
+                        txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                        fw.write(txt_content)
 
         except Exception as e:
             print(e)
@@ -356,8 +358,8 @@ if __name__ == '__main__':
     # cv2.imshow("test", img0)
     # cv2.waitKey(0)
 
-    data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train\images"
-    model_path=r"D:\Gosion\Python\yolov5-master\runs\train\002.smoking_v3_20250119\weights\best.onnx"
+    data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\2\images"
+    model_path=r"D:\Gosion\Python\yolov5-master\runs\train\002.smoking_v4\weights\best.onnx"
     yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     
 

@@ -725,11 +725,12 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="dif
         
         if flag == "same":
             for f in same_list:
-                fname_ws = get_fname_ws(f, file1_list)
-                f_src_path1 = path1 + "/{}".format(fname_ws)
-                f_src_path2 = path2 + "/{}".format(fname_ws)
-                f_dst_path1 = same_path1 + "/{}".format(fname_ws)
-                f_dst_path2 = same_path2 + "/{}".format(fname_ws)
+                fname_ws1 = get_fname_ws(f, file1_list)
+                fname_ws2 = get_fname_ws(f, file2_list)
+                f_src_path1 = path1 + "/{}".format(fname_ws1)
+                f_src_path2 = path2 + "/{}".format(fname_ws2)
+                f_dst_path1 = same_path1 + "/{}".format(fname_ws1)
+                f_dst_path2 = same_path2 + "/{}".format(fname_ws2)
                 
                 if mvcp == "move" or mvcp == "mv":
                     shutil.move(f_src_path1, f_dst_path1)
@@ -1128,7 +1129,7 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    # merge_txt_content(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format\labels_new", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format_yolo_format\labels")
+    # merge_txt_content(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\labels", path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\labels-2")
     # rename_files(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_add\labels", new_name_prefix="GuanWangLNG_sitting_det_1", start_num=0)
     # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
 
@@ -1150,7 +1151,9 @@ if __name__ == '__main__':
 
     # random_select_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images", mvcp="copy", select_num=100)
 
-    # process_via_filename(path1=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\images", path2=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train\labels", save_path="", with_suffix=False, flag="diff", mvcp="mv")
+    # process_via_filename(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\1_yolo_format\images", path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\1_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
+    for i in range(1, 12):
+        process_via_filename(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\{}_yolo_format\images".format(i), path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\{}_yolo_format\labels".format(i), save_path="", with_suffix=False, flag="same", mvcp="cp")
 
     
     

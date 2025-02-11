@@ -227,7 +227,7 @@ class YOLOv5_ONNX(object):
         return pred
 
     def post_process(self, pred, src_size, img_size):
-        output = self.non_max_suppression(pred, conf_thres=0.15, iou_thres=0.45, agnostic=False)
+        output = self.non_max_suppression(pred, conf_thres=0.60, iou_thres=0.45, agnostic=False)
         out_bbx = []
         for i, det in enumerate(output):  # detections per image
             if len(det):
@@ -358,7 +358,7 @@ if __name__ == '__main__':
     # cv2.imshow("test", img0)
     # cv2.waitKey(0)
 
-    data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\2\images"
+    data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\images"
     model_path=r"D:\Gosion\Python\yolov5-master\runs\train\002.smoking_v4\weights\best.onnx"
     yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     

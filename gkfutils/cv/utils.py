@@ -9309,7 +9309,7 @@ if __name__ == '__main__':
 
     # byte_data = 
     # img = byte2img(byte_data)
-    # cv2.imwrite(r'D:\Gosion\Projects\data\images\test_res_202502109.jpg', img)
+    # cv2.imwrite(r'D:\Gosion\Projects\data\images\test_res_20250212_1.jpg', img)
 
     # img_path = r'D:\Gosion\Projects\data\res2.jpg'
     # byte_data = img2byte(img_path)
@@ -9343,7 +9343,7 @@ if __name__ == '__main__':
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new_labelbee_format_yolo_format".replace("\\", "/"), select_num=111, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new_labelbee_format_yolo_format".replace("\\", "/"), select_num=111, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\192.168.45.192_01_20250115163057108")
 

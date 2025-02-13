@@ -1120,6 +1120,54 @@ def remove_corrupt_img(data_path):
             os.remove(f_abs_path)
 
 
+def process_db(db_path, m):
+    import sqlite3
+    from datetime import datetime
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    assert m in ["read", "r", "write", "w"], 'm should be one of ["read", "r", "write", "w"]!'
+
+    if m == "read" or m == "r":
+        table_list = [a for a in cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+
+        print('table_list is :\n', table_list)
+
+        # 获取表的列名（字段名），保存在col_names列表,每个表的字段名集为一个元组
+        col_names = []
+        for i in table_list:
+            col_name = cursor.execute('PRAGMA table_info ({})'.format(i[0])).fetchall()
+            col_name = [x[1] for x in col_name]
+            col_names.append(col_name)
+
+        print(col_names)
+
+        for tab in table_list:
+            # Can work
+            # df = pd.read_sql_query('SELECT * FROM {}'.format(tab[0]), conn)
+            # print('table ', tab[0], 'head is :\n', df.head())
+            # print('table ', tab[0], 'shape is :\n', df.shape)
+            # # df.to_excel('./'+tab[0]+'.xlsx')
+
+            # Can work
+            result = cursor.execute("SELECT * FROM {}".format(tab[0])).fetchall()
+            print(result)
+    else:
+        # 还有问题，插入失败（sqlite3.OperationalError: near "%": syntax error），待解决，2025.02.13
+        insert_sql = "INSERT INTO server_info (id, project_name, hostname, username, password, port, server_state, status, create_time, create_by, update_time, zip_file, install_type, install_state, remarks) VALUES (%d, %s, %s, %s, %s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        insert_data = (5, 'Test服务器', '10.10.11.205', 'gx', '123456', 22, '1', '0', datetime.now(), '', datetime.now(), 'D:/ubuntu-install/guoxun.tar.gz', '1', '0', '')
+        cursor.execute(insert_sql, insert_data)
+        conn.commit()
+        print("数据插入成功！")
+
+    cursor.close()
+    conn.close()
+
+    return
+
+
+
 if __name__ == '__main__':
     pass
 
@@ -1146,16 +1194,12 @@ if __name__ == '__main__':
 
     # merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\checked\images\新建文件夹")
 
-    # for i in range(2, 11):
-    #     merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\checked\images\新建文件夹 ({})".format(i))
-
     # random_select_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images", mvcp="copy", select_num=100)
 
     # process_via_filename(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\1_yolo_format\images", path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\1_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
-    for i in range(1, 12):
-        process_via_filename(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\{}_yolo_format\images".format(i), path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\{}_yolo_format\labels".format(i), save_path="", with_suffix=False, flag="same", mvcp="cp")
-
     
+
+    process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
     
 
 

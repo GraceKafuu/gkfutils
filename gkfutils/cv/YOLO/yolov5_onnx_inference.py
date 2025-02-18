@@ -227,7 +227,7 @@ class YOLOv5_ONNX(object):
         return pred
 
     def post_process(self, pred, src_size, img_size):
-        output = self.non_max_suppression(pred, conf_thres=0.60, iou_thres=0.45, agnostic=False)
+        output = self.non_max_suppression(pred, conf_thres=0.80, iou_thres=0.45, agnostic=False)
         out_bbx = []
         for i, det in enumerate(output):  # detections per image
             if len(det):
@@ -304,9 +304,12 @@ def yolo_inference_save_labels(data_path, model_path):
                     x1, y1, x2, y2, conf, cls = b
                     bbox_yolo = bbox_voc_to_yolo(src_size, [x1, y1, x2, y2])
 
-                    if int(cls) == 0:
-                        txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
-                        fw.write(txt_content)
+                    # if int(cls) == 0:
+                    #     txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                    #     fw.write(txt_content)
+
+                    txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                    fw.write(txt_content)
 
         except Exception as e:
             print(e)
@@ -321,10 +324,14 @@ def yolo_inference_save_labels(data_path, model_path):
 
 if __name__ == '__main__':
     # # onnx_path = r"/home/zengyifan/wujiahu/yolo/yolov5-6.2/runs/train/006_768_20230313_2_cls/weights/best.onnx"
-    # onnx_path = r"D:\Gosion\Projects\coal_conveying_corridor\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.0.onnx"
+    # # onnx_path = r"D:\Gosion\Projects\coal_conveying_corridor\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.0.onnx"
+    # # onnx_path = r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.0.onnx"
+    # onnx_path = r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\out_guardarea_detection\out_guardarea_det_yolov5s_640_640_v1.0.0.onnx"
     # # onnx_path = r"E:\GraceKafuu\Python\ultralytics-main\yolov8s.onnx"
     # # img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685.jpg"
-    # img_path = r"D:\Gosion\Projects\data\images\southeast.jpg"
+    # # img_path = r"D:\Gosion\Projects\data\images\southeast.jpg"
+    # # img_path = r"D:\Gosion\Projects\data\images\20250217151944.jpg"
+    # img_path = r"D:\Gosion\Projects\data\images\20250217153625.jpg"
 
     # model = YOLOv5_ONNX(onnx_path)
     # # model_input_size = (448, 768)
@@ -358,8 +365,10 @@ if __name__ == '__main__':
     # cv2.imshow("test", img0)
     # cv2.waitKey(0)
 
-    data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\images"
-    model_path=r"D:\Gosion\Python\yolov5-master\runs\train\002.smoking_v4\weights\best.onnx"
+    data_path=r"D:\Gosion\Projects\003.Sitting_Det\data\v2\train\images"
+    model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.0.onnx"
+    # data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train\images"
+    # model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\out_guardarea_detection\out_guardarea_det_yolov5s_640_640_v1.0.0.onnx"
     yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     
 

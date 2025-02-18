@@ -8848,20 +8848,53 @@ def change_txt_content(txt_path):
         with open(f_dst_path, "w", encoding="utf-8") as fw:
             # for line in txt_content:
             #     l = line.strip().split(" ")
-            #     cls_new = int(l[0]) - 1
+            #     cls = int(l[0])
+            #     if cls == 1:
+            #         cls_new = cls - 1
+            #     else:
+            #         cls_new = cls
             #     l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
             #     fw.write(l_new)
 
-            for i, line in enumerate(txt_content):
-                l = line.strip().split(" ")
+            # for i, line in enumerate(txt_content):
+            #     l = line.strip().split(" ")
                 
-                if i == len(txt_content) - 1:
-                    cls_new = int(l[0]) + 1
-                    l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
-                else:
+            #     if i == len(txt_content) - 1:
+            #         cls_new = int(l[0]) + 1
+            #         l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #     else:
+            #         cls_new = int(l[0])
+            #         l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #     fw.write(l_new)
+
+            sum_0 = 0
+            for line in txt_content:
+                l = line.strip().split(" ")
+                cls = int(l[0])
+                if cls == 0:
+                    sum_0 += 1
+
+            if sum_0 > 1:
+                idx_0 = 0
+                for line in txt_content:
+                    l = line.strip().split(" ")
+                    cls = int(l[0])
+                    if cls == 0:
+                        idx_0 += 1
+                        if idx_0 == 1:
+                            cls_new = cls
+                            l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+                            fw.write(l_new)
+                    else:
+                        cls_new = cls
+                        l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+                        fw.write(l_new)
+            else:
+                for line in txt_content:
+                    l = line.strip().split(" ")
                     cls_new = int(l[0])
                     l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
-                fw.write(l_new)
+                    fw.write(l_new)
 
 
 def expand_yolo_bbox(bbx, size, n=1.0):
@@ -9331,19 +9364,19 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\labels")
+    # change_txt_content(txt_path=r"D:\Gosion\Projects\003.Sitting_Det\data\v2\train\labels")
     # for i in range(10, 12):
     #     change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_labelbee_format\{}_yolo_format\labels".format(i))
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new_labelbee_format_yolo_format".replace("\\", "/"), select_num=111, move_or_copy="move", select_mode=0)
+    random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train_labelbee_format_yolo_format".replace("\\", "/"), select_num=68, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\192.168.45.192_01_20250115163057108")
 

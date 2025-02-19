@@ -1178,7 +1178,7 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\labels", path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\labels-2")
-    # rename_files(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train_add\labels", new_name_prefix="GuanWangLNG_sitting_det_1", start_num=0)
+    # rename_files(data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting", new_name_prefix="test", start_num=0)
     # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\merged_2"
@@ -1192,14 +1192,14 @@ if __name__ == '__main__':
 
     # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
-    # merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Det\data\checked\images\新建文件夹")
+    # merge_dirs(data_path=r"D:\Gosion\Projects\管网LNG\data\20250120\helmet_chongqibi_videos\2025-01-18_frames")
 
     # random_select_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images", mvcp="copy", select_num=100)
 
-    # process_via_filename(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\1_yolo_format\images", path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2\1_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
+    process_via_filename(path1=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\images", path2=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
 
-    process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
+    # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
     
 
 

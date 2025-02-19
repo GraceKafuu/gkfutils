@@ -9151,6 +9151,53 @@ def append_content_to_txt_test():
     #         fa.write(line_src)
 
 
+def append_jitter_box_yolo_label(data_path, append_label, p=5):
+    # lines = ["2 0.4578125 0.750925925925926 0.3625 0.4935185185185185"]
+
+    img_path = data_path + "/images"
+    lbl_path = data_path + "/labels"
+    # lbl_path_new = data_path + "/labels_new"
+    # os.makedirs(lbl_path_new, exist_ok=True)
+
+    file_list = get_file_list(lbl_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = lbl_path + "/{}".format(f)
+        # f_abs_path_new = lbl_path_new + "/{}".format(f)
+        img_abs_path = img_path + "/{}.jpg".format(fname)
+        img = cv2.imread(img_abs_path)
+        imgsz = img.shape[:2]
+
+        with open(f_abs_path, "a") as f_append:
+            for line in append_label:
+                l = line.strip().split(" ")
+                cls = int(l[0])
+                
+                bbox_yolo = list(map(float, l[1:]))
+                bbox_voc = bbox_yolo_to_voc(imgsz, bbox_yolo)
+                bbox_voc_new = [
+                    bbox_voc[0] + np.random.randint(-p, p + 1),
+                    bbox_voc[1] + np.random.randint(-p, p + 1),
+                    bbox_voc[2] + np.random.randint(-p, p + 1),
+                    bbox_voc[3] + np.random.randint(-p, p + 1)
+                ]
+
+                if bbox_voc_new[0] < 0: bbox_voc_new[0] = 0
+                if bbox_voc_new[1] < 0: bbox_voc_new[1] = 0
+                if bbox_voc_new[2] < 0: bbox_voc_new[2] = 0
+                if bbox_voc_new[3] < 0: bbox_voc_new[3] = 0
+                if bbox_voc_new[0] > imgsz[1]: bbox_voc_new[0] = imgsz[1]
+                if bbox_voc_new[1] > imgsz[0]: bbox_voc_new[1] = imgsz[0]
+                if bbox_voc_new[2] > imgsz[1]: bbox_voc_new[2] = imgsz[1]
+                if bbox_voc_new[3] > imgsz[0]: bbox_voc_new[3] = imgsz[0]
+
+                bbox_yolo_new = bbox_voc_to_yolo(imgsz, bbox_voc_new)
+                txt_content_new = "{} ".format(cls) + " ".join([str(b) for b in bbox_yolo_new]) + "\n"
+                f_append.write(txt_content_new)
+
+
+
+
 def jitter_bbox(data_path, classes=(2, ), p=5):
     """
     input is yolo format
@@ -9243,6 +9290,107 @@ def check_yolo_labels(data_path):
 
         
 
+def delete_yolo_labels_high_iou_bbox(data_path, iou_thr=0.8, target_cls=(0, 1), del_cls=0):
+    """
+    通过模型生成的标签中，有些框可能差不多，几乎重叠，但是类别不一样
+    函数的功能是去除指定的重复的类别框
+    """
+    img_path = data_path + "/images"
+    lbl_path = data_path + "/labels"
+    lbl_path_new = data_path + "/labels_new"
+    os.makedirs(lbl_path_new, exist_ok=True)
+
+    file_list = get_file_list(lbl_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = lbl_path + "/{}".format(f)
+        f_abs_path_new = lbl_path_new + "/{}".format(f)
+        img_abs_path = img_path + "/{}.jpg".format(fname)
+        img = cv2.imread(img_abs_path)
+        imgsz = img.shape[:2]
+
+        with open(f_abs_path, "r") as f_read:
+            lines = f_read.readlines()
+
+            del_targets = []
+
+            for i in range(len(lines) - 1):
+                for j in range(i, len(lines) - 1):
+                    line_j = lines[j]
+                    line_j1 = lines[j + 1]
+                    
+                    l_j = line_j.strip().split(" ")
+                    l_j1 = line_j1.strip().split(" ")
+
+                    cls_j = int(l_j[0])
+                    cls_j1 = int(l_j1[0])
+
+                    bbx_yolo_j = list(map(float, l_j[1:]))
+                    bbx_yolo_j1 = list(map(float, l_j1[1:]))
+                    bbx_voc_j = bbox_yolo_to_voc(imgsz, bbx_yolo_j)
+                    bbx_voc_j1 = bbox_yolo_to_voc(imgsz, bbx_yolo_j1)
+                    iou_j_j1 = cal_iou(bbx_voc_j, bbx_voc_j1)
+
+                    if iou_j_j1 > iou_thr and cls_j != cls_j1 and cls_j in target_cls and cls_j1 in target_cls:
+                        print(f_abs_path)
+                        if cls_j == del_cls:
+                            del_targets.append(line_j)
+                        elif cls_j1 == del_cls:
+                            del_targets.append(line_j1)
+
+        with open(f_abs_path_new, "w") as f_write:
+            for line in lines:
+                if line not in del_targets:
+                    f_write.write(line)
+            
+
+def select_specific_images_and_labels(data_path):
+    """
+    选择符合要求的图片和标签
+    """
+
+    img_path = data_path + "/images"
+    lbl_path = data_path + "/labels"
+    
+    save_path = make_save_path(data_path, relative=".", add_str="selected")
+    img_save_path = save_path + "/images"
+    lbl_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(lbl_save_path, exist_ok=True)
+
+    file_list = get_file_list(lbl_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        img_src_path = img_path + "/{}.jpg".format(fname)
+        lbl_src_path = lbl_path + "/{}".format(f)
+        img_dst_path = img_save_path + "/{}.jpg".format(fname)
+        lbl_dst_path = lbl_save_path + "/{}".format(f)
+
+        sitting_person_num = 0
+        guardarea_num = 0
+
+        with open(lbl_src_path, "r") as f_read:
+            lines = f_read.readlines()
+
+            for line in lines:
+                l = line.strip().split(" ")
+                cls = int(l[0])
+
+                if cls == 0:
+                    sitting_person_num += 1
+                elif cls == 2:
+                    guardarea_num += 1
+
+        if sitting_person_num == 1 and guardarea_num == 1:
+            shutil.copy(img_src_path, img_dst_path)
+            shutil.copy(lbl_src_path, lbl_dst_path)
+
+
+                
+
+
+
+                    
 
 
 
@@ -9370,19 +9518,19 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting")  # yolo_format 路径下是 images 和 labels
+    labelbee_to_yolo(data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train_labelbee_format_yolo_format".replace("\\", "/"), select_num=68, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\005.Calling_Det\data\LNG_yolo_format".replace("\\", "/"), select_num=120, move_or_copy="copy", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\192.168.45.192_01_20250115163057108")
+    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\20250120\helmet_chongqibi_videos\2025-01-18")
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train", CLS=(0, 1), crop_ratio=(1, ))
 
-    # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Sitting_Det\v1\train")
+    # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train_selected_aug_1")
 
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
 
@@ -9398,10 +9546,15 @@ if __name__ == '__main__':
     # print(n)
 
     # append_content_to_txt_test()
+    # append_jitter_box_yolo_label(data_path=r"D:\Gosion\Projects\GuanWangLNG\003_labelbee_format_1500_yolo_format\000", append_label=["2 0.4578125 0.750925925925926 0.3625 0.4935185185185185"], p=5)
 
     # jitter_bbox(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new", classes=(1, ), p=3)
 
     # check_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train")
+
+    # delete_yolo_labels_high_iou_bbox(data_path=r"D:\Gosion\Projects\GuanWangLNG\003_labelbee_format_yolo_format", iou_thr=0.95, target_cls=(0, 1), del_cls=1)
+
+    # select_specific_images_and_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train")
 
     
     

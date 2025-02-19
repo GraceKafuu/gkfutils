@@ -10,7 +10,8 @@ import time
 class YOLOv5_ONNX(object):
     def __init__(self, onnx_path):
         cuda = torch.cuda.is_available()
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+        # providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+        providers = ['CPUExecutionProvider']
         self.session = onnxruntime.InferenceSession(onnx_path, providers=providers)
         self.input_names = self.session.get_inputs()[0].name
         self.output_names = self.session.get_outputs()[0].name
@@ -227,7 +228,7 @@ class YOLOv5_ONNX(object):
         return pred
 
     def post_process(self, pred, src_size, img_size):
-        output = self.non_max_suppression(pred, conf_thres=0.80, iou_thres=0.45, agnostic=False)
+        output = self.non_max_suppression(pred, conf_thres=0.60, iou_thres=0.45, agnostic=False)
         out_bbx = []
         for i, det in enumerate(output):  # detections per image
             if len(det):
@@ -326,12 +327,14 @@ if __name__ == '__main__':
     # # onnx_path = r"/home/zengyifan/wujiahu/yolo/yolov5-6.2/runs/train/006_768_20230313_2_cls/weights/best.onnx"
     # # onnx_path = r"D:\Gosion\Projects\coal_conveying_corridor\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.0.onnx"
     # # onnx_path = r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.0.onnx"
-    # onnx_path = r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\out_guardarea_detection\out_guardarea_det_yolov5s_640_640_v1.0.0.onnx"
+    # # onnx_path = r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\out_guardarea_detection\out_guardarea_det_yolov5s_640_640_v1.0.0.onnx"
+    # onnx_path = r"D:\Gosion\Python\yolov5-master\runs\train\003.violated_sitting_det_v2\weights\best.onnx"
+    # # onnx_path = r"D:\Gosion\Python\yolov5-master\runs\train\004.out_guardarea_det_v2\weights\best.onnx"
     # # onnx_path = r"E:\GraceKafuu\Python\ultralytics-main\yolov8s.onnx"
     # # img_path = "/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685.jpg"
     # # img_path = r"D:\Gosion\Projects\data\images\southeast.jpg"
     # # img_path = r"D:\Gosion\Projects\data\images\20250217151944.jpg"
-    # img_path = r"D:\Gosion\Projects\data\images\20250217153625.jpg"
+    # img_path = r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting\test_0000006.png"
 
     # model = YOLOv5_ONNX(onnx_path)
     # # model_input_size = (448, 768)
@@ -351,24 +354,33 @@ if __name__ == '__main__':
     # #     t2 = time.time()
     # #     print(t2 - t2)
     # #     tt.append(t2 - t1)
-    # #
+    
     # # print(np.mean(tt))
 
     # out_bbx = model.post_process(pred, src_size, img_size=model_input_size)
     # print("out_bbx: ", out_bbx)
     # for b in out_bbx:
     #     cv2.rectangle(img0, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
-    #     # cv2.putText(img0, "smoke: {:.2f} concentration: {}".format(b[4], 2), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+    #     # cv2.putText(img0, "smoking: {:.2f} concentration: {}".format(b[4], 2), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+    #     cv2.putText(img0, "{}: {:.2f}".format(b[5], b[4]), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
 
     # # cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/paper/Image9685_pred.jpg", img0)
-    # cv2.imwrite(r"D:\Gosion\Projects\data\images\southeast_pred.jpg", img0)
+    # # cv2.imwrite(r"D:\Gosion\Projects\data\images\southeast_pred.jpg", img0)
     # cv2.imshow("test", img0)
     # cv2.waitKey(0)
 
-    data_path=r"D:\Gosion\Projects\003.Sitting_Det\data\v2\train\images"
-    model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.0.onnx"
-    # data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train\images"
-    # model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\out_guardarea_detection\out_guardarea_det_yolov5s_640_640_v1.0.0.onnx"
+    # data_path=r"D:\Gosion\Projects\003.Sitting_Det\data\v2\train\images"
+    # model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.0.onnx"
+    # # data_path=r"D:\Gosion\Projects\004.OutGuardArea_Det\data\v2\train\images"
+    # # model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\out_guardarea_detection\out_guardarea_det_yolov5s_640_640_v1.0.0.onnx"
+    # yolo_inference_save_labels(data_path=data_path, model_path=model_path)
+    # data_path=r"D:\Gosion\Projects\GuanWangLNG\images"
+    # # model_path=r"D:\Gosion\Python\yolov5-master\runs\train\003.violated_sitting_det_v2\weights\best.onnx"
+    # model_path=r"D:\Gosion\Python\yolov5-master\runs\train\004.out_guardarea_det_v2\weights\best.onnx"
+    # yolo_inference_save_labels(data_path=data_path, model_path=model_path)
+
+    data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting\images"
+    model_path=r"D:\Gosion\Python\yolov5-master\runs\train\003.violated_sitting_det_v2\weights\best.onnx"
     yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     
 

@@ -1192,11 +1192,11 @@ if __name__ == '__main__':
 
     # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
-    # merge_dirs(data_path=r"D:\Gosion\Projects\管网LNG\data\20250120\helmet_chongqibi_videos\2025-01-18_frames")
+    # merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\videos_merged_frames")
 
-    # random_select_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\images", mvcp="copy", select_num=100)
+    random_select_files(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train\images", mvcp="move", select_num=250)
 
-    process_via_filename(path1=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\images", path2=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
+    # process_via_filename(path1=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\images", path2=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")

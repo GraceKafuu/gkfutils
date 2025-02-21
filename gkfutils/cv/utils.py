@@ -8984,7 +8984,7 @@ def yolo_label_expand_bbox(data_path, classes, r=1.5):
                     fw.write(line)
 
 
-def ffmpeg_extract_video_frames(video_path):
+def ffmpeg_extract_video_frames(video_path, fps=25):
     save_path = make_save_path(video_path, relative=".", add_str="frames")
     file_list = get_file_list(video_path)
     for f in file_list:
@@ -9005,7 +9005,7 @@ def ffmpeg_extract_video_frames(video_path):
 
         # subprocess.run(command)
 
-        command = f"D:/installed/ffmpeg-7.0.2-essentials_build/bin/ffmpeg.exe -i {f_abs_path} -r 5 -q:v 1 -f image2 {f_dst_path}/{fname}_output_%09d.jpg"
+        command = f"D:/installed/ffmpeg-7.0.2-essentials_build/bin/ffmpeg.exe -i {f_abs_path} -r {fps} -q:v 1 -f image2 {f_dst_path}/{fname}_output_%09d.jpg"
         os.system(command)
 
 
@@ -9388,6 +9388,19 @@ def select_specific_images_and_labels(data_path):
 
                 
 
+def remove_corrupt_image(data_path):
+
+    save_path = make_save_path(data_path, relative=".", add_str="corrupt")
+
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        img_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(img_abs_path)
+        if img is None:
+            shutil.move(img_abs_path, save_path)
+
+
 
 
                     
@@ -9518,17 +9531,17 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting")  # yolo_format 路径下是 images 和 labels
-    labelbee_to_yolo(data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\005.Calling_Det\data\LNG_yolo_format".replace("\\", "/"), select_num=120, move_or_copy="copy", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\005.Calling_Det\data\LNG_Calling_v1\v1_yolo_format".replace("\\", "/"), select_num=50, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\管网LNG\data\20250120\helmet_chongqibi_videos\2025-01-18")
+    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\videos_merged", fps=5)
 
-    # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train", CLS=(0, 1), crop_ratio=(1, ))
+    crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
     # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train_selected_aug_1")
 
@@ -9546,7 +9559,7 @@ if __name__ == '__main__':
     # print(n)
 
     # append_content_to_txt_test()
-    # append_jitter_box_yolo_label(data_path=r"D:\Gosion\Projects\GuanWangLNG\003_labelbee_format_1500_yolo_format\000", append_label=["2 0.4578125 0.750925925925926 0.3625 0.4935185185185185"], p=5)
+    # append_jitter_box_yolo_label(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train\001_yolo_format", append_label=["0 0.5130208333333334 0.18055555555555555 0.20625 0.3277777777777778"], p=5)
 
     # jitter_bbox(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_new", classes=(1, ), p=3)
 
@@ -9555,6 +9568,10 @@ if __name__ == '__main__':
     # delete_yolo_labels_high_iou_bbox(data_path=r"D:\Gosion\Projects\GuanWangLNG\003_labelbee_format_yolo_format", iou_thr=0.95, target_cls=(0, 1), del_cls=1)
 
     # select_specific_images_and_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train")
+
+    # process_corrupt_images(img_path=r"D:\Gosion\Projects\data\silie_data\train\tear", algorithm="cv2", flag="move")
+
+    # remove_corrupt_image(data_path=r"D:\Gosion\Projects\data\silie_data\train\not_torn")
 
     
     

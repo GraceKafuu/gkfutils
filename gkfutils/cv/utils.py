@@ -587,7 +587,7 @@ def change_brightness(img, random=False, p=1, value=30):
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             h, s, v = cv2.split(hsv)
             v = cv2.add(v, brightness_value)
-            np.clip(v, 0, 255)
+            v = np.clip(v, 0, 255)
             final_hsv = cv2.merge((h, s, v))
             img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
             return img
@@ -598,7 +598,7 @@ def change_brightness(img, random=False, p=1, value=30):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         v = cv2.add(v, value)
-        np.clip(v, 0, 255)
+        v = np.clip(v, 0, 255)
         final_hsv = cv2.merge((h, s, v))
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         
@@ -8846,15 +8846,15 @@ def change_txt_content(txt_path):
 
         f_dst_path = save_path + "/{}".format(f)
         with open(f_dst_path, "w", encoding="utf-8") as fw:
-            # for line in txt_content:
-            #     l = line.strip().split(" ")
-            #     cls = int(l[0])
-            #     if cls == 1:
-            #         cls_new = cls - 1
-            #     else:
-            #         cls_new = cls
-            #     l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
-            #     fw.write(l_new)
+            for line in txt_content:
+                l = line.strip().split(" ")
+                cls = int(l[0])
+                if cls == 1:
+                    cls_new = cls - 1
+                else:
+                    cls_new = cls
+                l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+                fw.write(l_new)
 
             # for i, line in enumerate(txt_content):
             #     l = line.strip().split(" ")
@@ -8867,34 +8867,34 @@ def change_txt_content(txt_path):
             #         l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
             #     fw.write(l_new)
 
-            sum_0 = 0
-            for line in txt_content:
-                l = line.strip().split(" ")
-                cls = int(l[0])
-                if cls == 0:
-                    sum_0 += 1
+            # sum_0 = 0
+            # for line in txt_content:
+            #     l = line.strip().split(" ")
+            #     cls = int(l[0])
+            #     if cls == 0:
+            #         sum_0 += 1
 
-            if sum_0 > 1:
-                idx_0 = 0
-                for line in txt_content:
-                    l = line.strip().split(" ")
-                    cls = int(l[0])
-                    if cls == 0:
-                        idx_0 += 1
-                        if idx_0 == 1:
-                            cls_new = cls
-                            l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
-                            fw.write(l_new)
-                    else:
-                        cls_new = cls
-                        l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
-                        fw.write(l_new)
-            else:
-                for line in txt_content:
-                    l = line.strip().split(" ")
-                    cls_new = int(l[0])
-                    l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
-                    fw.write(l_new)
+            # if sum_0 > 1:
+            #     idx_0 = 0
+            #     for line in txt_content:
+            #         l = line.strip().split(" ")
+            #         cls = int(l[0])
+            #         if cls == 0:
+            #             idx_0 += 1
+            #             if idx_0 == 1:
+            #                 cls_new = cls
+            #                 l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #                 fw.write(l_new)
+            #         else:
+            #             cls_new = cls
+            #             l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #             fw.write(l_new)
+            # else:
+            #     for line in txt_content:
+            #         l = line.strip().split(" ")
+            #         cls_new = int(l[0])
+            #         l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #         fw.write(l_new)
 
 
 def expand_yolo_bbox(bbx, size, n=1.0):
@@ -9401,7 +9401,69 @@ def remove_corrupt_image(data_path):
             shutil.move(img_abs_path, save_path)
 
 
+def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255), apply_mask=True):
+    img_orig = img.copy()
+    if apply_mask:
+        # 640 * 512, (620, 68) (640, 445)
+        imgsz = img.shape[:2]
+        rh1, rh2 = 68 / 512, 445 / 512
+        rw1, rw2 = 620 / 640, 640 / 640
+        img[int(rh1 * imgsz[0]):int(rh2 * imgsz[0]), int(rw1 * imgsz[1]):int(rw2 * imgsz[1])] = (0, 0, 0)
+        
+    hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv_image, lower, upper)
 
+    # # 计算指定颜色区域的像素数量
+    # color_pixel_count = cv2.countNonZero(mask)
+
+
+    # 可视化结果（可选）
+    # 将掩码应用到原图上，显示提取的颜色区域
+    result = cv2.bitwise_and(img, img, mask=mask)
+    # result = np.uint8(result)
+
+
+    gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+
+    # gray2 = cv2.cvtColor(img_orig, cv2.COLOR_BGR2GRAY)
+    # cv2.imwrite(r"D:\Gosion\Projects\GuanWangLNG\cewen\wendutu_result\gray2.jpg", gray2)
+    
+    _, bw_image = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+
+    # cv2.imwrite(r"D:\Gosion\Projects\GuanWangLNG\cewen\wendutu_result\bw_image.jpg", bw_image)
+ 
+    # white_area = np.sum(bw_image == 255)
+    white_area = cv2.countNonZero(bw_image)
+
+    # 计算图像的总像素数量
+    total_pixel_count = img.shape[0] * img.shape[1]
+
+    # 计算指定颜色区域占整张图像的面积比例
+    color_area_ratio = white_area / total_pixel_count
+
+    # 输出结果
+    # print(f"指定颜色区域的像素数量: {white_area}")
+    # print(f"图像的总像素数量: {total_pixel_count}")
+    print(f"指定颜色区域占整张图像的面积比例: {color_area_ratio:.12%}\n")
+
+    rs = "{}/{}_{:.12%}".format(white_area, total_pixel_count, color_area_ratio)
+
+
+    # # 显示原图和结果
+    # cv2.imshow("Original Image", img)
+    # cv2.imshow("Mask", mask)
+    # cv2.imshow("Result", result)
+
+    # # 等待按键并关闭窗口
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    # cv2.imwrite(r"D:\Gosion\Projects\GuanWangLNG\cewen\wendutu_result\result.jpg", result)
+
+    # res = np.hstack((img_orig, result), dtype=np.uint8)
+    
+    # return res, color_area_ratio, rs
+    return result, color_area_ratio, rs
 
                     
 
@@ -9503,7 +9565,7 @@ if __name__ == '__main__':
 
     # byte_data = 
     # img = byte2img(byte_data)
-    # cv2.imwrite(r'D:\Gosion\Projects\data\images\test_res_20250212_1.jpg', img)
+    # cv2.imwrite(r'D:\Gosion\Projects\data\images\test_res_20250222_1.jpg', img)
 
     # img_path = r'D:\Gosion\Projects\data\res2.jpg'
     # byte_data = img2byte(img_path)
@@ -9525,29 +9587,29 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"D:\Gosion\Projects\003.Sitting_Det\data\v2\train\labels")
+    # change_txt_content(txt_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\003_1255_yolo_format\labels")
     # for i in range(10, 12):
     #     change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_labelbee_format\{}_yolo_format\labels".format(i))
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\20250221")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\val")  # labelbee_format 路径下是 images 和 jsons
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
     # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\005.Calling_Det\data\LNG_Calling_v1\v1_yolo_format".replace("\\", "/"), select_num=50, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\videos_merged", fps=5)
+    ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.if_tear\video\20250224", fps=25)
 
-    crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
+    # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
     # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train_selected_aug_1")
 
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
 
-    # remove_yolo_label_specific_class(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\new", rm_cls=(0, 1, 3, ))
+    # remove_yolo_label_specific_class(data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\003_1255_yolo_format", rm_cls=(2, ))
 
     # make_border_and_change_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4_exp_make_border\train_base", dstsz=(1080 + 1920, 1920 + 1920))
 
@@ -9573,6 +9635,24 @@ if __name__ == '__main__':
 
     # remove_corrupt_image(data_path=r"D:\Gosion\Projects\data\silie_data\train\not_torn")
 
+    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250226"
+    # save_path = make_save_path(data_path, relative='.', add_str="result")
+    # file_list = get_file_list(data_path)
+    # ratio_list = []
+    # for f in file_list:
+    #     fname = os.path.splitext(f)[0]
+    #     f_abs_path = os.path.join(data_path, f)
+    #     print("{}: ".format(f_abs_path))
+    #     img = cv2.imread(f_abs_path)
+    #     res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 221), upper=(180, 30, 255), apply_mask=True)
+    #     ratio_list.append(color_area_ratio)
+    #     res_path = "{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
+    #     cv2.imwrite(res_path, res)
+
+    # mean_r = np.mean(ratio_list)
+    # min_r = np.min(ratio_list)
+    # max_r = np.max(ratio_list)
+    # print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r * 100, min_r * 100, max_r * 100))
     
     
 

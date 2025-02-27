@@ -1177,29 +1177,31 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    # merge_txt_content(path1=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\labels", path2=r"D:\Gosion\Projects\004.GuardArea_Det\data\new\labels-2")
-    # rename_files(data_path=r"D:\Gosion\Projects\GuanWangLNG\loubaowubao-0218\sitting", new_name_prefix="test", start_num=0)
+    # merge_txt_content(path1=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels_1_2", path2=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels")
+    # rename_files(data_path=r"D:\Gosion\Projects\GuanWangLNG\20250226", new_name_prefix="20250226", start_num=0)
     # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
 
-    # data_path = r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v3\from_YanDajun_checked\train_makeBorder\merged_2"
+    # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
     # dir_list = os.listdir(data_path)
     # for i, d in enumerate(dir_list):
     #     dir_path = data_path + "/{}".format(d)
-    #     rename_files(data_path=dir_path, new_name_prefix="smoking_v3_from_YanDajun_make_border_2_{}".format(i), start_num=0)
+    #     rename_files(data_path=dir_path, new_name_prefix="leaking-20250223_{}_{}".format(d, i), start_num=0)
 
 
     # remove_corrupt_img(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\New_All\Add\Det\v1_add\v2\train\images")
 
     # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
-    # merge_dirs(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\videos_merged_frames")
+    # merge_dirs(data_path=r"D:\Gosion\Projects\006.if_tear\video\20250224_frames")
 
-    random_select_files(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\20250219\v2\train\images", mvcp="move", select_num=250)
+    random_select_files(data_path=r"D:\Gosion\Projects\006.if_tear\cls\v4\train\2", mvcp="move", select_num=19)
 
     # process_via_filename(path1=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\images", path2=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
+
+    # save_file_path_to_txt(data_path=r"D:\Gosion\Projects\006.if_tear\video_frames\frames_merged", abspath=True)
     
 
 

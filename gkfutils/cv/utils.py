@@ -9593,15 +9593,15 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\20250221")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\val")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4")  # yolo_format 路径下是 images 和 labels
+    labelbee_to_yolo(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
     # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\005.Calling_Det\data\LNG_Calling_v1\v1_yolo_format".replace("\\", "/"), select_num=50, move_or_copy="move", select_mode=0)
 
-    ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.if_tear\video\20250224", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.if_tear\video\20250224", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -9627,7 +9627,7 @@ if __name__ == '__main__':
 
     # check_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train")
 
-    # delete_yolo_labels_high_iou_bbox(data_path=r"D:\Gosion\Projects\GuanWangLNG\003_labelbee_format_yolo_format", iou_thr=0.95, target_cls=(0, 1), del_cls=1)
+    # delete_yolo_labels_high_iou_bbox(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4", iou_thr=0.95, target_cls=(0, 1), del_cls=1)
 
     # select_specific_images_and_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train")
 

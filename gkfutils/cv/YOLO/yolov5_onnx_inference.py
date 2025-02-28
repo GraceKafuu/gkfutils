@@ -398,8 +398,8 @@ if __name__ == '__main__':
     # model_path=r"D:\Gosion\Python\yolov5-master\runs\train\001.leaking_liquid_det_v2_780\weights\best.onnx"
     # yolo_inference_save_labels(data_path=data_path, model_path=model_path)
 
-    data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\20250221\images"
-    model_path=r"D:\Gosion\Python\yolov5-master\runs\train\004.out_guardarea_det_v2\weights\best.onnx"
+    data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4\images"
+    model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.2.onnx"
     yolo_inference_save_labels(data_path=data_path, model_path=model_path)
     
 

@@ -844,6 +844,23 @@ def change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5):
             img = img.astype(np.float32)
             return img
         else:
+            img = img.astype(np.uint8)
+            hgain = np.random.uniform(hgain[0], hgain[1])
+            sgain = np.random.uniform(sgain[0], sgain[1])
+            vgain = np.random.uniform(vgain[0], vgain[1])
+            r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
+            hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
+            dtype = img.dtype  # uint8
+
+            x = np.arange(0, 256, dtype=np.int16)
+            lut_hue = ((x * r[0]) % 180).astype(dtype)
+            lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
+            lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+
+            img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
+            cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
+            img = img.astype(np.float32)
+            return img
             return img
     else:
         img = img.astype(np.uint8)
@@ -861,6 +878,35 @@ def change_hsv(img, random=False, p=1, hgain=0.5, sgain=0.5, vgain=0.5):
         img = img.astype(np.float32)
         return img
     
+
+def change_color(img, random=False, p=1, hue_shift=30):
+    if random:
+        if np.random.random() <= p:
+            value = np.random.randint(0, 180)
+            # 将图像从BGR颜色空间转换为HSV颜色空间
+            hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            
+            # 调整Hue值
+            hsv_image[:, :, 0] = (hsv_image[:, :, 0] + value) % 180
+            
+            # 将图像从HSV颜色空间转换回BGR颜色空间
+            new_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+            
+            return new_image
+        else:
+            return new_image
+    else:
+        # 将图像从BGR颜色空间转换为HSV颜色空间
+            hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            
+            # 调整Hue值
+            hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue_shift) % 180
+            
+            # 将图像从HSV颜色空间转换回BGR颜色空间
+            new_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+            
+            return new_image
+
 
 def log_transformation(img, random=False, p=1):
     """
@@ -930,6 +976,11 @@ def color_distortion(img, random=False, p=1, value=(-50, 50)):
             img = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
             return img
         else:
+            hue_v = np.random.randint(value[0], value[1])
+            hsv_image = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2HSV)
+            hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue_v) % 180  # 在Hue通道上增加30
+            hsv_image = np.clip(hsv_image, 0, 255)
+            img = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
             return img
     else:
         assert isinstance(value, int), "If random=False, value should be int!"
@@ -9593,15 +9644,15 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4")  # yolo_format 路径下是 images 和 labels
-    labelbee_to_yolo(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4_add")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det\v1")  # labelbee_format 路径下是 images 和 jsons
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\005.Calling_Det\data\LNG_Calling_v1\v1_yolo_format".replace("\\", "/"), select_num=50, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det\v1_300\train".replace("\\", "/"), select_num=6, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.if_tear\video\20250224", fps=25)
+    ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\video\20250301", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 

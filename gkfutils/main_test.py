@@ -198,7 +198,7 @@ def image_processing_aug_det_data(data_path):
         lbl_abs_path = lbl_path + "/{}.txt".format(fname)
         lbl_dst_path = lbl_save_path + "/{}.txt".format(fname)
         
-        img = dilate_erode(img, random=True, p=p, flag=np.random.choice(["dilate", "erode"]))
+        # img = dilate_erode(img, random=True, p=p, flag=np.random.choice(["dilate", "erode"]))
 
         # rdm0 = np.random.choice(np.arange(2))
         # if rdm0 == 0:
@@ -206,37 +206,40 @@ def image_processing_aug_det_data(data_path):
         # else:
         #     img = stretch(img, random=True, p=p, r=(0.25, 1.25))
 
-        rdm1 = np.random.choice(np.arange(5))
-        if rdm1 == 0:
-            img = change_brightness(img, random=True, p=p, value=(-25, 25))
-        # elif rdm1 == 1:
-        #     img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
-        elif rdm1 == 2:
-            img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 25))
+        # rdm1 = np.random.choice(np.arange(5))
+        # if rdm1 == 0:
+        #     img = change_brightness(img, random=True, p=p, value=(-25, 25))
+        # # elif rdm1 == 1:
+        # #     img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
+        # elif rdm1 == 2:
+        #     img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 25))
         # elif rdm1 == 3:
-            # img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
+        #     img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
         # else:
         #     img = log_transformation(img, random=True, p=p)
 
-        rdm2 = np.random.choice(np.arange(6))
-        if rdm2 == 0:
-            img = gaussian_noise(img, random=True, p=p, mean=(0, 1), var=(0.1, 0.25))
-        elif rdm2 == 1:
-            img = poisson_noise(img, random=True, p=p, n=(2, 5))
-        elif rdm2 == 2:
-            img = sp_noise(img, random=True, p=p, salt_p=(0.01, 0.025), pepper_p=(0.01, 0.025))
-        elif rdm2 == 3:
-            img = gaussian_blur(img, random=True, p=p)
-        elif rdm2 == 4:
-            img = motion_blur(img, random=True, p=p, angle=(-180, 180))
-        else:
-            img = median_blur(img, random=True, p=p)
+        # rdm2 = np.random.choice(np.arange(6))
+        # if rdm2 == 0:
+        #     img = gaussian_noise(img, random=True, p=p, mean=(0, 1), var=(0.1, 0.25))
+        # elif rdm2 == 1:
+        #     img = poisson_noise(img, random=True, p=p, n=(2, 5))
+        # elif rdm2 == 2:
+        #     img = sp_noise(img, random=True, p=p, salt_p=(0.01, 0.025), pepper_p=(0.01, 0.025))
+        # elif rdm2 == 3:
+        #     img = gaussian_blur(img, random=True, p=p)
+        # elif rdm2 == 4:
+        #     img = motion_blur(img, random=True, p=p, angle=(-180, 180))
+        # else:
+        #     img = median_blur(img, random=True, p=p)
         
-        # rdm3 = np.random.choice(np.arange(2))
+        rdm3 = np.random.choice(np.arange(2))
+        # img = color_distortion(img, random=True, p=p, value=(-360, 360))
+        # img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.95), sgain=(0.25, 0.95), vgain=(0.25, 0.95))
+        img = change_color(img, random=True, p=1, hue_shift=30)
         # if rdm3 == 0:
         #     img = color_distortion(img, random=True, p=p, value=(-360, 360))
         # else:
-        #     img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.75), sgain=(0.25, 0.75), vgain=(0.25, 0.75))
+        #     img = change_hsv(img, random=True, p=p, hgain=(0.45, 0.95), sgain=(0.45, 0.95), vgain=(0.45, 0.95))
         
         # img = transperent_overlay(img, random=True, p=p, max_h_r=1.0, max_w_r=0.5, alpha=(0.1, 0.6))
 
@@ -248,20 +251,20 @@ def image_processing_aug_det_data(data_path):
         # else:
         #     img = tophat_blackhat(img, random=True, p=p, flag=np.random.choice(["tophat", "blackhat"]))
 
-        rdm5 = np.random.choice(np.arange(2))
-        if rdm5 == 0:
-            img = make_sunlight_effect(img, random=True, p=p, effect_r=(10, 80), light_strength=(50, 80))
-        else:
-            img = make_rain_effect(img, random=True, p=p, m=np.random.choice([0, 1]), length=(10, 90), angle=(0, 180), noise=(100, 500))
+        # rdm5 = np.random.choice(np.arange(2))
+        # if rdm5 == 0:
+        #     img = make_sunlight_effect(img, random=True, p=p, effect_r=(10, 80), light_strength=(50, 80))
+        # else:
+        #     img = make_rain_effect(img, random=True, p=p, m=np.random.choice([0, 1]), length=(10, 90), angle=(0, 180), noise=(100, 500))
 
         # img = make_rain_effect(img, random=True, p=p, m=np.random.choice([0, 1]), length=(10, 90), angle=(0, 180), noise=(100, 500))
         
-        img = compress(img, random=True, p=p, quality=(25, 95))
+        # img = compress(img, random=True, p=p, quality=(25, 95))
         # img = rotate(img, random=True, p=p, algorithm="pil", angle=(-45, 45), expand=True)
 
         # 以下OCR数据增强时不建议使用:
         # img = flip(img, random=True, p=p, m=np.random.choice([-1, 0, 1]))  # m=np.random.choice([-1, 0, 1])
-        img = equalize_hist(img, random=True, p=p, m=1)  # m=np.random.choice([0, 1])
+        # img = equalize_hist(img, random=True, p=p, m=1)  # m=np.random.choice([0, 1])
         # img = translate(img, random=True, p=p, tx=(-50, 50), ty=(-50, 50), dstsz=None)
 
         # 以下还存在问题, 需要优化:
@@ -768,7 +771,7 @@ def cal_params_flops_test():
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
-    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train_selected")
+    image_processing_aug_det_data(data_path=r"E:\wujiahu\003\v4_add")
     # make_border()
 
     # det_labels_convertion()

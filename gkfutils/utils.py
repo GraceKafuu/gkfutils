@@ -1178,7 +1178,7 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels_1_2", path2=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels")
-    # rename_files(data_path=r"D:\Gosion\Projects\GuanWangLNG\20250226", new_name_prefix="20250226", start_num=0)
+    rename_files(data_path=r"E:\wujiahu\003\v4_add_aug_0\images", new_name_prefix="003_violated_sitting_v4_aug_2", start_num=0)
     # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
@@ -1194,9 +1194,9 @@ if __name__ == '__main__':
 
     # merge_dirs(data_path=r"D:\Gosion\Projects\006.if_tear\video\20250224_frames")
 
-    random_select_files(data_path=r"D:\Gosion\Projects\006.if_tear\cls\v4\train\2", mvcp="move", select_num=19)
+    # random_select_files(data_path=r"D:\Gosion\Projects\006.if_tear\cls\v4\train\2", mvcp="move", select_num=19)
 
-    # process_via_filename(path1=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\images", path2=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
+    # process_via_filename(path1=r"E:\wujiahu\003\v4_add_aug_0\images", path2=r"E:\wujiahu\003\v4_add_aug_0\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")

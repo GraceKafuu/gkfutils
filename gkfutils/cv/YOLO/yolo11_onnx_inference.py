@@ -84,8 +84,274 @@ class Colors:
         return tuple(int(h[1 + i : 1 + i + 2], 16) for i in (0, 2, 4))
 
 
+class LetterBox:
+    """
+    Resize image and padding for detection, instance segmentation, pose.
+
+    This class resizes and pads images to a specified shape while preserving aspect ratio. It also updates
+    corresponding labels and bounding boxes.
+
+    Attributes:
+        new_shape (tuple): Target shape (height, width) for resizing.
+        auto (bool): Whether to use minimum rectangle.
+        scaleFill (bool): Whether to stretch the image to new_shape.
+        scaleup (bool): Whether to allow scaling up. If False, only scale down.
+        stride (int): Stride for rounding padding.
+        center (bool): Whether to center the image or align to top-left.
+
+    Methods:
+        __call__: Resize and pad image, update labels and bounding boxes.
+
+    Examples:
+        >>> transform = LetterBox(new_shape=(640, 640))
+        >>> result = transform(labels)
+        >>> resized_img = result["img"]
+        >>> updated_instances = result["instances"]
+    """
+
+    def __init__(self, new_shape=(640, 640), auto=False, scaleFill=False, scaleup=True, center=True, stride=32):
+        """
+        Initialize LetterBox object for resizing and padding images.
+
+        This class is designed to resize and pad images for object detection, instance segmentation, and pose estimation
+        tasks. It supports various resizing modes including auto-sizing, scale-fill, and letterboxing.
+
+        Args:
+            new_shape (Tuple[int, int]): Target size (height, width) for the resized image.
+            auto (bool): If True, use minimum rectangle to resize. If False, use new_shape directly.
+            scaleFill (bool): If True, stretch the image to new_shape without padding.
+            scaleup (bool): If True, allow scaling up. If False, only scale down.
+            center (bool): If True, center the placed image. If False, place image in top-left corner.
+            stride (int): Stride of the model (e.g., 32 for YOLOv5).
+
+        Attributes:
+            new_shape (Tuple[int, int]): Target size for the resized image.
+            auto (bool): Flag for using minimum rectangle resizing.
+            scaleFill (bool): Flag for stretching image without padding.
+            scaleup (bool): Flag for allowing upscaling.
+            stride (int): Stride value for ensuring image size is divisible by stride.
+
+        Examples:
+            >>> letterbox = LetterBox(new_shape=(640, 640), auto=False, scaleFill=False, scaleup=True, stride=32)
+            >>> resized_img = letterbox(original_img)
+        """
+        self.new_shape = new_shape
+        self.auto = auto
+        self.scaleFill = scaleFill
+        self.scaleup = scaleup
+        self.stride = stride
+        self.center = center  # Put the image in the middle or top-left
+
+    def __call__(self, labels=None, image=None):
+        """
+        Resizes and pads an image for object detection, instance segmentation, or pose estimation tasks.
+
+        This method applies letterboxing to the input image, which involves resizing the image while maintaining its
+        aspect ratio and adding padding to fit the new shape. It also updates any associated labels accordingly.
+
+        Args:
+            labels (Dict | None): A dictionary containing image data and associated labels, or empty dict if None.
+            image (np.ndarray | None): The input image as a numpy array. If None, the image is taken from 'labels'.
+
+        Returns:
+            (Dict | Tuple): If 'labels' is provided, returns an updated dictionary with the resized and padded image,
+                updated labels, and additional metadata. If 'labels' is empty, returns a tuple containing the resized
+                and padded image, and a tuple of (ratio, (left_pad, top_pad)).
+
+        Examples:
+            >>> letterbox = LetterBox(new_shape=(640, 640))
+            >>> result = letterbox(labels={"img": np.zeros((480, 640, 3)), "instances": Instances(...)})
+            >>> resized_img = result["img"]
+            >>> updated_instances = result["instances"]
+        """
+        if labels is None:
+            labels = {}
+        img = labels.get("img") if image is None else image
+        shape = img.shape[:2]  # current shape [height, width]
+        new_shape = labels.pop("rect_shape", self.new_shape)
+        if isinstance(new_shape, int):
+            new_shape = (new_shape, new_shape)
+
+        # Scale ratio (new / old)
+        r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+        if not self.scaleup:  # only scale down, do not scale up (for better val mAP)
+            r = min(r, 1.0)
+
+        # Compute padding
+        ratio = r, r  # width, height ratios
+        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+        dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
+        if self.auto:  # minimum rectangle
+            dw, dh = np.mod(dw, self.stride), np.mod(dh, self.stride)  # wh padding
+        elif self.scaleFill:  # stretch
+            dw, dh = 0.0, 0.0
+            new_unpad = (new_shape[1], new_shape[0])
+            ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
+
+        if self.center:
+            dw /= 2  # divide padding into 2 sides
+            dh /= 2
+
+        if shape[::-1] != new_unpad:  # resize
+            img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
+        top, bottom = int(round(dh - 0.1)) if self.center else 0, int(round(dh + 0.1))
+        left, right = int(round(dw - 0.1)) if self.center else 0, int(round(dw + 0.1))
+        img = cv2.copyMakeBorder(
+            img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114)
+        )  # add border
+        if labels.get("ratio_pad"):
+            labels["ratio_pad"] = (labels["ratio_pad"], (left, top))  # for evaluation
+
+        if len(labels):
+            labels = self._update_labels(labels, ratio, left, top)
+            labels["img"] = img
+            labels["resized_shape"] = new_shape
+            return labels
+        else:
+            return img
+
+    @staticmethod
+    def _update_labels(labels, ratio, padw, padh):
+        """
+        Updates labels after applying letterboxing to an image.
+
+        This method modifies the bounding box coordinates of instances in the labels
+        to account for resizing and padding applied during letterboxing.
+
+        Args:
+            labels (Dict): A dictionary containing image labels and instances.
+            ratio (Tuple[float, float]): Scaling ratios (width, height) applied to the image.
+            padw (float): Padding width added to the image.
+            padh (float): Padding height added to the image.
+
+        Returns:
+            (Dict): Updated labels dictionary with modified instance coordinates.
+
+        Examples:
+            >>> letterbox = LetterBox(new_shape=(640, 640))
+            >>> labels = {"instances": Instances(...)}
+            >>> ratio = (0.5, 0.5)
+            >>> padw, padh = 10, 20
+            >>> updated_labels = letterbox._update_labels(labels, ratio, padw, padh)
+        """
+        labels["instances"].convert_bbox(format="xyxy")
+        labels["instances"].denormalize(*labels["img"].shape[:2][::-1])
+        labels["instances"].scale(*ratio)
+        labels["instances"].add_padding(padw, padh)
+        return labels
+    
+
+def clip_boxes(boxes, shape):
+    """
+    Takes a list of bounding boxes and a shape (height, width) and clips the bounding boxes to the shape.
+
+    Args:
+        boxes (torch.Tensor): The bounding boxes to clip.
+        shape (tuple): The shape of the image.
+
+    Returns:
+        (torch.Tensor | numpy.ndarray): The clipped boxes.
+    """
+    boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
+    boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
+    return boxes
+
+
+def clip_coords(coords, shape):
+    """
+    Clip line coordinates to the image boundaries.
+
+    Args:
+        coords (torch.Tensor | numpy.ndarray): A list of line coordinates.
+        shape (tuple): A tuple of integers representing the size of the image in the format (height, width).
+
+    Returns:
+        (torch.Tensor | numpy.ndarray): Clipped coordinates
+    """
+    coords[..., 0] = coords[..., 0].clip(0, shape[1])  # x
+    coords[..., 1] = coords[..., 1].clip(0, shape[0])  # y
+    return coords
+
+
+def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True, xywh=False):
+        """
+        Rescales bounding boxes (in the format of xyxy by default) from the shape of the image they were originally
+        specified in (img1_shape) to the shape of a different image (img0_shape).
+
+        Args:
+            img1_shape (tuple): The shape of the image that the bounding boxes are for, in the format of (height, width).
+            boxes (torch.Tensor): the bounding boxes of the objects in the image, in the format of (x1, y1, x2, y2)
+            img0_shape (tuple): the shape of the target image, in the format of (height, width).
+            ratio_pad (tuple): a tuple of (ratio, pad) for scaling the boxes. If not provided, the ratio and pad will be
+                calculated based on the size difference between the two images.
+            padding (bool): If True, assuming the boxes is based on image augmented by yolo style. If False then do regular
+                rescaling.
+            xywh (bool): The box format is xywh or not, default=False.
+
+        Returns:
+            boxes (torch.Tensor): The scaled bounding boxes, in the format of (x1, y1, x2, y2)
+        """
+        if ratio_pad is None:  # calculate from img0_shape
+            gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+            pad = (
+                round((img1_shape[1] - img0_shape[1] * gain) / 2 - 0.1),
+                round((img1_shape[0] - img0_shape[0] * gain) / 2 - 0.1),
+            )  # wh padding
+        else:
+            gain = ratio_pad[0][0]
+            pad = ratio_pad[1]
+
+        if padding:
+            boxes[..., 0] -= pad[0]  # x padding
+            boxes[..., 1] -= pad[1]  # y padding
+            if not xywh:
+                boxes[..., 2] -= pad[0]  # x padding
+                boxes[..., 3] -= pad[1]  # y padding
+        boxes[..., :4] /= gain
+        return clip_boxes(boxes, img0_shape)
+
+
+def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None, normalize=False, padding=True):
+    """
+    Rescale segment coordinates (xy) from img1_shape to img0_shape.
+
+    Args:
+        img1_shape (tuple): The shape of the image that the coords are from.
+        coords (torch.Tensor): the coords to be scaled of shape n,2.
+        img0_shape (tuple): the shape of the image that the segmentation is being applied to.
+        ratio_pad (tuple): the ratio of the image size to the padded image size.
+        normalize (bool): If True, the coordinates will be normalized to the range [0, 1]. Defaults to False.
+        padding (bool): If True, assuming the boxes is based on image augmented by yolo style. If False then do regular
+            rescaling.
+
+    Returns:
+        coords (torch.Tensor): The scaled coordinates.
+    """
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0][0]
+        pad = ratio_pad[1]
+
+    if padding:
+        coords[..., 0] -= pad[0]  # x padding
+        coords[..., 1] -= pad[1]  # y padding
+    coords[..., 0] /= gain
+    coords[..., 1] /= gain
+    coords = clip_coords(coords, img0_shape)
+    if normalize:
+        coords[..., 0] /= img0_shape[1]  # width
+        coords[..., 1] /= img0_shape[0]  # height
+    return coords
+
+
 class YOLO11_ORT:
-    """YOLO model for handling inference and visualization."""
+    """
+    YOLO11 model for handling inference and visualization. Also support YOLOv8.
+    Currently support detection and pose, other tasks will be added later.
+    """
+    
     def __init__(self, onnx_model, num_kpt=17, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
         """
         Initializes an instance of the YOLOv8 class.
@@ -184,6 +450,24 @@ class YOLO11_ORT:
         # Draw the label text on the image
         cv2.putText(img, label, (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
+    def pre_transform(self, im):
+        """
+        Pre-transform input image before inference.
+
+        Args:
+            im (List(np.ndarray)): (N, 3, h, w) for tensor, [(h, w, 3) x N] for list.
+
+        Returns:
+            (list): A list of transformed images.
+        """
+
+        letterbox = LetterBox(
+            (self.input_height, self.input_width),
+            auto=False,
+            stride=32,
+        )
+        return letterbox(image=im)
+
     def preprocess(self, input):
         """
         Preprocesses the input image before performing inference.
@@ -203,10 +487,12 @@ class YOLO11_ORT:
         self.img_height, self.img_width = self.img.shape[:2]
 
         # Convert the image color space from BGR to RGB
+        # img = self.img
         img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
 
         # Resize the image to match the input shape
-        img = cv2.resize(img, (self.input_width, self.input_height))
+        # img = cv2.resize(img, (self.input_width, self.input_height))
+        img = self.pre_transform(img)
 
         # Normalize the image data by dividing it by 255.0
         image_data = np.array(img) / 255.0
@@ -219,7 +505,7 @@ class YOLO11_ORT:
 
         # Return the preprocessed image data
         return image_data
-
+    
     def det_postprocess(self, input_image, output):
         """
         Performs post-processing on the model's output to extract bounding boxes, scores, and class IDs.
@@ -383,7 +669,6 @@ class YOLO11_ORT:
         area1 = self.area_of(boxes1[..., :2], boxes1[..., 2:])
         return overlap_area / (area0 + area1 - overlap_area + eps)
 
-
     def area_of(self, left_top, right_bottom):
         """Compute the areas of rectangles given two corners.
         Args:
@@ -408,14 +693,24 @@ class YOLO11_ORT:
 
             boxes, scores, keypoints = self.nms(boxes, scores, keypoints, iou_threshold=iou_threshold)
 
-            boxes[:, 0] *= width_radio
-            boxes[:, 1] *= height_radio
-            boxes[:, 2] *= width_radio
-            boxes[:, 3] *= height_radio
+            # 错误
+            # boxes[:, 0] *= width_radio
+            # boxes[:, 1] *= height_radio
+            # boxes[:, 2] *= width_radio
+            # boxes[:, 3] *= height_radio
+
+            # 正确
+            boxes = scale_boxes((self.input_height, self.input_width), boxes, (self.img_height, self.img_width))
+
 
             keypoints = keypoints.reshape([-1, self.num_kpt, 3])
-            keypoints[:, :, 0] *= width_radio
-            keypoints[:, :, 1] *= height_radio
+
+            # 错误
+            # keypoints[:, :, 0] *= width_radio
+            # keypoints[:, :, 1] *= height_radio
+
+            # 正确
+            keypoints = scale_coords((self.input_height, self.input_width), keypoints, (self.img_height, self.img_width))
 
         else:
             boxes = np.array([])
@@ -535,7 +830,7 @@ class YOLO11_ORT:
 
         for b, s, k in zip(boxes, scores, keypoints):
             b = list(map(round, b))
-            self.img = self.draw_kpts(self.img, k, self.img.shape, radius=5, kpt_line=True)
+            self.img = self.draw_kpts(self.img, k, self.img.shape[:2], radius=5, kpt_line=True)
 
             print("img_path: {}".format(img_path))
             res = self.sitting_or_standing(k, angle_thr=145)
@@ -561,11 +856,13 @@ class YOLO11_ORT:
             outputs[0][0],
             width_radio=self.img_width / self.input_width,
             height_radio=self.img_height / self.input_height,
+            filter_threshold=0.60,
+            iou_threshold=0.45
         )
 
         for b, s, k in zip(boxes, scores, keypoints):
             b = list(map(round, b))
-            self.img = self.draw_kpts(self.img, k, self.img.shape, radius=5, kpt_line=True)
+            self.img = self.draw_kpts(self.img, k, self.img.shape[:2], radius=5, kpt_line=True)
 
             cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
             cv2.putText(self.img, "0: {:.2f}".format(s), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
@@ -606,6 +903,12 @@ if __name__ == "__main__":
     data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images"
     save_path = data_path + "_vis_yolo11_pose"
     os.makedirs(save_path, exist_ok=True)
+
+    # f_abs_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images\4_output_000000147.jpg"
+    # output = model.pose_detect(f_abs_path)
+    # cv2.namedWindow("output", cv2.WINDOW_NORMAL)
+    # cv2.imshow("output", output)
+    # cv2.waitKey(0)
 
     file_list = sorted(os.listdir(data_path))
     for f in tqdm(file_list):

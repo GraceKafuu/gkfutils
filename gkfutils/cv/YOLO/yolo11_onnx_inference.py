@@ -86,7 +86,7 @@ class Colors:
 
 class YOLO11_ORT:
     """YOLO model for handling inference and visualization."""
-    def __init__(self, onnx_model, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
+    def __init__(self, onnx_model, num_kpt=17, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
         """
         Initializes an instance of the YOLOv8 class.
 
@@ -96,6 +96,7 @@ class YOLO11_ORT:
             confidence_thres: Confidence threshold for filtering detections.
             iou_thres: IoU (Intersection over Union) threshold for non-maximum suppression.
         """
+        self.num_kpt = num_kpt
         self.onnx_model = onnx_model
         self.confidence_thres = confidence_thres
         self.iou_thres = iou_thres
@@ -412,7 +413,7 @@ class YOLO11_ORT:
             boxes[:, 2] *= width_radio
             boxes[:, 3] *= height_radio
 
-            keypoints = keypoints.reshape([-1, 17, 3])
+            keypoints = keypoints.reshape([-1, self.num_kpt, 3])
             keypoints[:, :, 0] *= width_radio
             keypoints[:, :, 1] *= height_radio
 
@@ -512,6 +513,36 @@ class YOLO11_ORT:
         else:
             return "Sitting"
 
+    def sitting_or_standing_detect(self, img_path):
+        """
+        Performs inference using an ONNX model and returns the output image with drawn detections.
+
+        Returns:
+            output_img: The output image with drawn detections.
+        """
+        
+        # Preprocess the image data
+        img_data = self.preprocess(img_path)
+
+        # Run inference using the preprocessed image data
+        outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+
+        boxes, scores, keypoints = self.pose_postprocess(
+            outputs[0][0],
+            width_radio=self.img_width / self.input_width,
+            height_radio=self.img_height / self.input_height,
+        )
+
+        for b, s, k in zip(boxes, scores, keypoints):
+            b = list(map(round, b))
+            self.img = self.draw_kpts(self.img, k, self.img.shape, radius=5, kpt_line=True)
+
+            print("img_path: {}".format(img_path))
+            res = self.sitting_or_standing(k, angle_thr=145)
+            print("Res: {}\n".format(res))
+            cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
+            cv2.putText(self.img, "Person: {:.2f} {}".format(s, res), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+
     def pose_detect(self, img_path):
         """
         Performs inference using an ONNX model and returns the output image with drawn detections.
@@ -534,21 +565,19 @@ class YOLO11_ORT:
 
         for b, s, k in zip(boxes, scores, keypoints):
             b = list(map(round, b))
-            self.img = self.draw_kpts(self.img, k, self.img.shape[:-1], radius=5, kpt_line=True)
+            self.img = self.draw_kpts(self.img, k, self.img.shape, radius=5, kpt_line=True)
 
-            print("img_path: {}".format(img_path))
-            res = self.sitting_or_standing(k, angle_thr=145)
-            print("Res: {}\n".format(res))
             cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
-            cv2.putText(self.img, "Person: {:.2f} {}".format(s, res), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+            cv2.putText(self.img, "0: {:.2f}".format(s), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
 
         return self.img
 
 
 if __name__ == "__main__":
     # model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s.onnx"
-    model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
-    model = YOLO11_ORT(model_path)
+    # model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
+    model_path = r"D:\Gosion\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v2\weights\best.onnx"
+    model = YOLO11_ORT(model_path, num_kpt=2)
 
     # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images"
     # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_images"
@@ -564,10 +593,23 @@ if __name__ == "__main__":
     #     cv2.imwrite(f_dst_path, output)
 
 
-    f_abs_path = r"D:\Gosion\Projects\003.Sitting_Det\data\v1\val\images\192.168.45.192_01_20250117112730288.jpg"
-    output = model.pose_detect(f_abs_path)
-    # output = model.det_detect(f_abs_path)
+    # # f_abs_path = r"D:\Gosion\Projects\003.Sitting_Det\data\v1\val\images\192.168.45.192_01_20250117112730288.jpg"
+    # f_abs_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1_102_20250304\val\images\1_output_000000169.jpg"
+    # output = model.pose_detect(f_abs_path)
+    # # output = model.det_detect(f_abs_path)
 
-    cv2.namedWindow("output", cv2.WINDOW_NORMAL)
-    cv2.imshow("output", output)
-    cv2.waitKey(0)
+    # cv2.namedWindow("output", cv2.WINDOW_NORMAL)
+    # cv2.imshow("output", output)
+    # cv2.waitKey(0)
+
+
+    data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images"
+    save_path = data_path + "_vis_yolo11_pose"
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = sorted(os.listdir(data_path))
+    for f in tqdm(file_list):
+        f_abs_path = data_path + "/{}".format(f)
+        f_dst_path = save_path + "/{}".format(f)
+        output = model.pose_detect(f_abs_path)
+        cv2.imwrite(f_dst_path, output)

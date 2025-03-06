@@ -3431,6 +3431,250 @@ def labelme_to_voc(data_path):
             xml.write('</annotation>')
 
 
+def labelme_det_kpt_to_yolo_labels(data_path, class_list, keypoint_list):
+    img_path = data_path + "/images"
+    json_path = data_path + "/jsons"
+
+    save_path = make_save_path(data_path=data_path, relative=".", add_str="yolo_format")
+    img_save_path = save_path + "/images"
+    lbl_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(lbl_save_path, exist_ok=True)
+    
+    file_list = get_file_list(img_path)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        img_src_path = img_path + "/{}".format(f)
+        json_src_path = json_path + "/{}.json".format(fname)
+            
+        img = cv2.imread(img_src_path)
+
+        if not os.path.exists(json_src_path): continue
+
+        with open(json_src_path) as json_file:
+            json_data = json.load(json_file)
+
+        h,w = img.shape[:2]
+        # 步骤：
+        # 1. 找出所有的矩形，记录下矩形的坐标，以及对应group_id
+        # 2. 遍历所有的head和tail，记下点的坐标，以及对应group_id，加入到对应的矩形中
+        # 3. 转为yolo格式
+
+        # rectangles = {}
+        rectangles = []
+        # 遍历初始化
+        for shape in json_data["shapes"]:
+            label = shape["label"] # pen, head, tail
+            group_id = shape["group_id"] # 0, 1, 2, ...
+            points = shape["points"] # x,y coordinates
+            shape_type = shape["shape_type"]
+
+            # 只处理矩形
+            if shape_type == "rectangle" and label == "torn":
+                # if group_id not in rectangles:
+                #     rectangles[group_id] = {
+                #         "label": label,
+                #         "rect": points[0] + points[1],  # Rectangle [x1, y1, x2, y2]
+                #         "keypoints_list": []
+                #     }
+
+                rectangles.append(points[0] + points[1])
+
+        # 遍历更新，将点加入对应group_id的矩形中
+        # for keypoint in keypoint_list:
+        #     for shape in json_data["shapes"]:
+        #         label = shape["label"]
+        #         group_id = shape["group_id"]
+        #         points = shape["points"]
+        #         # 如果匹配到了对应的keypoint
+        #         if label == keypoint:
+        #             rectangles[group_id]["keypoints_list"].append(points[0])
+
+        # for shape in json_data["shapes"]:
+        #     label = shape["label"]
+        #     group_id = shape["group_id"]
+        #     points = shape["points"]
+        #     # 如果匹配到了对应的keypoint
+        #     if label in keypoint_list:
+        #         rectangles[group_id]["keypoints_list"].append(points[0])
+
+        keypoints = []
+        for shape in json_data["shapes"]:
+            label = shape["label"]
+            group_id = shape["group_id"]
+            points = shape["points"]
+            # 如果匹配到了对应的keypoint
+            if label in keypoint_list:
+                keypoints.append(points[0])
+
+        
+        # 转为yolo格式
+        img_dst_path = img_save_path + "/{}".format(f)
+        shutil.copy(img_src_path, img_dst_path)
+
+        yolo_dst_path = lbl_save_path + "/{}.txt".format(fname)
+        with open(yolo_dst_path, "w") as f:
+
+            yolo_list = []
+            for rectangle in rectangles:
+                result_list  = []
+                # label_id = class_list.index(rectangle["label"])
+                # x1,y1,x2,y2
+                # x1,y1,x2,y2 = rectangle["rect"]
+                x1,y1,x2,y2 = rectangle
+                # center_x, center_y, width, height
+                center_x = (x1+x2)/2
+                center_y = (y1+y2)/2
+                width = abs(x1-x2)
+                height = abs(y1-y2)
+                # normalize
+                center_x /= w
+                center_y /= h
+                width /= w
+                height /= h
+
+                # 保留6位小数
+                center_x = round(center_x, 6)
+                center_y = round(center_y, 6)
+                width = round(width, 6)
+                height = round(height, 6)
+
+
+                # 添加 label_id, center_x, center_y, width, height
+                label_id = 0
+                result_list = [label_id, center_x, center_y, width, height]
+            
+                # 添加 p1_x, p1_y, p1_v, p2_x, p2_y, p2_v
+                # for point in rectangle["keypoints_list"]:
+
+                points_bbox = []
+                for point in keypoints:
+                    x,y = point
+                    x,y = int(x), int(y)
+
+                    if x > x1 and x < x2 and y > y1 and y < y2:
+                        # normalize
+                        x /= w
+                        y /= h
+                        # 保留6位小数
+                        x = round(x, 6)
+                        y = round(y, 6)
+                        
+                        # result_list.extend([x,y,2])
+                        points_bbox.append([x,y,2])
+
+                assert len(points_bbox) == 2, "len(points_bbox) != 2"
+                if points_bbox[0][0] > points_bbox[1][0]:
+                    points_bbox = points_bbox[::-1]
+                    print("points_bbox = points_bbox[::-1]")
+
+                result_list.extend(points_bbox[0])
+                result_list.extend(points_bbox[1])
+
+                yolo_list.append(result_list)
+                
+            
+            for yolo in yolo_list:
+                # for i in range(len(yolo)):
+                #     if i == 0:
+                #         f.write(str(yolo[i]))
+                #     else:
+                #         f.write(" " + str(yolo[i]))
+                # f.write("\n")
+
+                content = " ".join([str(i) for i in yolo]) + "\n"
+                f.write(content)
+
+
+def labelbee_multi_step_det_kpt_to_yolo_labels(data_path, save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1):
+    """
+    Usually labelbee's class 0 is background, 1 is the first class.
+    So labelbee -> yolo: cls_id = cls_id + cls_plus, where cls_plus == -1.
+    """
+    img_path = data_path + "/images"
+    json_path = data_path + "/jsons"
+
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "yolo_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    txt_save_path = save_path + "/labels"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(txt_save_path, exist_ok=True)
+
+    json_list = sorted(os.listdir(json_path))
+    for j in tqdm(json_list):
+        try:
+            img_name_ws= os.path.splitext(j)[0]  # img_name_with_suffix
+            img_name = os.path.splitext(img_name_ws)[0]
+
+            json_abs_path = json_path + "/{}".format(j)
+            json_ = json.load(open(json_abs_path, 'r', encoding='utf-8'))
+            if not json_: continue
+            imgsz = (json_["height"], json_["width"])
+
+            step_1_result = json_["step_1"]["result"]
+            step_2_result = json_["step_2"]["result"]
+            if not step_1_result: continue
+            if not step_2_result: continue
+
+            if copy_images:
+                img_src_path = img_path + "/{}".format(img_name_ws)
+                img_dst_path = img_save_path + "/{}".format(img_name_ws)
+                shutil.copy(img_src_path, img_dst_path)
+
+            len_s1_result = len(step_1_result)
+            len_s2_result = len(step_2_result)
+            assert len_s1_result * 2 == len_s2_result, "len_s1_result * 2 != len_s2_result"
+
+            txt_dst_path = txt_save_path + "/{}.txt".format(img_name)
+            with open(txt_dst_path, "w", encoding="utf-8") as fw:
+                for i in range(len_s1_result):
+                    cls_id = int(step_1_result[i]["attribute"])
+                    rect_curr_id = str(step_1_result[i]["id"])
+
+                    x = step_1_result[i]["x"]
+                    y = step_1_result[i]["y"]
+                    w = step_1_result[i]["width"]
+                    h = step_1_result[i]["height"]
+                    voc_bbx = (x, y, x + w, y + h)
+
+                    print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_dst_path)
+                    bb = bbox_voc_to_yolo(imgsz, voc_bbx)
+                    # txt_content = "{}".format(cls_id + cls_plus) + " " + " ".join([str(b) for b in bb]) + "\n"
+                    txt_content = "{}".format(cls_id + cls_plus) + " " + " ".join([str(b) for b in bb])
+
+                    point_content_list = []
+                    for j in range(len_s2_result):
+                        point_curr_id = step_2_result[j]["id"]
+                        point_src_id = str(step_2_result[j]["sourceID"])
+                        order = step_2_result[j]["order"]
+
+                        if point_src_id == rect_curr_id:
+                            px = step_2_result[j]["x"]
+                            py = step_2_result[j]["y"]
+                            px /= imgsz[1]
+                            py /= imgsz[0]
+                            point_content_list.append([px, py, order])
+
+                    point_content_list = sorted(point_content_list, key=lambda x: x[2])
+                    point_content = ""
+                    for p in point_content_list:
+                        point_content += " " + " ".join([str(p[0]), str(p[1]), str(2)])
+
+                    txt_content_new = txt_content + point_content + "\n"
+                    fw.write(txt_content_new)
+
+        except Exception as Error:
+            print(Error)
+
+    print("OK!")
+
+
+
 def vis_yolo_labels(data_path, print_flag=True, color_num=1000, rm_small_object=False, rm_size=32):
     colors = []
     for i in range(color_num * 2):
@@ -9453,12 +9697,15 @@ def remove_corrupt_image(data_path):
 
 
 def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255), apply_mask=True):
+    h_crop = 68
+    img = img[h_crop:, :]
     img_orig = img.copy()
     if apply_mask:
         # 640 * 512, (620, 68) (640, 445)
         imgsz = img.shape[:2]
-        rh1, rh2 = 68 / 512, 445 / 512
-        rw1, rw2 = 620 / 640, 640 / 640
+        # rh1, rh2 = 68 / 512, 445 / 512
+        rh1, rh2 = (68 - h_crop) / imgsz[0], (445 - h_crop) / imgsz[0]
+        rw1, rw2 = 620 / imgsz[1], 640 / imgsz[1]
         img[int(rh1 * imgsz[0]):int(rh2 * imgsz[0]), int(rw1 * imgsz[1]):int(rw2 * imgsz[1])] = (0, 0, 0)
         
     hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -9490,14 +9737,14 @@ def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255
     total_pixel_count = img.shape[0] * img.shape[1]
 
     # 计算指定颜色区域占整张图像的面积比例
-    color_area_ratio = white_area / total_pixel_count
+    color_area_ratio = white_area / total_pixel_count * 100
 
     # 输出结果
     # print(f"指定颜色区域的像素数量: {white_area}")
     # print(f"图像的总像素数量: {total_pixel_count}")
-    print(f"指定颜色区域占整张图像的面积比例: {color_area_ratio:.12%}\n")
+    print(f"指定颜色区域占整张图像的面积比例: {color_area_ratio:.6f}\n")
 
-    rs = "{}/{}_{:.12%}".format(white_area, total_pixel_count, color_area_ratio)
+    rs = "{}_{}_{:.6f}".format(white_area, total_pixel_count, color_area_ratio)
 
 
     # # 显示原图和结果
@@ -9517,9 +9764,50 @@ def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255
     return result, color_area_ratio, rs
 
                     
+def extract_parabolic_curve_area(img_path):
+    # 读取图片
+    image = cv2.imread(img_path)
+    if image is None:
+        print("Error: 图片未找到，请检查路径。")
+        exit()
 
+    # 获取图片的高度和宽度
+    height, width = image.shape[:2]
 
+    # 定义抛物线的参数 (y = a*(x - x0)^2 + y0)
+    a = 0.001  # 抛物线的开口大小
+    x0 = width // 2  # 抛物线的原点 x 坐标（可调整）
+    # y0 = height // 2  # 抛物线的原点 y 坐标（可调整）
+    y0 = height // 4  # 抛物线的原点 y 坐标（可调整）
 
+    # 定义距离抛物线的上下边缘的像素数
+    N = 50
+
+    # 创建一个与图片大小相同的空白掩码
+    mask = np.zeros_like(image)
+
+    # 遍历每一列
+    for x in range(width):
+        # 计算抛物线的 y 值（以 (x0, y0) 为原点）
+        y_parabola = int(a * (x - x0) ** 2 + y0)
+        
+        # 计算上边缘和下边缘的 y 值
+        y_upper = max(0, y_parabola - N)
+        y_lower = min(height - 1, y_parabola + N)
+        
+        # 在掩码上绘制矩形区域
+        mask[y_upper:y_lower, x] = 255
+
+    # 使用掩码提取感兴趣的区域
+    result = cv2.bitwise_and(image, mask)
+
+    # 显示原始图片和提取的区域
+    cv2.imshow('Original Image', image)
+    cv2.imshow('Extracted Region', result)
+
+    # 等待按键并关闭窗口
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 
@@ -9646,13 +9934,16 @@ if __name__ == '__main__':
 
     # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4_add")  # yolo_format 路径下是 images 和 labels
     # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det\v1")  # labelbee_format 路径下是 images 和 jsons
+
+    # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\train", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det\v1_300\train".replace("\\", "/"), select_num=6, move_or_copy="move", select_mode=0)
+    random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\train".replace("\\", "/"), select_num=96, move_or_copy="move", select_mode=0)
 
-    ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\video\20250301", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\video\20250301", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -9686,7 +9977,7 @@ if __name__ == '__main__':
 
     # remove_corrupt_image(data_path=r"D:\Gosion\Projects\data\silie_data\train\not_torn")
 
-    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250226"
+    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250304"
     # save_path = make_save_path(data_path, relative='.', add_str="result")
     # file_list = get_file_list(data_path)
     # ratio_list = []
@@ -9695,15 +9986,17 @@ if __name__ == '__main__':
     #     f_abs_path = os.path.join(data_path, f)
     #     print("{}: ".format(f_abs_path))
     #     img = cv2.imread(f_abs_path)
-    #     res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 221), upper=(180, 30, 255), apply_mask=True)
+    #     res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 200), upper=(180, 30, 255), apply_mask=True)
     #     ratio_list.append(color_area_ratio)
-    #     res_path = "{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
+    #     res_path = r"{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
     #     cv2.imwrite(res_path, res)
 
     # mean_r = np.mean(ratio_list)
     # min_r = np.min(ratio_list)
     # max_r = np.max(ratio_list)
-    # print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r * 100, min_r * 100, max_r * 100))
+    # print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r, min_r, max_r))
+
+    # extract_parabolic_curve_area(img_path=r"D:\Gosion\Projects\data\images\southeast.jpg")
     
     
 

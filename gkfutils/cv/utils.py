@@ -7415,7 +7415,7 @@ class CLS_ORT:
         
         return cls
     
-    
+
 def create_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 160), randint_low=10, randint_high=51, hw_dis=100, dst_num=20000):
     img_list = sorted(os.listdir(data_path))
 
@@ -9747,7 +9747,8 @@ def remove_corrupt_image(data_path):
 
 
 def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255), apply_mask=True):
-    h_crop = 68
+    # h_crop = 68
+    h_crop = 0
     img = img[h_crop:, :]
     img_orig = img.copy()
     if apply_mask:
@@ -9991,7 +9992,7 @@ if __name__ == '__main__':
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\train".replace("\\", "/"), select_num=96, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\train".replace("\\", "/"), select_num=96, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\video\20250301", fps=25)
 
@@ -10027,24 +10028,25 @@ if __name__ == '__main__':
 
     # remove_corrupt_image(data_path=r"D:\Gosion\Projects\data\silie_data\train\not_torn")
 
-    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250304"
-    # save_path = make_save_path(data_path, relative='.', add_str="result")
-    # file_list = get_file_list(data_path)
-    # ratio_list = []
-    # for f in file_list:
-    #     fname = os.path.splitext(f)[0]
-    #     f_abs_path = os.path.join(data_path, f)
-    #     print("{}: ".format(f_abs_path))
-    #     img = cv2.imread(f_abs_path)
-    #     res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 200), upper=(180, 30, 255), apply_mask=True)
-    #     ratio_list.append(color_area_ratio)
-    #     res_path = r"{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
-    #     cv2.imwrite(res_path, res)
+    data_path = r"D:\Gosion\Projects\GuanWangLNG\20250307"
+    save_path = make_save_path(data_path, relative='.', add_str="result")
+    file_list = get_file_list(data_path)
+    ratio_list = []
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(data_path, f)
+        print("{}: ".format(f_abs_path))
+        # img = cv2.imread(f_abs_path)
+        img = cv2.imdecode(np.fromfile(f_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+        res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 200), upper=(180, 30, 255), apply_mask=True)
+        ratio_list.append(color_area_ratio)
+        res_path = r"{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
+        cv2.imwrite(res_path, res)
 
-    # mean_r = np.mean(ratio_list)
-    # min_r = np.min(ratio_list)
-    # max_r = np.max(ratio_list)
-    # print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r, min_r, max_r))
+    mean_r = np.mean(ratio_list)
+    min_r = np.min(ratio_list)
+    max_r = np.max(ratio_list)
+    print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r, min_r, max_r))
 
     # extract_parabolic_curve_area(img_path=r"D:\Gosion\Projects\data\images\southeast.jpg")
     

@@ -7366,6 +7366,56 @@ class GKFCLS():
         return acc_i
     
 
+class CLS_ORT:
+    def __init__(self, model_path):
+        self.model_path = model_path
+        self.ort_session = self.get_ort_session(self.model_path)
+        self.inputs = self.ort_session.get_inputs()[0]
+        self.outputs = self.ort_session.get_outputs()[0]
+        self.input_name = self.inputs.name
+        self.output_name =self.outputs.name
+        self.inputsz = (self.inputs.shape[2], self.inputs.shape[3])
+
+    def get_ort_session(self, model_path):
+        providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+        ort_session = ort.InferenceSession(model_path, providers=providers)
+        return ort_session
+
+    def pre_process(self, img, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):
+        """
+        # mean_ = np.array([0.485, 0.456, 0.406])
+        # std_ = np.array([0.229, 0.224, 0.225])
+        """
+        # img = (img / 255. - np.array(mean)) / np.array(std)
+        img = (img / 255. - 0.5) / 0.5
+        # img = img / 255.
+        img_x = img.transpose(2, 0, 1)
+        img_x = img_x[np.newaxis, :]
+        img_x = img_x.astype(np.float32)
+        return img_x
+
+    def softmax(self, x, axis=None):
+        ex = np.exp(x - np.max(x, axis=axis, keepdims=True))
+        return ex / np.sum(ex, axis=axis, keepdims=True)
+
+    def post_process(self, ort_out):
+        # ort_out = ort_outs[0][0]
+        out = self.softmax(np.array(ort_out), axis=0)
+        cls = np.argmax(out)
+        return cls
+
+    def inference(self, img):
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # img_cp = img
+        img = cv2.resize(img, self.inputsz)
+        img = self.pre_process(img)
+
+        ort_outs = self.ort_session.run(["output"], {self.inputs.name: img})
+        cls = self.post_process(ort_outs[0][0])
+        
+        return cls
+    
+    
 def create_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 160), randint_low=10, randint_high=51, hw_dis=100, dst_num=20000):
     img_list = sorted(os.listdir(data_path))
 

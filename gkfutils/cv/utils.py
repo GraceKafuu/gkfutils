@@ -10074,8 +10074,18 @@ def extract_parabolic_curve_area(img_path):
     cv2.destroyAllWindows()
 
 
-
-
+def adjust_putText():
+    """
+    cv2.putText()遇到了问题：原本是将字符显示在目标框的上方，但是有的目标框靠近图像上边缘导致字符超出图片显示不了。
+    可以通过检测目标框的位置来判断是否将文本显示在框的上方或下方。如果目标框靠近图像的上边缘，将文本显示在框的下方；否则，显示在框的上方。
+    """
+    pass
+    # (text_width, text_height), baseline = cv2.getTextSize(str(dis), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+    # if b[1] - text_height - 10 < 0:  # 如果文本超出图像上边缘
+    #     text_y = b[3] + text_height + 8  # 将文本显示在框的下方
+    # else:
+    #     text_y = b[1] - 5  # 将文本显示在框的上方
+    # cv2.putText(img, "{:.2f}".format(dis), (b[0], text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
 
 
 

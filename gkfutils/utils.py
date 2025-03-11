@@ -1178,8 +1178,8 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels_1_2", path2=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels")
-    rename_files(data_path=r"D:\Gosion\Projects\GuanWangLNG\20250304", new_name_prefix="20250304", start_num=0)
-    # rename_files(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\010\labels", new_name_prefix="smoking_v4_010", start_num=0)
+    rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\images", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
+    rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\labels", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
     # dir_list = os.listdir(data_path)
@@ -1192,9 +1192,9 @@ if __name__ == '__main__':
 
     # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
-    # merge_dirs(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\all")
+    # merge_dirs(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\videos\20250308_frames")
 
-    # random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\all_merged", mvcp="move", select_num=200)
+    # random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged", mvcp="move", select_num=550)
 
     # process_via_filename(path1=r"E:\wujiahu\003\v4_add_aug_0\images", path2=r"E:\wujiahu\003\v4_add_aug_0\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     

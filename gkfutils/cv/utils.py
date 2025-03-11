@@ -2200,7 +2200,7 @@ def bbox_voc_to_yolo(imgsz, box):
     return [x, y, w, h]
 
 
-def bbox_yolo_to_voc(imgsz, bbx):
+def bbox_yolo_to_voc(imgsz, bbx, return_decimal=False):
     """
     YOLO --> VOC
     !!!!!! orig: (bbx, imgsz) 20230329 changed to (imgsz, bbx)
@@ -2209,10 +2209,17 @@ def bbox_yolo_to_voc(imgsz, bbx):
     :return: [x_min, y_min, x_max, y_max]
     """
     bbx_ = (bbx[0] * imgsz[1], bbx[1] * imgsz[0], bbx[2] * imgsz[1], bbx[3] * imgsz[0])
-    x_min = int(round(bbx_[0] - (bbx_[2] / 2)))
-    y_min = int(round(bbx_[1] - (bbx_[3] / 2)))
-    x_max = int(round(bbx_[0] + (bbx_[2] / 2)))
-    y_max = int(round(bbx_[1] + (bbx_[3] / 2)))
+
+    if return_decimal:
+        x_min = bbx_[0] - (bbx_[2] / 2)
+        y_min = bbx_[1] - (bbx_[3] / 2)
+        x_max = bbx_[0] + (bbx_[2] / 2)
+        y_max = bbx_[1] + (bbx_[3] / 2)
+    else:
+        x_min = int(round(bbx_[0] - (bbx_[2] / 2)))
+        y_min = int(round(bbx_[1] - (bbx_[3] / 2)))
+        x_max = int(round(bbx_[0] + (bbx_[2] / 2)))
+        y_max = int(round(bbx_[1] + (bbx_[3] / 2)))
 
     if x_min < 0: x_min = 0
     if y_min < 0: y_min = 0
@@ -2253,6 +2260,14 @@ def write_labelbee_det_json(bbx, imgsz):
     step_1 = {}
     step_1["toolName"] = "rectTool"
 
+    ids = []
+    while (len(ids) < len(bbx)):
+        id_ = random.sample(chars, 8)
+        id_ = "".join([d for d in id_])
+        if id_ not in ids:
+            ids.append(id_)
+    assert len(ids) == len(bbx), "len(ids) != len(bbxs)"
+
     result = []
     for i in range(len(bbx)):
         result_dict = {}
@@ -2262,8 +2277,9 @@ def write_labelbee_det_json(bbx, imgsz):
         result_dict["height"] = bbx[i][3] - bbx[i][1]
         result_dict["attribute"] = "{}".format(bbx[i][4])
         result_dict["valid"] = True
-        id_ = random.sample(chars, 8)
-        result_dict["id"] = "".join(d for d in id_)
+        # id_ = random.sample(chars, 8)
+        # result_dict["id"] = "".join(d for d in id_)
+        result_dict["id"] = ids[i]
         result_dict["sourceID"] = ""
         result_dict["textAttribute"] = ""
         result_dict["order"] = i + 1
@@ -3672,6 +3688,167 @@ def labelbee_multi_step_det_kpt_to_yolo_labels(data_path, save_path="", copy_ima
             print(Error)
 
     print("OK!")
+
+
+def write_labelbee_det_kpt_json(bbxs, kpts, imgsz):
+    """
+    {"x":316.6583427922815,"y":554.4245175936436,"width":1419.1872871736662,"height":556.1679909194097,
+    "attribute":"1","valid":true,"id":"tNd2HY6C","sourceID":"","textAttribute":"","order":1}
+    :param bbx: x1, y1, x2, y2
+    :param imgsz: H, W
+    :return:
+    """
+    assert len(bbxs) == len(kpts), "len(bbxs) != len(kpts)"
+
+    chars = ""
+    for i in range(48, 48 + 9):
+        chars += chr(i)
+    for j in range(65, 65 + 25):
+        chars += chr(j)
+    for k in range(97, 97 + 25):
+        chars += chr(k)
+
+    j = {}
+    j["width"] = imgsz[1]
+    j["height"] = imgsz[0]
+    j["valid"] = True
+    j["rotate"] = 0
+
+    # --------------------------------
+    step_1 = {}
+    step_1["dataSourceStep"] = 0
+    step_1["toolName"] = "rectTool"
+
+    ids = []
+    while (len(ids) < len(bbxs)):
+        id_ = random.sample(chars, 8)
+        id_ = "".join([d for d in id_])
+        if id_ not in ids:
+            ids.append(id_)
+    assert len(ids) == len(bbxs), "len(ids) != len(bbxs)"
+
+    result = []
+    for i in range(len(bbxs)):
+        result_dict = {}
+        result_dict["x"] = bbxs[i][0]
+        result_dict["y"] = bbxs[i][1]
+        result_dict["width"] = bbxs[i][2] - bbxs[i][0]
+        result_dict["height"] = bbxs[i][3] - bbxs[i][1]
+        result_dict["attribute"] = "{}".format(bbxs[i][4])
+        result_dict["valid"] = True
+        result_dict["id"] = ids[i]
+        result_dict["sourceID"] = ""
+        result_dict["textAttribute"] = ""
+        result_dict["order"] = i + 1
+        result.append(result_dict)
+
+    step_1["result"] = result
+    j["step_1"] = step_1
+
+    # --------------------------------
+    step_2 = {}
+    step_2["dataSourceStep"] = 1
+    step_2["toolName"] = "pointTool"
+
+    point_ids = []
+    while (len(point_ids) < len(kpts)):
+        pid_ = random.sample(chars, 8)
+        pid_ = "".join([d for d in pid_])
+        if pid_ not in ids and pid_ not in point_ids:
+            point_ids.append(pid_)
+    assert len(point_ids) == len(kpts), "len(point_ids) != len(kpts)"
+    
+    point_result = []
+    for i in range(len(kpts)):
+        for n in range(2):
+            point_result_dict = {}
+            if n == 0:
+                point_result_dict["x"] = kpts[i][0]
+                point_result_dict["y"] = kpts[i][1]
+            else:
+                point_result_dict["x"] = kpts[i][2]
+                point_result_dict["y"] = kpts[i][3]
+            if n == 0:
+                point_result_dict["attribute"] = "1"
+            else:
+                point_result_dict["attribute"] = "2"
+            point_result_dict["valid"] = True
+            point_result_dict["id"] = point_ids[i]
+            point_result_dict["sourceID"] = ids[i]
+            point_result_dict["textAttribute"] = ""
+            if n == 0:
+                point_result_dict["order"] = 1
+            else:
+                point_result_dict["order"] = 2
+            point_result.append(point_result_dict)
+
+    step_2["result"] = point_result
+    j["step_2"] = step_2
+
+    return j
+
+
+def det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path, save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True):
+    """
+    Usually labelbee's class 0 is background, 1 is the first class.
+    So yolo -> labelbee: class = int(l[0]) + cls_plus, where cls_plus == 1.
+    """
+    img_path = data_path + "/images"
+    txt_path = data_path + "/labels"
+
+    if save_path is None or save_path == "":
+        save_path = make_save_path(data_path, ".", "labelbee_format")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
+    img_save_path = save_path + "/images"
+    json_save_path = save_path + "/jsons"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(json_save_path, exist_ok=True)
+
+    file_list = sorted(os.listdir(img_path))
+
+    for f in tqdm(file_list):
+        file_name = os.path.splitext(f)[0]
+        img_src_path = img_path + "/{}".format(f)
+        txt_src_path = txt_path + "/{}.txt".format(file_name)
+        if not os.path.exists(img_src_path): continue
+        if not os.path.exists(txt_src_path): continue
+
+        img = cv2.imread(img_src_path)
+        if img is None: continue
+        imgsz = img.shape[:2]
+
+        if copy_images:
+            img_dst_path = img_save_path + "/{}".format(f)
+            shutil.copy(img_src_path, img_dst_path)
+        json_dst_path = json_save_path + "/{}.json".format(f)
+
+        step_one_bbx = []
+        step_two_kpt = []
+        with open(txt_src_path, "r", encoding="utf-8") as fr:
+            lines = fr.readlines()
+            for line in lines:
+                l = line.strip().split(" ")
+                bbx = list(map(float, l[1:5]))
+                voc_bbx = bbox_yolo_to_voc(imgsz, bbx, return_decimal=return_decimal)
+                print_small_bbx_message(voc_bbx, small_bbx_thresh, txt_src_path)
+                
+                voc_bbx.append(int(l[0]) + cls_plus)
+                step_one_bbx.append(voc_bbx)
+
+                yolo_pts = list(map(float, l[5:7])) + list(map(float, l[8:10]))
+                voc_pts = [yolo_pts[0] * imgsz[1], yolo_pts[1] * imgsz[0], yolo_pts[2] * imgsz[1], yolo_pts[3] * imgsz[0]]
+                step_two_kpt.append(voc_pts)
+
+        with open(json_dst_path, "w", encoding="utf-8") as jw:
+            jw.write(json.dumps(write_labelbee_det_kpt_json(step_one_bbx, step_two_kpt, imgsz)))
+
+    print("OK!")
+
+
+
+
 
 
 
@@ -5203,6 +5380,12 @@ def cal_brightness(img):
     else:
         k = abs(da) / m
         return k[0], da
+
+
+def cal_brightness_v2(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # 灰度化
+    brightness = np.mean(gray)
+    return brightness
 
 
 def opencv_add_chinese_text(img, text, left, top, font_path="simsun.ttc", textColor=(0, 255, 0), textSize=20):
@@ -9746,16 +9929,41 @@ def remove_corrupt_image(data_path):
             shutil.move(img_abs_path, save_path)
 
 
+def LNG_connected_component_analysis(img, area_low=100, area_high=1000, connectivity=8):
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=connectivity)
+    areas = stats[:, -1]  # stats[:, cv2.CC_STAT_AREA]
+    areas_new = []
+    h_new = []
+    w_new = []
+    for i in range(1, num_labels):
+        if areas[i] > area_low and areas[i] < area_high:
+            areas_new.append(areas[i])
+
+        if areas[i] > area_low / 2:
+            h_new.append(stats[i, cv2.CC_STAT_HEIGHT])
+            w_new.append(stats[i, cv2.CC_STAT_WIDTH])
+
+    if len(areas_new) == 0:
+        return num_labels, 0, 0, 0
+    
+    area_avg = np.mean(areas_new)
+    h_avg = np.mean(h_new)
+    w_avg = np.mean(w_new)
+    return num_labels, area_avg, h_avg, w_avg
+            
+
+
 def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255), apply_mask=True):
     # h_crop = 68
     h_crop = 0
+    assert h_crop <= 68, "h_crop must be less than 68!"
     img = img[h_crop:, :]
     img_orig = img.copy()
     if apply_mask:
         # 640 * 512, (620, 68) (640, 445)
         imgsz = img.shape[:2]
         # rh1, rh2 = 68 / 512, 445 / 512
-        rh1, rh2 = (68 - h_crop) / imgsz[0], (445 - h_crop) / imgsz[0]
+        rh1, rh2 = (68 - h_crop) / imgsz[0], (512 - h_crop - 68) / imgsz[0]
         rw1, rw2 = 620 / imgsz[1], 640 / imgsz[1]
         img[int(rh1 * imgsz[0]):int(rh2 * imgsz[0]), int(rw1 * imgsz[1]):int(rw2 * imgsz[1])] = (0, 0, 0)
         
@@ -9780,6 +9988,11 @@ def cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 100), upper=(80, 80, 255
     _, bw_image = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
 
     # cv2.imwrite(r"D:\Gosion\Projects\GuanWangLNG\cewen\wendutu_result\bw_image.jpg", bw_image)
+
+
+    num_labels, area_avg, h_avg, w_avg = LNG_connected_component_analysis(bw_image, area_low=100, area_high=1000, connectivity=8)
+    print(f"num_labels: {num_labels}, area_avg: {area_avg}, h_avg: {h_avg}, w_avg: {w_avg}")
+
  
     # white_area = np.sum(bw_image == 255)
     white_area = cv2.countNonZero(bw_image)
@@ -9876,9 +10089,8 @@ def extract_parabolic_curve_area(img_path):
 
 
 
-
 if __name__ == '__main__':
-    # pass
+    pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
     # extract_one_gif_frames(gif_path="")
     # extract_one_video_frames(video_path="", gap=5)
@@ -9987,14 +10199,15 @@ if __name__ == '__main__':
     # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det\v1")  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
-    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\train", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3_\train\labelbee_format\500", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\train".replace("\\", "/"), select_num=96, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3_\train\labelbee_format\500_yolo_format".replace("\\", "/"), select_num=54, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\video\20250301", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\videos\20250308", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -10028,28 +10241,35 @@ if __name__ == '__main__':
 
     # remove_corrupt_image(data_path=r"D:\Gosion\Projects\data\silie_data\train\not_torn")
 
-    data_path = r"D:\Gosion\Projects\GuanWangLNG\20250307"
-    save_path = make_save_path(data_path, relative='.', add_str="result")
-    file_list = get_file_list(data_path)
-    ratio_list = []
-    for f in file_list:
-        fname = os.path.splitext(f)[0]
-        f_abs_path = os.path.join(data_path, f)
-        print("{}: ".format(f_abs_path))
-        # img = cv2.imread(f_abs_path)
-        img = cv2.imdecode(np.fromfile(f_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-        res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 200), upper=(180, 30, 255), apply_mask=True)
-        ratio_list.append(color_area_ratio)
-        res_path = r"{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
-        cv2.imwrite(res_path, res)
+    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250309"
+    # save_path = make_save_path(data_path, relative='.', add_str="result")
+    # file_list = get_file_list(data_path)
+    # ratio_list = []
+    # for f in file_list:
+    #     fname = os.path.splitext(f)[0]
+    #     f_abs_path = os.path.join(data_path, f)
+    #     print("{}: ".format(f_abs_path))
+    #     img = cv2.imread(f_abs_path)
+    #     # img = cv2.imdecode(np.fromfile(f_abs_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+    #     res, color_area_ratio, rs = cal_area_ratio_of_sepecific_color(img, lower=(0, 0, 200), upper=(180, 30, 255), apply_mask=True)
+    #     ratio_list.append(color_area_ratio)
+    #     res_path = r"{}/{}_{}.jpg".format(save_path, fname, rs.replace("%", ""))
+    #     cv2.imwrite(res_path, res)
 
-    mean_r = np.mean(ratio_list)
-    min_r = np.min(ratio_list)
-    max_r = np.max(ratio_list)
-    print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r, min_r, max_r))
+    # mean_r = np.mean(ratio_list)
+    # min_r = np.min(ratio_list)
+    # max_r = np.max(ratio_list)
+    # print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r, min_r, max_r))
 
     # extract_parabolic_curve_area(img_path=r"D:\Gosion\Projects\data\images\southeast.jpg")
-    
+
+    # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_0\images"
+    # file_list = get_file_list(data_path)
+    # for f in file_list:
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     img = cv2.imread(f_abs_path)
+    #     brightness = cal_brightness_v2(img)
+    #     print("{}: {}".format(f_abs_path, brightness))    
     
 
 

@@ -206,36 +206,36 @@ def image_processing_aug_det_data(data_path):
         # else:
         #     img = stretch(img, random=True, p=p, r=(0.25, 1.25))
 
-        # rdm1 = np.random.choice(np.arange(5))
-        # if rdm1 == 0:
-        #     img = change_brightness(img, random=True, p=p, value=(-25, 25))
-        # # elif rdm1 == 1:
-        # #     img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
+        rdm1 = np.random.choice(np.arange(5))
+        if rdm1 == 0:
+            img = change_brightness(img, random=True, p=p, value=(-25, 25))
+        elif rdm1 == 1:
+            img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
         # elif rdm1 == 2:
         #     img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 25))
         # elif rdm1 == 3:
         #     img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
-        # else:
-        #     img = log_transformation(img, random=True, p=p)
+        else:
+            img = log_transformation(img, random=True, p=p)
 
-        # rdm2 = np.random.choice(np.arange(6))
-        # if rdm2 == 0:
-        #     img = gaussian_noise(img, random=True, p=p, mean=(0, 1), var=(0.1, 0.25))
-        # elif rdm2 == 1:
-        #     img = poisson_noise(img, random=True, p=p, n=(2, 5))
-        # elif rdm2 == 2:
-        #     img = sp_noise(img, random=True, p=p, salt_p=(0.01, 0.025), pepper_p=(0.01, 0.025))
-        # elif rdm2 == 3:
-        #     img = gaussian_blur(img, random=True, p=p)
+        rdm2 = np.random.choice(np.arange(6))
+        if rdm2 == 0:
+            img = gaussian_noise(img, random=True, p=p, mean=(0, 1), var=(0.1, 0.25))
+        elif rdm2 == 1:
+            img = poisson_noise(img, random=True, p=p, n=(2, 5))
+        elif rdm2 == 2:
+            img = sp_noise(img, random=True, p=p, salt_p=(0.01, 0.025), pepper_p=(0.01, 0.025))
+        elif rdm2 == 3:
+            img = gaussian_blur(img, random=True, p=p)
         # elif rdm2 == 4:
         #     img = motion_blur(img, random=True, p=p, angle=(-180, 180))
-        # else:
-        #     img = median_blur(img, random=True, p=p)
+        else:
+            img = median_blur(img, random=True, p=p)
         
-        rdm3 = np.random.choice(np.arange(2))
-        # img = color_distortion(img, random=True, p=p, value=(-360, 360))
-        # img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.95), sgain=(0.25, 0.95), vgain=(0.25, 0.95))
-        img = change_color(img, random=True, p=1, hue_shift=30)
+        # rdm3 = np.random.choice(np.arange(2))
+        # # img = color_distortion(img, random=True, p=p, value=(-360, 360))
+        # # img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.95), sgain=(0.25, 0.95), vgain=(0.25, 0.95))
+        # img = change_color(img, random=True, p=1, hue_shift=30)
         # if rdm3 == 0:
         #     img = color_distortion(img, random=True, p=p, value=(-360, 360))
         # else:
@@ -270,6 +270,9 @@ def image_processing_aug_det_data(data_path):
         # 以下还存在问题, 需要优化:
         # img = warp_and_deform(img, random=True, p=p, a=(5, 15), b=(1, 5), gridspace=(10, 20))
         # img = normalize(img, random=True, p=p, alpha=0, beta=1, norm_type=np.random.choice([cv2.NORM_MINMAX, cv2.NORM_L2]))  # 容易变黑图
+
+        brightness = cal_brightness_v2(img)
+        if brightness > 200: continue
 
         cv2.imwrite(img_dst_path, img)
         shutil.copy(lbl_abs_path, lbl_dst_path)
@@ -771,7 +774,7 @@ def cal_params_flops_test():
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
-    image_processing_aug_det_data(data_path=r"E:\wujiahu\003\v4_add")
+    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train")
     # make_border()
 
     # det_labels_convertion()

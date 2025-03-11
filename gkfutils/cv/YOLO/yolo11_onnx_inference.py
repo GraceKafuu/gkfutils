@@ -6,6 +6,7 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 from tqdm import tqdm
+import shutil
 
 
 class Colors:
@@ -344,6 +345,69 @@ def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None, normalize=False
         coords[..., 0] /= img0_shape[1]  # width
         coords[..., 1] /= img0_shape[0]  # height
     return coords
+
+
+def bbox_voc_to_yolo(imgsz, box):
+    """
+    VOC --> YOLO
+    :param imgsz: [H, W]
+    :param box:
+    orig: [xmin, xmax, ymin, ymax], deprecated;
+    new:  [xmin, ymin, xmax, ymax], 2024.03.29, WJH.
+    :return: [x, y, w, h]
+    """
+    dh = 1. / (imgsz[0])
+    dw = 1. / (imgsz[1])
+    # x = (box[0] + box[1]) / 2.0
+    # y = (box[2] + box[3]) / 2.0
+    # w = box[1] - box[0]
+    # h = box[3] - box[2]
+    x = (box[0] + box[2]) / 2.0
+    y = (box[1] + box[3]) / 2.0
+    w = box[2] - box[0]
+    h = box[3] - box[1]
+    x = int(round(x)) * dw
+    w = int(round(w)) * dw
+    y = int(round(y)) * dh
+    h = int(round(h)) * dh
+
+    if x < 0: x = 0
+    if y < 0: y = 0
+    if w > 1: w = 1
+    if h > 1: h = 1
+    assert x <= 1, "x: {}".format(x)
+    assert y <= 1, "y: {}".format(y)
+    assert w >= 0, "w: {}".format(w)
+    assert h >= 0, "h: {}".format(h)
+
+    return [x, y, w, h]
+
+
+def bbox_yolo_to_voc(imgsz, bbx):
+    """
+    YOLO --> VOC
+    !!!!!! orig: (bbx, imgsz) 20230329 changed to (imgsz, bbx)
+    :param bbx: yolo format bbx
+    :param imgsz: [H, W]
+    :return: [x_min, y_min, x_max, y_max]
+    """
+    bbx_ = (bbx[0] * imgsz[1], bbx[1] * imgsz[0], bbx[2] * imgsz[1], bbx[3] * imgsz[0])
+    x_min = int(round(bbx_[0] - (bbx_[2] / 2)))
+    y_min = int(round(bbx_[1] - (bbx_[3] / 2)))
+    x_max = int(round(bbx_[0] + (bbx_[2] / 2)))
+    y_max = int(round(bbx_[1] + (bbx_[3] / 2)))
+
+    if x_min < 0: x_min = 0
+    if y_min < 0: y_min = 0
+    if x_max > imgsz[1]: x_max = imgsz[1]
+    if y_max > imgsz[0]: y_max = imgsz[0]
+
+    assert x_min >= 0 and x_min <= imgsz[1], "x_min: {}".format(x_min)
+    assert y_min >= 0 and y_min <= imgsz[0], "y_min: {}".format(y_min)
+    assert x_max >= 0 and x_max <= imgsz[1], "x_max: {}".format(x_max)
+    assert y_max >= 0 and y_max <= imgsz[0], "y_max: {}".format(y_max)
+
+    return [x_min, y_min, x_max, y_max]
 
 
 class YOLO11_ORT:
@@ -868,6 +932,69 @@ class YOLO11_ORT:
             cv2.putText(self.img, "0: {:.2f}".format(s), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
 
         return self.img
+    
+    def pose_detect_generate_yolo_labels(self, data_path):
+        dirname = os.path.basename(data_path)
+        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_converted_yolo_labels".format(dirname)
+        img_save_path = save_path + "/images"
+        lbl_save_path = save_path + "/labels"
+        os.makedirs(img_save_path, exist_ok=True)
+        os.makedirs(lbl_save_path, exist_ok=True)
+
+        file_list = sorted(os.listdir(data_path))
+        for f in file_list:
+            fname = os.path.splitext(f)[0]
+            f_abs_path = data_path + "/{}".format(f)
+            img = cv2.imread(f_abs_path)
+            imgsz = img.shape[:2]
+
+            img_data = self.preprocess(img)
+
+            # Run inference using the preprocessed image data
+            outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+
+            boxes, scores, keypoints = self.pose_postprocess(
+                outputs[0][0],
+                width_radio=self.img_width / self.input_width,
+                height_radio=self.img_height / self.input_height,
+                filter_threshold=0.60,
+                iou_threshold=0.45
+            )
+
+            img_dst_path = img_save_path + "/{}".format(f)
+            if len(boxes) != 0:
+                shutil.copy(f_abs_path, img_dst_path)
+
+                lbl_dst_path = lbl_save_path + "/{}.txt".format(fname)
+
+                with open(lbl_dst_path, "w", encoding="utf-8") as f_wirte:
+                    for b, s, k in zip(boxes, scores, keypoints):
+                        yolo_box = bbox_voc_to_yolo(imgsz, b)
+
+                        pts_yolo = ""
+                        for i, k in enumerate(k):
+                            x_coord, y_coord = k[0], k[1]
+                            x_coord_yolo, y_coord_yolo = k[0] / imgsz[1], k[1] / imgsz[0]
+                            pts_k = [x_coord_yolo, y_coord_yolo, 2]
+                            
+                            if i == 0:
+                                pts_yolo += " ".join([str(ki) for ki in pts_k]) + " "
+                            else:
+                                pts_yolo += " ".join([str(ki) for ki in pts_k])
+
+                    
+                        line = "0 " + " ".join([str(bi) for bi in yolo_box]) + " " + pts_yolo + "\n"
+                        f_wirte.write(line)
+
+                    
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -900,19 +1027,23 @@ if __name__ == "__main__":
     # cv2.waitKey(0)
 
 
-    data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images"
-    save_path = data_path + "_vis_yolo11_pose"
-    os.makedirs(save_path, exist_ok=True)
+    # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images"
+    # save_path = data_path + "_vis_yolo11_pose"
+    # os.makedirs(save_path, exist_ok=True)
 
-    # f_abs_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images\4_output_000000147.jpg"
-    # output = model.pose_detect(f_abs_path)
-    # cv2.namedWindow("output", cv2.WINDOW_NORMAL)
-    # cv2.imshow("output", output)
-    # cv2.waitKey(0)
+    # # f_abs_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v2\val_not_labeled\images\4_output_000000147.jpg"
+    # # output = model.pose_detect(f_abs_path)
+    # # cv2.namedWindow("output", cv2.WINDOW_NORMAL)
+    # # cv2.imshow("output", output)
+    # # cv2.waitKey(0)
 
-    file_list = sorted(os.listdir(data_path))
-    for f in tqdm(file_list):
-        f_abs_path = data_path + "/{}".format(f)
-        f_dst_path = save_path + "/{}".format(f)
-        output = model.pose_detect(f_abs_path)
-        cv2.imwrite(f_dst_path, output)
+    # file_list = sorted(os.listdir(data_path))
+    # for f in tqdm(file_list):
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     f_dst_path = save_path + "/{}".format(f)
+    #     output = model.pose_detect(f_abs_path)
+    #     cv2.imwrite(f_dst_path, output)
+
+
+    data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\val\images"
+    model.pose_detect_generate_yolo_labels(data_path)

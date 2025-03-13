@@ -10088,15 +10088,495 @@ def adjust_putText():
     # cv2.putText(img, "{:.2f}".format(dis), (b[0], text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
 
 
+def corner_detect(img):
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # # find Harris corners
+    # gray = np.float32(gray)
+    # dst = cv2.cornerHarris(gray, 2, 3, 0.04)
+    # dst = cv2.dilate(dst,None)
+    # ret, dst = cv2.threshold(dst, 0.01*dst.max(), 255, 0)
+    # dst = np.uint8(dst)
+    # # find centroids
+    # ret, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+    # # define the criteria to stop and refine the corners
+    # criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)
+    # corners = cv2.cornerSubPix(gray, np.float32(centroids), (5,5), (-1,-1), criteria)
+    # # Now draw them
+    # res = np.hstack((centroids, corners))
+    # res = np.intp(res)
+    # img[res[:, 1],res[:, 0]] = [0, 0, 255]
+    # img[res[:, 3],res[:, 2]] = [0, 255, 0]
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+
+    # =======================================================================================
+    # https://www.cnblogs.com/GYH2003/articles/GYH-PythonOpenCV-FeatureDetection-Corner.html
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = np.float32(gray)  # 转换为浮点型
+    # dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)  # Harris 角点检测
+    t1 = time.time()
+    dst = cv2.cornerHarris(gray, blockSize=10, ksize=7, k=0.04)  # Harris 角点检测
+    t2 = time.time()
+    print("Harris角点检测耗时：", t2 - t1)
+
+    r, dst = cv2.threshold(dst, 0.01 * dst.max(), 255, 0)  # 二值化阈值处理
+    dst = np.uint8(dst)  # 转换为整型
+    cv2.imshow('dst', dst)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+
+    # 不同的连通域赋予不同的颜色
+    output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for i in range(1, num_labels):
+        mask = labels == i
+        output[:, :, 0][mask] = np.random.randint(0, 256)
+        output[:, :, 1][mask] = np.random.randint(0, 256)
+        output[:, :, 2][mask] = np.random.randint(0, 256)
+
+    # 标记角点
+    dst = cv2.dilate(dst, None)  # 膨胀操作，增强角点标记
+    print(dst > 0.01 * dst.max())
+    img[dst > 0.01 * dst.max()] = [0, 0, 255]  # 将角点标记为红色
+
+    # 显示结果
+    cv2.imshow('Harris Corners', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    # =======================================================================================
+
+    # # Shi-Tomasi 角点检测
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # corners = cv2.goodFeaturesToTrack(gray, maxCorners=100, qualityLevel=0.01, minDistance=10)
+    # corners = np.int0(corners)  # 转换为整数坐标
+
+    # # 标记角点
+    # for corner in corners:
+    #     x, y = corner.ravel()
+    #     cv2.circle(img, (x, y), 5, (0, 255, 0), -1)  # 用绿色圆点标记角点
+
+    # # 显示结果
+    # cv2.imshow('Shi-Tomasi Corners', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    # # FAST 角点检测
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # fast = cv2.FastFeatureDetector_create()  # 创建 FAST 检测器
+    # keypoints = fast.detect(gray, None)  # 检测角点
+
+    # # 标记角点
+    # image_with_keypoints = cv2.drawKeypoints(img, keypoints, None, color=(0, 255, 0))  # 用绿色标记角点
+
+    # # 显示结果
+    # cv2.imshow('FAST Corners', image_with_keypoints)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    # # =======================================================================================
+    # img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # 转换为灰度图像
+    # img_gray = np.float32(img_gray)  # 转换为浮点类型
+    # dst = cv2.cornerHarris(img_gray, 10, 7, 0.04)  # 查找哈里斯角
+    # r, dst = cv2.threshold(dst, 0.01 * dst.max(), 255, 0)  # 二值化阈值处理
+    # dst = np.uint8(dst)  # 转换为整型
+    # r, l, s, cxys = cv2.connectedComponentsWithStats(dst)  # 查找质点坐标
+    # cif = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)  # 定义优化查找条件
+    # corners = cv2.cornerSubPix(img_gray, np.float32(cxys), (5, 5), (-1, -1), cif)  # 执行优化查找
+    # res = np.hstack((cxys, corners))  # 堆叠构造新数组，便于标注角
+    # res = np.intp(res)  # 转换为整型
+    # img[res[:, 1], res[:, 0]] = [0, 0, 255]  # 将哈里斯角对应像素设置为红色
+    # img[res[:, 3], res[:, 2]] = [0, 255, 0]  # 将优化结果像素设置为绿色
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # 转换为RGB格式
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # # =======================================================================================
+
+
+def draw_triangle_mask(img, areas):
+    """
+    在图像中划定一个三角形区域，并将区域内的像素值设置为0。
+    
+    参数:
+        image: 输入图像。
+        vertices: 三角形的三个顶点坐标，格式为[[x1, y1], [x2, y2], [x3, y3]]。
+        [[100, 100], [200, 300], [300, 100]]
+    
+    返回:
+        masked_image: 处理后的图像。
+    """
+    mask = 255 * np.ones_like(img)
+    
+    for a in areas:
+        a = np.array(a, dtype=np.int32)
+        mask = cv2.fillPoly(mask, [a], (0, 0, 0))
+    
+    return mask
+
+
+def apply_mask_area(img, flag=True):
+    # 去除干扰，屏蔽不是roi区域，roi区域是激光线附近的区域
+    if flag:
+        imgsz = img.shape[:2]
+        areas = [
+            [[0, 0], [0, int(0.5 * imgsz[0])], [int(0.25 * imgsz[1]), 0]],
+            [[int(0.75 * imgsz[1]), 0], [imgsz[1], 0], [imgsz[1], int(0.5 * imgsz[0])]],
+            [[int(0.5 * imgsz[1]), int(0.35 * imgsz[0])], [0, imgsz[0]], [imgsz[1], imgsz[0]]]
+        ]
+        masked_image = draw_triangle_mask(img, areas)
+        img = cv2.bitwise_and(img, masked_image)
+
+    return img
+
+    
+def corner_detect_test():
+    expand_pixels = 25
+    dis_thresh = 30
+    min_inliers = 5
+    data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged"
+    save_path = make_save_path(data_path, add_str="Harris_Corners_Result")
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+
+        img_ama = apply_mask_area(img, flag=True)
+
+        # =======================================================================================
+        # https://www.cnblogs.com/GYH2003/articles/GYH-PythonOpenCV-FeatureDetection-Corner.html
+        gray = cv2.cvtColor(img_ama, cv2.COLOR_BGR2GRAY)
+        gray = np.float32(gray)  # 转换为浮点型
+        # dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)  # Harris 角点检测
+        dst = cv2.cornerHarris(gray, blockSize=10, ksize=7, k=0.04)  # Harris 角点检测
+
+        r, dst = cv2.threshold(dst, 0.01 * dst.max(), 255, 0)  # 二值化阈值处理
+        dst = np.uint8(dst)
+
+        # 标记角点
+        dst = cv2.dilate(dst, None)  # 膨胀操作，增强角点标记
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+
+        # # 不同的连通域赋予不同的颜色
+        # output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+        # for i in range(1, num_labels):
+        #     mask = labels == i
+        #     output[:, :, 0][mask] = np.random.randint(0, 256)
+        #     output[:, :, 1][mask] = np.random.randint(0, 256)
+        #     output[:, :, 2][mask] = np.random.randint(0, 256)
+
+        # for i in range(len(centroids_new)):
+        #     cv2.circle(img, (int(centroids_new[i][0]), int(centroids_new[i][1])), 5, (0, 0, 255), -1)
+        # cv2.imwrite(save_path + "/{}_centroids_new_0.jpg".format(fname), img)
+
+        # centroids_new = img_points_coord_to_cardesian_coord(imgsz, np.array(centroids_new))
+        # polynomial, poly_filtered = polyfit_v2(centroids_new)
+        # y_plot_initial = polynomial(centroids_new[:, 0])
+        # y_plot_filtered = poly_filtered(centroids_new[:, 0])
+
+        # for i in range(len(centroids_new)):
+        #     cv2.circle(img, (int(centroids_new[i][0]), int(centroids_new[i][1])), 5, (0, 255, 255), -1)
+        # cv2.imwrite(save_path + "/{}_centroids_new_1.jpg".format(fname), img)
+
+        centroids_new = sorted(centroids[1:], key=lambda x: x[0])
+        stats_new = sorted(stats[1:], key=lambda x: x[0])
+        wides = []
+
+        if len(centroids_new) >= min_inliers:
+            centroids_new = np.array(centroids_new)
+            best_poly= polyfit_RANSAC(centroids_new, degree=2, n_iters=100, threshold=5, min_inliers=min_inliers)
+            fit_y = best_poly(centroids_new[:, 0])
+
+            # center_y = np.array([b[1] + b[3] / 2 for b in stats_new])
+            # dis_fc_y = np.abs(center_y - fit_y)
+            # dis_median = sorted(dis_fc_y)[len(fit_y) // 2]
+            # print("fit_y: {}".format(fit_y))
+            # print("center_y: {}".format(center_y))
+            # print("dis_fc_y: {}".format(dis_fc_y))
+            # print("dis_median: {}".format(dis_median))
+
+            for i in range(len(stats_new)):
+                bi = stats_new[i][:-1]
+                bi_center = [bi[0] + bi[2] / 2, bi[1] + bi[3] / 2]
+                bi_expand = [bi[0] - expand_pixels, bi[1] - round(1.25 * expand_pixels), bi[0] + bi[2] + expand_pixels, bi[1] + bi[3] + round(1.25 * expand_pixels)]
+                fit_y_i = best_poly(bi_center[0])
+
+                d = abs(bi_center[1] - fit_y_i)
+                if d <= dis_thresh:
+                    wides.append(bi[2] - 2)  # 因为前面进行了膨胀，所以需要减2
+                    cv2.circle(img, (int(bi_center[0]), int(bi_center[1])), 5, (255, 255, 255), -1)
+                    cv2.rectangle(img, (bi_expand[0], bi_expand[1]), (bi_expand[2], bi_expand[3]), (255, 0, 255), 2)
+        else:
+            for i in range(len(stats_new)):
+                bi = stats_new[i][:-1]
+                bi_center = [bi[0] + bi[2] / 2, bi[1] + bi[3] / 2]
+                bi_expand = [bi[0] - expand_pixels, bi[1] - round(1.25 * expand_pixels), bi[0] + bi[2] + expand_pixels, bi[1] + bi[3] + round(1.25 * expand_pixels)]
+
+                wides.append(bi[2] - 2)  # 因为前面进行了膨胀，所以需要减2
+                cv2.circle(img, (int(bi_center[0]), int(bi_center[1])), 5, (255, 255, 255), -1)
+                cv2.rectangle(img, (bi_expand[0], bi_expand[1]), (bi_expand[2], bi_expand[3]), (255, 0, 255), 2)
+
+        cv2.imwrite(save_path + "/{}_centroids_new_2.jpg".format(fname), img)
+        print("fname: {} wides: {}".format(fname, wides))
+
+
+        # for i in range(len(centroids_new)):
+        #     cv2.circle(img, (int(centroids_new[i, 0]), int(centroids_new[i, 1])), 5, (0, 0, 255), -1)
+        #     # cv2.circle(img, (int(centroids_new[i, 0]), int(y_plot_initial[i])), 3, (0, 255, 255), -1)
+        #     # cv2.circle(img, (int(centroids_new[i, 0]), int(y_plot_filtered[i])), 6, (255, 255, 0), -1)
+
+
+        # img[dst > 0.01 * dst.max()] = [0, 0, 255]  # 将角点标记为红色
+
+        # f_dst_path = save_path + "/{}".format(f)
+        # cv2.imwrite(f_dst_path, img)
+
+        # 显示结果
+        # cv2.imshow('Harris Corners', img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+        # =======================================================================================
+
+
+def img_points_coord_to_cardesian_coord(imgsz, points):
+    """imgsz: [h, w]"""
+    points[1] = imgsz[0] - points[1]
+
+    return points
+
+
+def polyfit_v2(points, degree=2):
+    # 多项式拟合（二次）
+    coefficients = np.polyfit(points[:, 0], points[:, 1], degree)
+    polynomial = np.poly1d(coefficients)
+
+    # 计算点到曲线的距离
+    x_vals = points[:, 0]
+    y_vals = points[:, 1]
+    distances = np.abs(y_vals - polynomial(x_vals)) / np.sqrt(1 + np.polyval(np.polyder(coefficients), x_vals)**2)
+
+    # 过滤离群点（阈值=1.0）
+    threshold = 15.0
+    filtered_points = points[distances <= threshold]
+
+    # 重新拟合曲线
+    if len(filtered_points) > 0:
+        coeff_filtered = np.polyfit(filtered_points[:, 0], filtered_points[:, 1], degree)
+        poly_filtered = np.poly1d(coeff_filtered)
+    else:
+        poly_filtered = polynomial  # 若无点保留，使用原始曲线
+
+    # y_plot_initial = polynomial(points[:, 0])
+    # y_plot_filtered = poly_filtered(points[:, 0])
+
+    return polynomial, poly_filtered
+
+
+def polyfit_RANSAC(points, degree=2, n_iters=100, threshold=5, min_inliers=5):
+    best_model=None
+    best_inliers=[]
+    
+    for i in range(n_iters):
+        sample = random.sample(list(points), min_inliers)
+        sample_x = np.array([p[0] for p in sample])
+        sample_y = np.array([p[1] for p in sample])
+        # 多项式拟合（二次）
+        try:
+            coefficients = np.polyfit(sample_x, sample_y, degree)
+            polynomial = np.poly1d(coefficients)
+        except:
+            continue
+
+        # 计算点到曲线的距离
+        x_vals = points[:, 0]
+        y_vals = points[:, 1]
+        distances = np.abs(y_vals - polynomial(x_vals)) / np.sqrt(1 + np.polyval(np.polyder(coefficients), x_vals)**2)
+
+        # 统计内点
+        inliers = points[distances < threshold]
+        if len(inliers) > len(best_inliers):
+            best_inliers = inliers
+            best_model = polynomial
+
+    # 使用最佳内点重新拟合曲线
+    if best_model is not None:
+        best_coeff = np.polyfit(best_inliers[:, 0], best_inliers[:, 1], 2)
+        best_poly = np.poly1d(best_coeff)
+    else:
+        # 多项式拟合（二次）
+        coefficients = np.polyfit(points[:, 0], points[:, 1], degree)
+        polynomial = np.poly1d(coefficients)
+
+        # 计算点到曲线的距离
+        x_vals = points[:, 0]
+        y_vals = points[:, 1]
+        distances = np.abs(y_vals - polynomial(x_vals)) / np.sqrt(1 + np.polyval(np.polyder(coefficients), x_vals)**2)
+
+        # 过滤离群点（阈值=1.0）
+        filtered_points = points[distances <= threshold]
+
+        # 重新拟合曲线
+        if len(filtered_points) > 0:
+            coeff_filtered = np.polyfit(filtered_points[:, 0], filtered_points[:, 1], degree)
+            best_poly = np.poly1d(coeff_filtered)
+        else:
+            best_poly = polynomial  # 若无点保留，使用原始曲线
+
+    return best_poly
 
 
 
+def polyfit_test():
+    # 生成示例点坐标 (x, y)
+    points = np.array([
+        [1, 2], [2, 3], [3, 5], [4, 7], [5, 11],
+        [6, 15], [7, 20], [8, 25], [9, 30], [10, 35]
+    ], dtype=np.float32)
+
+    # 定义图像尺寸和坐标系映射参数
+    img_width, img_height = 800, 600
+    x_min, x_max = 0, 12  # 扩展x范围以便显示
+    y_min, y_max = 0, 40  # 扩展y范围
+
+    # 数据坐标到图像坐标的转换函数
+    def data_to_img_coord(x, y):
+        scale_x = img_width / (x_max - x_min)
+        scale_y = img_height / (y_max - y_min)
+        img_x = int((x - x_min) * scale_x)
+        img_y = int(img_height - (y - y_min) * scale_y)  # OpenCV的y轴向下
+        return img_x, img_y
+
+    # 创建空白图像
+    img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255  # 白色背景
+
+    # 绘制原始点
+    for x, y in points:
+        img_x, img_y = data_to_img_coord(x, y)
+        cv2.circle(img, (img_x, img_y), 5, (0, 0, 255), -1)  # 红色点
+
+    # 多项式拟合（二次）
+    degree = 2
+    coefficients = np.polyfit(points[:, 0], points[:, 1], degree)
+    polynomial = np.poly1d(coefficients)
+
+    # 计算点到曲线的距离
+    x_vals = points[:, 0]
+    y_vals = points[:, 1]
+    distances = np.abs(y_vals - polynomial(x_vals)) / np.sqrt(1 + np.polyval(np.polyder(coefficients), x_vals)**2)
+
+    # 过滤离群点（阈值=1.0）
+    threshold = 1.0
+    filtered_points = points[distances <= threshold]
+
+    # 重新拟合曲线
+    if len(filtered_points) > 0:
+        coeff_filtered = np.polyfit(filtered_points[:, 0], filtered_points[:, 1], degree)
+        poly_filtered = np.poly1d(coeff_filtered)
+    else:
+        poly_filtered = polynomial  # 若无点保留，使用原始曲线
+
+    # 在图像上绘制拟合曲线
+    x_plot = np.linspace(x_min, x_max, 100)
+    y_plot_initial = polynomial(x_plot)
+    y_plot_filtered = poly_filtered(x_plot)
+
+    # 绘制原始拟合曲线（蓝色）
+    for i in range(len(x_plot)-1):
+        x1, y1 = data_to_img_coord(x_plot[i], y_plot_initial[i])
+        x2, y2 = data_to_img_coord(x_plot[i+1], y_plot_initial[i+1])
+        cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+
+    # 绘制过滤后的曲线（绿色）
+    for i in range(len(x_plot)-1):
+        x1, y1 = data_to_img_coord(x_plot[i], y_plot_filtered[i])
+        x2, y2 = data_to_img_coord(x_plot[i+1], y_plot_filtered[i+1])
+        cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+    # 绘制过滤后的点（绿色）
+    for x, y in filtered_points:
+        img_x, img_y = data_to_img_coord(x, y)
+        cv2.circle(img, (img_x, img_y), 5, (0, 255, 0), -1)
+
+    # 添加文本说明
+    cv2.putText(img, f"Original Equation: {polynomial}", (10, 30), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+    cv2.putText(img, f"Filtered Equation: {poly_filtered}", (10, 60), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+    cv2.putText(img, "Red: Original Points | Blue: Initial Fit | Green: Filtered", (10, 90), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+
+    # 显示结果
+    cv2.imshow("Curve Fitting with Outlier Removal", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
+def get_specific_color_area_ratio(img, color="green"):
+    """
+    https://news.sohu.com/a/569474695_120265289
+    https://blog.csdn.net/yuan2019035055/article/details/140495066
+    """
+    if color == "black":
+        lower = (0, 0, 0)
+        upper = (180, 255, 46)
+    elif color == "gray":
+        lower = (0, 0, 46)
+        upper = (180, 43, 220)
+    elif color == "white":
+        lower = (0, 0, 221)
+        upper = (180, 30, 255)
+    elif color == "red":
+        lower0 = (0, 43, 46)
+        upper0 = (10, 255, 255)
+        lower1 = (156, 43, 46)
+        upper1 = (180, 255, 255)
+    elif color == "orange":
+        lower = (11, 43, 46)
+        upper = (25, 255, 255)
+    elif color == "yellow":
+        lower = (26, 43, 46)
+        upper = (34, 255, 255)
+    elif color == "green":
+        lower = (35, 43, 46)
+        upper = (77, 255, 255)
+    elif color == "cyan":
+        lower = (78, 43, 46)
+        upper = (99, 255, 255)
+    elif color == "blue":
+        lower = (100, 43, 46)
+        upper = (124, 255, 255)
+    elif color == "purple":
+        lower = (125, 43, 46)
+        upper = (155, 255, 255)
+    else:
+        raise ValueError("Invalid color. Please choose from 'black', 'gray', 'white', 'red', 'orange', 'yellow','green', 'cyan', 'blue', 'purple'.")
 
+    hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
+    if color == "red":
+        mask0 = cv2.inRange(hsv_image, lower0, upper0)
+        mask1 = cv2.inRange(hsv_image, lower1, upper1)
+        mask = cv2.bitwise_or(mask0, mask1)
+    else:
+        mask = cv2.inRange(hsv_image, lower, upper)
 
+    # 可视化结果（可选）
+    # 将掩码应用到原图上，显示提取的颜色区域
+    result = cv2.bitwise_and(img, img, mask=mask)
+    gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
+    _, bw_image = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+
+    # 下面两个方法结果一致
+    # white_area = np.sum(bw_image == 255)
+    white_area = cv2.countNonZero(bw_image)
+
+    # 计算图像的总像素数量
+    total_pixel_count = img.shape[0] * img.shape[1]
+
+    # 计算指定颜色区域占整张图像的面积比例
+    r = white_area / total_pixel_count * 100
+
+    return r
 
 
 if __name__ == '__main__':
@@ -10210,7 +10690,7 @@ if __name__ == '__main__':
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3_\train\labelbee_format\500", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
-    det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
+    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
@@ -10279,7 +10759,16 @@ if __name__ == '__main__':
     #     f_abs_path = data_path + "/{}".format(f)
     #     img = cv2.imread(f_abs_path)
     #     brightness = cal_brightness_v2(img)
-    #     print("{}: {}".format(f_abs_path, brightness))    
+    #     print("{}: {}".format(f_abs_path, brightness))
+    # 
+
+
+    # img_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged\Video_2025_03_08_111948_1_output_000003979.jpg"
+    # img = cv2.imread(img_path)
+    # corner_detect(img)    
+
+    corner_detect_test()
+    # polyfit_test()
     
 
 

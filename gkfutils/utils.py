@@ -1027,7 +1027,7 @@ class Logger(object):
         # 实例化TimedRotatingFileHandler
         # interval是时间间隔，backupCount是备份文件的个数，如果超过这个个数，就会自动删除，when是间隔的时间单位，单位有以下几种：
         # S 秒、M 分、H 小时、D 天、W 每星期（interval==0时代表星期一）、midnight 每天凌晨
-        th = TimedRotatingFileHandler(filename=logpath + filename +'-log.', when=when, interval=1, backupCount=backCount, encoding='utf-8')
+        th = TimedRotatingFileHandler(filename=logpath + filename +'.', when=when, interval=1, backupCount=backCount, encoding='utf-8')
         th.setFormatter(format_str) # 设置文件里写入的格式
         th.suffix = "-%Y-%m-%d_%H-%M-%S.log"
 
@@ -1178,8 +1178,8 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels_1_2", path2=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels")
-    rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\images", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
-    rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\labels", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
+    # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\images", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
+    # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\labels", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
     # dir_list = os.listdir(data_path)
@@ -1202,6 +1202,11 @@ if __name__ == '__main__':
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
 
     # save_file_path_to_txt(data_path=r"D:\Gosion\Projects\006.if_tear\video_frames\frames_merged", abspath=True)
+
+    # logger = Logger(filename="Test-Logger", level='info', when='D', interval=1, backCount=30)
+    # logger.logger.info("test")
+    # logger.logger.info("===========================================")
+
     
 
 

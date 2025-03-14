@@ -1,0 +1,191 @@
+# 版本：v1.0.2  更新时间：2025.03.10
+
+
+# 短袖检测
+cotta_detection:
+  path:
+    det_model_path: "./weights/cotta_detection/cotta_det_yolov5s_640_640_v1.0.0.onnx"
+    det_class_path: "./weights/cotta_detection/cotta_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 手部检测
+hand_detection:
+  path:
+    det_model_path: "./weights/hand_detection/hand_det_yolov5s_640_640_v1.0.0.onnx"
+    det_class_path: "./weights/hand_detection/hand_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 安全帽检测
+helmet_detection:
+  path:
+    det_model_path: "./weights/helmet_detection/helmet_det_yolov5s_640_640_v1.0.1.onnx"
+    det_class_path: "./weights/helmet_detection/helmet_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 异物检测
+impurity_detection:
+  path:
+    det_model_path: ""
+    det_class_path: ""
+
+  threshold:
+   
+
+
+# 煤泄漏检测
+leaking_coal_detection:
+  path:
+    det_model_path: ""
+    det_class_path: ""
+
+  threshold:
+    
+
+
+# 跑冒滴漏检测（目前命名为液体泄漏检测，后期有空需要更名）
+leaking_liquid_detection:
+  flag:
+    cca: True
+  threshold:
+    h_crop: 68
+    area_low: 100
+    area_high: 1000
+    num_labels_low: 5
+    num_labels_high: 15
+    area_avg_low: 200
+    area_avg_high: 500
+    hw_avg_low: 15
+    hw_avg_high: 30
+
+
+
+# 仪表识别
+meter_recognition:
+  path:
+    det_model_path: "./weights/meter_recognition/meter_det_yolov5s_640_640_v1.0.0.onnx"
+    det_class_path: "./weights/meter_recognition/meter_det_yolov5s_classes_v1.0.0.txt"
+    seg_model_path: "./weights/meter_segmentation/meter_seg_unet_vgg_416_416_v1.0.0.pth"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 车辆充气时，不在监护区检测
+out_guardarea_detection:
+  path:
+    det_model_path: "./weights/out_guardarea_detection/out_guardarea_det_yolov5s_640_640_v1.0.2.onnx"
+    det_class_path: "./weights/out_guardarea_detection/out_guardarea_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    conf_threshold: 0.60
+    iou_threshold: 0.45
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 人体检测
+people_detection:
+  path:
+    det_model_path: "./weights/tg_detection/tg_det_yolov5s_640_640_v1.0.0.pth"
+    det_class_path: "./weights/tg_detection/tg_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 打电话检测
+phone_detection:
+  path:
+    det_model_path: "./weights/phone_detection/phone_det_yolov5s_640_640_v1.0.3.onnx"
+    det_class_path: "./weights/phone_detection/phone_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 单边皮带跑偏
+roller_detection:
+  path:
+    det_model_path: "./weights/roller_detection/roller_det_yolov5s_640_640_v1.0.0.onnx"
+    det_class_path: "./weights/roller_detection/roller_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 吸烟检测
+smoking_detection:
+  path:
+    # det_model_path: "./weights/smoking_detection/smoking_GuanWangLNG_det_yolov5s_640_640_v1.0.0.onnx"
+    # det_class_path: "./weights/smoking_detection/smoking_GuanWangLNG_det_yolov5s_classes_v1.0.0.txt"
+    det_model_path: "E:/wujiahu/pipechina_beihaihaikou/weights/smoking_detection/smoking_det_yolov5s_640_640_v1.0.0.onnx"
+    det_class_path: "E:/wujiahu/pipechina_beihaihaikou/weights/smoking_detection/smoking_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 测试，YOLOv5 coco 检测模型
+test_detection:
+  path:
+    det_model_path: "./weights/test_detection/test_det_yolov5s_640_640_v1.0.0.onnx"
+    det_class_path: "./weights/test_detection/test_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    conf_threshold: 0.60
+    iou_threshold: 0.45
+
+
+# 阀门检测
+valve_detection:
+  path:
+    det_model_path: "./weights/valve_detection/valve_det_yolov5s_640_640_v1.0.3.onnx"
+    det_class_path: "./weights/valve_detection/valve_det_yolov5s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+
+
+# 违规坐在防护栏上检测
+violated_sitting_detection:
+  path:
+    det_model_path: "./weights/violated_sitting_detection/violated_sitting_det_yolov5s_640_640_v1.0.1.onnx"
+    det_class_path: "./weights/violated_sitting_detection/violated_sitting_det_yolov5s_classes_v1.0.0.txt"
+    pose_model_path: "./weights/violated_sitting_detection/person_kpt_yolo11s_640_640_v1.0.0.onnx"
+    pose_class_path: "./weights/violated_sitting_detection/person_kpt_yolo11s_classes_v1.0.0.txt"
+
+  threshold:
+    score_threshold: 0.60
+    nms_threshold: 0.45
+    confidence_threshold: 0.60
+    conf_threshold: 0.60
+    iou_threshold: 0.45
+    

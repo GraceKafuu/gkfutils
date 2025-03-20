@@ -170,21 +170,23 @@ def image_processing_aug():
         cv2.imwrite(f_dst_path, img)
 
 
-def image_processing_aug_det_data(data_path):
-    # img_path = "./data/images/0.jpg"
-    # dst_path = img_path.replace(".jpg", "_res.jpg")
-    # if os.path.exists(dst_path): os.remove(dst_path)
-    # shutil.rmtree("./data/images_results")
-
-    # data_path = "./data/images"
-    img_path = data_path + "/images"
-    lbl_path = data_path + "/labels"
+def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
+    if t == "det":
+        img_path = data_path + "/images"
+        lbl_path = data_path + "/labels"
+        
+        save_path = make_save_path(data_path, relative=".", add_str="aug")
+        img_save_path = save_path + "/images"
+        lbl_save_path = save_path + "/labels"
+        os.makedirs(img_save_path, exist_ok=True)
+        os.makedirs(lbl_save_path, exist_ok=True)
+    else:
+        img_path = data_path
+        
+        save_path = make_save_path(data_path, relative=".", add_str="aug")
+        img_save_path = save_path
+        os.makedirs(img_save_path, exist_ok=True)
     
-    save_path = make_save_path(data_path, relative=".", add_str="aug")
-    img_save_path = save_path + "/images"
-    lbl_save_path = save_path + "/labels"
-    os.makedirs(img_save_path, exist_ok=True)
-    os.makedirs(lbl_save_path, exist_ok=True)
 
     file_list = get_file_list(img_path)
     p = 0.5
@@ -194,17 +196,17 @@ def image_processing_aug_det_data(data_path):
         f_abs_path = img_path + "/{}".format(f)
         img = cv2.imread(f_abs_path)
 
-        img_dst_path = img_save_path + "/{}".format(f)
-        lbl_abs_path = lbl_path + "/{}.txt".format(fname)
-        lbl_dst_path = lbl_save_path + "/{}.txt".format(fname)
+        if t == "det":
+            lbl_abs_path = lbl_path + "/{}.txt".format(fname)
+            lbl_dst_path = lbl_save_path + "/{}.txt".format(fname)
         
         # img = dilate_erode(img, random=True, p=p, flag=np.random.choice(["dilate", "erode"]))
 
-        # rdm0 = np.random.choice(np.arange(2))
-        # if rdm0 == 0:
-        #     img = scale(img, random=True, p=p, fx=(0.5, 1.5), fy=(0.5, 1.5))
-        # else:
-        #     img = stretch(img, random=True, p=p, r=(0.25, 1.25))
+        rdm0 = np.random.choice(np.arange(2))
+        if rdm0 == 0:
+            img = scale(img, random=True, p=p, fx=(0.5, 1.5), fy=(0.5, 1.5))
+        else:
+            img = stretch(img, random=True, p=p, r=(0.25, 1.25))
 
         rdm1 = np.random.choice(np.arange(5))
         if rdm1 == 0:
@@ -215,8 +217,8 @@ def image_processing_aug_det_data(data_path):
         #     img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 25))
         # elif rdm1 == 3:
         #     img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
-        else:
-            img = log_transformation(img, random=True, p=p)
+        # else:
+        #     img = log_transformation(img, random=True, p=p)
 
         rdm2 = np.random.choice(np.arange(6))
         if rdm2 == 0:
@@ -259,11 +261,11 @@ def image_processing_aug_det_data(data_path):
 
         # img = make_rain_effect(img, random=True, p=p, m=np.random.choice([0, 1]), length=(10, 90), angle=(0, 180), noise=(100, 500))
         
-        # img = compress(img, random=True, p=p, quality=(25, 95))
+        img = compress(img, random=True, p=p, quality=(25, 95))
         # img = rotate(img, random=True, p=p, algorithm="pil", angle=(-45, 45), expand=True)
 
         # 以下OCR数据增强时不建议使用:
-        # img = flip(img, random=True, p=p, m=np.random.choice([-1, 0, 1]))  # m=np.random.choice([-1, 0, 1])
+        img = flip(img, random=True, p=p, m=np.random.choice([-1, 0, 1]))  # m=np.random.choice([-1, 0, 1])
         # img = equalize_hist(img, random=True, p=p, m=1)  # m=np.random.choice([0, 1])
         # img = translate(img, random=True, p=p, tx=(-50, 50), ty=(-50, 50), dstsz=None)
 
@@ -274,8 +276,15 @@ def image_processing_aug_det_data(data_path):
         brightness = cal_brightness_v2(img)
         if brightness > 200: continue
 
-        cv2.imwrite(img_dst_path, img)
-        shutil.copy(lbl_abs_path, lbl_dst_path)
+        
+
+        if t == "det":
+            img_dst_path = img_save_path + "/{}".format(f)
+            cv2.imwrite(img_dst_path, img)
+            shutil.copy(lbl_abs_path, lbl_dst_path)
+        else:
+            img_dst_path = img_save_path + "/{}_{}.jpg".format(fname, fname_add_str)
+            cv2.imwrite(img_dst_path, img)
 
 
 def make_border():
@@ -774,7 +783,7 @@ def cal_params_flops_test():
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
-    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train")
+    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2_merged", t="cls", fname_add_str="aug_new_20250319")
     # make_border()
 
     # det_labels_convertion()

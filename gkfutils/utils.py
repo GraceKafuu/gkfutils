@@ -216,6 +216,9 @@ def unzip_many_files(data_path):
 
 
 def merge_dirs(data_path, use_glob=False, n_subdir=2):
+    """
+    TODO: 增加各文件夹的文件名是否相同, 防止覆盖
+    """
     dir_name = get_dir_name(data_path)
     dst_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_merged".format(dir_name)
     os.makedirs(dst_path, exist_ok=True)
@@ -1167,6 +1170,21 @@ def process_db(db_path, m):
     return
 
 
+def get_system_platform():
+    """
+    https://blog.csdn.net/JiuYux/article/details/135343778
+    """
+    if sys.platform.startswith("win"):
+        print("当前系统是Windows")
+    elif sys.platform.startswith("linux"):
+        print("当前系统是Linux")
+    elif sys.platform.startswith("darwin"):
+        print("当前系统是Mac OS")
+    else:
+        print("当前系统是其他操作系统")
+
+
+
 
 if __name__ == '__main__':
     pass
@@ -1178,7 +1196,7 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels_1_2", path2=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels")
-    # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\images", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
+    # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2_merged", new_name_prefix="v5_2_aug_1_20250319_rename", start_num=0)
     # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\labels", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
@@ -1192,9 +1210,11 @@ if __name__ == '__main__':
 
     # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
-    # merge_dirs(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\videos\20250308_frames")
+    # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
+    # merge_dirs(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2")
 
-    # random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged", mvcp="move", select_num=550)
+
+    random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\0", mvcp="move", select_num=7432)
 
     # process_via_filename(path1=r"E:\wujiahu\003\v4_add_aug_0\images", path2=r"E:\wujiahu\003\v4_add_aug_0\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
@@ -1206,6 +1226,8 @@ if __name__ == '__main__':
     # logger = Logger(filename="Test-Logger", level='info', when='D', interval=1, backCount=30)
     # logger.logger.info("test")
     # logger.logger.info("===========================================")
+
+    # get_system_platform()
 
     
 

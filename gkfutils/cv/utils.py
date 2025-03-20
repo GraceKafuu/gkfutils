@@ -7602,12 +7602,12 @@ class CLS_ORT:
 def create_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 160), randint_low=10, randint_high=51, hw_dis=100, dst_num=20000):
     img_list = sorted(os.listdir(data_path))
 
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}_random_cropped".format(data_path.split("/")[-1])
+    save_path = make_save_path(data_path, ".", "random_cropped")
     os.makedirs(save_path, exist_ok=True)
 
     total_num = 0
 
-    for img in tqdm(img_list):
+    for img in tqdm(img_list[1000:]):
 
         if total_num >= dst_num:
             break
@@ -7938,7 +7938,8 @@ def cal_iou(bbx1, bbx2):
     return iou
 
 
-def seamless_clone(bg_path, obj_path):
+def seamless_clone(fg_path, bg_path, dst_num=5000):
+    """
     img1 = cv2.imread(bg_path)
     img2 = cv2.imread(obj_path)
     img2 = cv2.resize(img2, (1920, 1080))
@@ -7957,6 +7958,57 @@ def seamless_clone(bg_path, obj_path):
     cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/output_normal.png", output_normal)
     cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/output_mixed.png", output_mixed)
     cv2.imwrite("/home/zengyifan/wujiahu/data/006.Fire_Smoke_Det/others/output_MONOCHROME.png", output_MONOCHROME)
+    """
+    save_path = make_save_path(fg_path, ".", "seamless_clone_result")
+    fg_img_list = get_file_list(fg_path)
+    bg_img_list = get_file_list(bg_path)
+
+    for fg in fg_img_list:
+        fgname = os.path.splitext(fg)[0]
+        fg_abs_path = fg_path + "/{}".format(fg)
+        fg_img = cv2.imread(fg_abs_path)
+        fgsz = fg_img.shape[:2]
+
+        for bg in bg_img_list:
+            bgname = os.path.splitext(bg)[0]
+            bg_abs_path = bg_path + "/{}".format(bg)
+            bg_img = cv2.imread(bg_abs_path)
+            bgsz = bg_img.shape[:2]
+
+            bg_img = cv2.resize(bg_img, (fgsz[1], fgsz[0]))
+
+            mask = 255 * np.ones(fg_img.shape, fg_img.dtype)
+            center = (fgsz[1] // 2, fgsz[0] // 2)
+            # output_normal = cv2.seamlessClone(fg_img, bg_img, mask, center, cv2.NORMAL_CLONE)
+            # output_mixed = cv2.seamlessClone(fg_img, bg_img, mask, center, cv2.MIXED_CLONE)
+            output_MONOCHROME = cv2.seamlessClone(fg_img, bg_img, mask, center, cv2.MONOCHROME_TRANSFER)
+
+            output_path = save_path + "/{}_{}_{}.png".format(fgname, bgname, "MIXED_CLONE")
+            cv2.imwrite(output_path, output_MONOCHROME)
+
+            if len(os.listdir(save_path)) >= 5000:
+                break
+
+
+            # mask = np.zeros(fgsz, dtype=np.uint8)
+            # center = (fgsz[1]//2, fgsz[0]//2)  # 中心点坐标
+            # axes = (fgsz[1]//4, fgsz[0]//4)    # 椭圆长短轴
+            # cv2.ellipse(mask, center, axes, 0, 0, 360, 255, -1)  # 绘制白色填充椭圆
+
+            # # 设置克隆位置（这里使用目标图像中心）
+            # clone_position = (fgsz[1]//2, fgsz[0]//2)
+
+            # # 执行无缝克隆
+            # result = cv2.seamlessClone(
+            #     fg_img, 
+            #     bg_img, 
+            #     mask, 
+            #     clone_position, 
+            #     cv2.NORMAL_CLONE  # 克隆模式：保持纹理细节
+            # )
+
+            # output_path = save_path + "/{}_{}_{}.png".format(fgname, bgname, "MIXED_CLONE")
+            # cv2.imwrite(output_path, result)
 
 
 def draw_label(size=(384, 384, 3), polygon_list=None):
@@ -10579,6 +10631,68 @@ def get_specific_color_area_ratio(img, color="green"):
     return r
 
 
+def classify_image_by_brightness(data_path, show_brightness=False):
+    """
+    判断图像的亮度是否超过阈值，并返回对应的类别。
+    """
+    save_path = make_save_path(data_path, ".", "classify_image_by_brightness")
+    paths = []
+    for i in range(10):
+        pathi = save_path + "/{}".format(i)
+        paths.append(pathi)
+        os.makedirs(pathi, exist_ok=True)
+        
+
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        brightness = cal_brightness_v2(img)
+        if show_brightness:
+            print("{}: {}".format(fname, brightness))
+        else:
+            # if brightness > 225:
+            #     f_dst_path = paths[0] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 200:
+            #     f_dst_path = paths[1] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 175:
+            #     f_dst_path = paths[2] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 150:
+            #     f_dst_path = paths[3] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 125:
+            #     f_dst_path = paths[4] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 100:
+            #     f_dst_path = paths[5] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 75:
+            #     f_dst_path = paths[6] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 55:
+            #     f_dst_path = paths[7] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # elif brightness > 30:
+            #     f_dst_path = paths[8] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+            # else:
+            #     f_dst_path = paths[9] + "/{}".format(f)
+            #     shutil.move(f_abs_path, f_dst_path)
+
+            if brightness > 169 and brightness < 172:
+                f_dst_path = paths[0] + "/{}".format(f)
+                shutil.move(f_abs_path, f_dst_path)
+            else:
+                f_dst_path = paths[1] + "/{}".format(f)
+                shutil.move(f_abs_path, f_dst_path)
+
+
+
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
@@ -10731,7 +10845,7 @@ if __name__ == '__main__':
 
     # remove_corrupt_image(data_path=r"D:\Gosion\Projects\data\silie_data\train\not_torn")
 
-    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250309"
+    # data_path = r"D:\Gosion\Projects\GuanWangLNG\20250318"
     # save_path = make_save_path(data_path, relative='.', add_str="result")
     # file_list = get_file_list(data_path)
     # ratio_list = []
@@ -10751,6 +10865,7 @@ if __name__ == '__main__':
     # max_r = np.max(ratio_list)
     # print("mean_r: {} %, min_r: {} %, max_r: {} %".format(mean_r, min_r, max_r))
 
+    # --------------------------------------------------------------------------------------
     # extract_parabolic_curve_area(img_path=r"D:\Gosion\Projects\data\images\southeast.jpg")
 
     # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_0\images"
@@ -10767,8 +10882,14 @@ if __name__ == '__main__':
     # img = cv2.imread(img_path)
     # corner_detect(img)    
 
-    corner_detect_test()
+    # corner_detect_test()
     # polyfit_test()
+
+    classify_image_by_brightness(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\1\000", show_brightness=False)
+
+    # create_cls_negatives_via_random_crop(data_path=r"E:\wujiahu\coco\train2017", random_size=(64, 96, 100, 128, 160), randint_low=2, randint_high=6, hw_dis=100, dst_num=5000)
+
+    # seamless_clone(fg_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\2_random_selected_100", bg_path=r"E:\wujiahu\coco\Random_Selected\train2017_random_cropped_random_selected_500", dst_num=5000)
     
 
 

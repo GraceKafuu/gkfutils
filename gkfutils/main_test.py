@@ -783,7 +783,7 @@ def cal_params_flops_test():
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
-    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2_merged", t="cls", fname_add_str="aug_new_20250319")
+    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500", t="cls", fname_add_str="aug_new2_20250320")
     # make_border()
 
     # det_labels_convertion()

@@ -1214,7 +1214,7 @@ if __name__ == '__main__':
     # merge_dirs(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2")
 
 
-    random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\0", mvcp="move", select_num=7432)
+    random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500_aug", mvcp="copy", select_num=601)
 
     # process_via_filename(path1=r"E:\wujiahu\003\v4_add_aug_0\images", path2=r"E:\wujiahu\003\v4_add_aug_0\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
     

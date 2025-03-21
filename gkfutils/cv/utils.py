@@ -7607,7 +7607,7 @@ def create_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 1
 
     total_num = 0
 
-    for img in tqdm(img_list[1000:]):
+    for img in tqdm(img_list[6000:]):
 
         if total_num >= dst_num:
             break
@@ -10885,9 +10885,9 @@ if __name__ == '__main__':
     # corner_detect_test()
     # polyfit_test()
 
-    classify_image_by_brightness(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\1\000", show_brightness=False)
+    # classify_image_by_brightness(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\1\000", show_brightness=False)
 
-    # create_cls_negatives_via_random_crop(data_path=r"E:\wujiahu\coco\train2017", random_size=(64, 96, 100, 128, 160), randint_low=2, randint_high=6, hw_dis=100, dst_num=5000)
+    # create_cls_negatives_via_random_crop(data_path=r"E:\wujiahu\coco\train2017", random_size=(64, 96, 100, 128, 160, 180, 200, 256), randint_low=2, randint_high=6, hw_dis=100, dst_num=5000)
 
     # seamless_clone(fg_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\2_random_selected_100", bg_path=r"E:\wujiahu\coco\Random_Selected\train2017_random_cropped_random_selected_500", dst_num=5000)
     

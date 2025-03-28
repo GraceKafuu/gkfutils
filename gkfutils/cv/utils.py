@@ -10691,6 +10691,609 @@ def classify_image_by_brightness(data_path, show_brightness=False):
                 shutil.move(f_abs_path, f_dst_path)
 
 
+def bilateral_filter(img, d=9, csigma=75, ssigma=75):
+    filtered = cv2.bilateralFilter(img, d, csigma, ssigma)
+    return filtered
+
+
+def opencv_imread_filename_contain_chinese(img_path):
+    img = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+    return img
+
+
+def opencv_imwrite_filename_contain_chinese(img_path, img):
+    cv2.imencode('.jpg', img)[1].tofile(img_path)
+
+
+def z_score(x, mean, std):
+    return (x - mean) / std
+
+
+def expand_bbox(bi, imgsz, expand_pixels):
+    """ imgsz: [h, w] """
+    x1 = bi[0] - expand_pixels
+    y1 = bi[1] - round(1.25 * expand_pixels)
+    x2 = bi[0] + bi[2] + expand_pixels
+    y2 = bi[1] + bi[3] + round(1.25 * expand_pixels)
+
+    if x1 < 0:
+        x1 = 0
+    if y1 < 0:
+        y1 = 0
+    if x2 > imgsz[1]:
+        x2 = imgsz[1]
+    if y2 > imgsz[0]:
+        y2 = imgsz[0]
+
+    bi_expand = [x1, y1, x2, y2]
+
+    return bi_expand
+
+
+
+def corner_detect_v2(img, expand_pixels=25, brightness_thresh=2, dilate_pixels=2):
+    imgsz = img.shape[:2]
+    dst_bbx_pts = []
+    wides = []
+    
+    # =======================================================================================
+    # https://www.cnblogs.com/GYH2003/articles/GYH-PythonOpenCV-FeatureDetection-Corner.html
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # 根据实验，基本全黑（镜头套了盖子）的图误报很多，这种图和密密麻麻的黑点等类似的噪声图相似，对角点检测有影响，导致误报非常多
+    # 对于这种情况，为了减少误报，去除这种图的影响
+    brt= np.mean(gray)
+    if brt < brightness_thresh or brt > (255 - brightness_thresh):
+        return img, dst_bbx_pts, wides
+
+    gray = np.float32(gray)  # 转换为浮点型
+    # dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)  # Harris 角点检测
+    dst = cv2.cornerHarris(gray, blockSize=10, ksize=7, k=0.04)  # Harris 角点检测
+
+    r, dst = cv2.threshold(dst, 0.01 * dst.max(), 255, 0)  # 二值化阈值处理
+    dst = np.uint8(dst)
+
+    # 标记角点
+    dst = cv2.dilate(dst, None)  # 膨胀操作，增强角点标记
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+
+    centroids_new = sorted(centroids[1:], key=lambda x: x[0])
+    stats_new = sorted(stats[1:], key=lambda x: x[0])
+
+    for i in range(len(stats_new)):
+        bi = stats_new[i][:-1]
+        bi_center = [bi[0] + bi[2] / 2, bi[1] + bi[3] / 2]
+        bi_expand = expand_bbox(bi, imgsz, expand_pixels)
+
+        torn_dis = bi[2] - dilate_pixels  # 因为前面进行了膨胀，所以需要减dilate_pixels
+        wides.append(torn_dis)
+        p_draw_i = [bi[0] + dilate_pixels / 2, bi[1] + bi[3] / 2]
+        p_draw_i_1 = [bi[0] + bi[2] - dilate_pixels / 2, bi[1] + bi[3] / 2]
+        dst_bp = [bi_expand, [p_draw_i, p_draw_i_1]]  # dst_bp： dst_bbox_points
+        dst_bbx_pts.append(dst_bp)
+
+        cv2.circle(img, (round(p_draw_i[0]), round(p_draw_i[1])), 5, (255, 56, 56), -1, lineType=cv2.LINE_AA)
+        cv2.circle(img, (round(p_draw_i_1[0]), round(p_draw_i_1[1])), 5, (255, 157, 151), -1, lineType=cv2.LINE_AA)
+        cv2.rectangle(img, (bi_expand[0], bi_expand[1]), (bi_expand[2], bi_expand[3]), (255, 0, 255), 2)
+
+        (text_width, text_height), baseline = cv2.getTextSize(str(torn_dis), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+        if bi_expand[1] - text_height - 10 < 0:  # 如果文本超出图像上边缘
+            text_y = bi_expand[3] + text_height + 8  # 将文本显示在框的下方
+        else:
+            text_y = bi_expand[1] - 5  # 将文本显示在框的上方
+
+        cv2.putText(img, "{:.2f}".format(torn_dis), (bi_expand[0], text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
+
+    return img, dst_bbx_pts, wides
+
+
+def group_elements(arr, thr=15):
+    if not arr:  # 处理空数组
+        return []
+    groups = [[arr[0]]]  # 初始化第一个组
+    for num in arr[1:]:
+        # 如果当前元素与当前组最后一个元素的差超过15，创建新组
+        if num - groups[-1][-1] > thr:
+            groups.append([num])
+        else:
+            groups[-1].append(num)
+    return groups
+
+
+def group_numpy_array(arr, thr=15):
+    if arr.size == 0:  # 处理空数组
+        return []
+    if arr.ndim != 1:  # 确保输入为一维数组
+        raise ValueError("输入必须是一维数组")
+    
+    # 计算相邻元素差值并找到分割点
+    diffs = np.diff(arr)
+    split_indices = np.where(diffs > thr)[0] + 1
+    
+    # 分割原数组为多个组
+    groups = np.split(arr, split_indices)
+    
+    # # 转换为列表形式输出（可选）
+    # grouped_coordinates = [group.tolist() for group in groups]
+    # return grouped_coordinates
+
+    return groups
+
+
+def median_filter_1d(res_list, k=15):
+    """
+    中值滤波
+    """
+    edge = int(k / 2)
+    new_res = res_list.copy()
+    for i in range(len(res_list)):
+        if i <= edge or i >= len(res_list) - edge - 1:
+            pass
+        else:
+            medianv = np.median(res_list[i - edge:i + edge + 1])
+            if new_res[i] != medianv:
+                new_res[i] = medianv
+            else:
+                pass
+
+    return new_res
+
+
+def merge_sorted_unique(arr1, arr2):
+    merged = np.concatenate((arr1, arr2))
+    return np.unique(merged)
+
+
+def merge_keep_order(arr1, arr2):
+    merged = np.concatenate((arr1, arr2))
+    _, idx = np.unique(merged, return_index=True)
+    return merged[np.sort(idx)]
+
+
+def get_bbx_btd(g, imgsz, expand_pixels=10, y_draw=25):
+    x1 = np.min(g) - expand_pixels
+    y1 = y_draw
+    x2 = np.max(g) + expand_pixels
+    y2 = imgsz[0] - y_draw
+
+    bbx_org = [x1 + expand_pixels, y1, x2 - expand_pixels, y2]
+
+    if x1 < 0:
+        x1 = 0
+    if x2 > imgsz[1]:
+        x2 = imgsz[1]
+
+    bbx_exp = [x1, y1, x2, y2]
+    return bbx_org, bbx_exp
+
+
+def connected_components_analysis_btd(img, connectivity=8, area_thr=100, h_thr=8, w_thr=8):
+    """
+    stats: [x, y, w, h, area]
+    """
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=connectivity)
+    
+    stats_new = []
+    stats_new_idx = []
+    areas = stats[:, -1]  # stats[:, cv2.CC_STAT_AREA]
+    for i in range(1, num_labels):
+        # if areas[i] > area_thr and stats[i, 2] / stats[i, 3] < 2:
+        #     labels[labels == i] = 0
+        # else:
+        #     if stats[i, 2] < w_thr or stats[i, 3] < h_thr:
+        #         labels[labels == i] = 0
+        #     else:
+        #         stats_new.append(stats[i])
+        #         stats_new_idx.append(i)
+        # if areas[i] < area_thr:
+        #     labels[labels == i] = 0
+        # else:
+        #     if areas[i] > area_thr and stats[i, 2] > stats[i, 3] * 1.5:
+        #         stats_new.append(stats[i])
+        #         stats_new_idx.append(i)
+        #     elif stats[i, 2] < w_thr or stats[i, 3] < h_thr:
+        #         labels[labels == i] = 0
+
+        if areas[i] > area_thr and stats[i, 2] > stats[i, 3] * 2:
+            stats_new.append(stats[i])
+            stats_new_idx.append(i)
+
+    # 不同的连通域赋予不同的颜色
+    output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for i in range(1, num_labels):
+        mask = labels == i
+        output[:, :, 0][mask] = np.random.randint(0, 256)
+        output[:, :, 1][mask] = np.random.randint(0, 256)
+        output[:, :, 2][mask] = np.random.randint(0, 256)
+
+
+    four_points = []
+    for si in stats_new_idx:
+        mask = np.uint8(labels == si)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        assert len(contours) == 1, "len(contours) != 1"
+        contour = contours[0]
+        points = contour.reshape(-1, 2)
+        top_left = points[np.argmin(points[:, 0] + points[:, 1])]
+        bottom_right = points[np.argmax(points[:, 0] + points[:, 1])]
+        bottom_left = points[np.argmin(points[:, 0] - points[:, 1])]
+        top_right = points[np.argmax(points[:, 0] - points[:, 1])]
+        four_points.append([top_left, top_right, bottom_right, bottom_left])
+
+    stats_new = sorted(stats_new, key=lambda x: x[0])
+    four_points = sorted(four_points, key=lambda x: x[0][0])
+    
+    return output, num_labels, labels, stats, centroids, stats_new, four_points
+
+
+def get_draw_points(tr_i, tl_i_1, x1, y1, x2, y2, w1, m1v, m2v, y_gap, gap_thresh):
+    """
+    tr_i: top_right_i
+    tl_i_1: top_left_i_1
+    m1v: wides_m1_value
+    m2v: wides_m2_value
+    """
+    points_draw_i = np.empty(shape=(0, 2), dtype=np.int32)
+    points_draw_i_1 = np.empty(shape=(0, 2), dtype=np.int32)
+    if abs(m1v - m2v) <= gap_thresh:
+        if y_gap <= gap_thresh:
+            points_draw_i = np.append(points_draw_i, tr_i.reshape(1, 2), axis=0)
+            points_draw_i_1 = np.append(points_draw_i_1, tl_i_1.reshape(1, 2), axis=0)
+        else:
+            points_draw_i = np.append(points_draw_i, np.array([[x1 + w1, y1]]), axis=0)
+            points_draw_i_1 = np.append(points_draw_i_1, np.array([[x2, y2]]), axis=0)
+    else:
+        points_draw_i = np.append(points_draw_i, np.array([[x1 + w1, y1]]), axis=0)
+        points_draw_i_1 = np.append(points_draw_i_1, np.array([[x2, y2]]), axis=0)
+    
+    points_draw_i = np.squeeze(points_draw_i, axis=0)
+    points_draw_i_1 = np.squeeze(points_draw_i_1, axis=0)
+
+    return points_draw_i, points_draw_i_1
+
+
+def get_connected_components_analysis_bbx(img0, img, analysis_output, expand_pixels=10, y_draw=25, draw_circle=False):
+    imgsz = img.shape[:2]
+    stats_new = analysis_output[-2]
+    four_points = analysis_output[-1]
+
+    dst_bbx_pts = []
+    wides = []
+
+    for i in range(len(stats_new) - 1):
+        x1, y1, w1, h1, area1 = stats_new[i]
+        x2, y2, w2, h2, area2 = stats_new[i + 1]
+        
+        x1_draw = round(x1 + w1 - expand_pixels)
+        y1_draw = round((y1 + y2) / 2 - expand_pixels)
+        x2_draw = round(x2 + expand_pixels)
+        y2_draw = round((y1 + y2) / 2 + expand_pixels * 2)
+        if x1_draw < 0: x1_draw = 0
+        if x2_draw < 0: x2_draw = 0
+        if x1_draw > imgsz[1]: x1_draw = imgsz[1]
+        if x2_draw > imgsz[1]: x2_draw = imgsz[1]
+        if y1_draw < 0: y1_draw = 0
+        if y2_draw < 0: y2_draw = 0
+        if y1_draw > imgsz[0]: y1_draw = imgsz[0]
+        if y2_draw > imgsz[0]: y2_draw = imgsz[0]
+
+        if y2_draw <= y1_draw or x2_draw <= x1_draw: continue
+        if x2_draw - x1_draw > 150: continue
+        
+        wides_m1_value = abs(x2 - (x1 + w1))
+        
+        top_right_i = four_points[i][1]
+        top_left_i_1 = four_points[i + 1][0]
+        y_gap = abs(top_right_i[1] - top_left_i_1[1])
+        wides_m2_value = cal_distance(top_right_i, top_left_i_1)
+
+        points_draw_i, points_draw_i_1 = get_draw_points(
+            top_right_i, top_left_i_1, x1, y1, x2, y2, w1, wides_m1_value, wides_m2_value, y_gap, gap_thresh=30
+        )
+
+        # # 去除一些误报
+        # x1_o = x1_draw + expand_pixels
+        # x2_o = x2_draw - expand_pixels
+        # c = img_src[:, x1_o:x2_o]
+        # col_sums = np.sum(c, axis=0)
+
+        # if col_sums.size == 0: continue
+        # mean = np.mean(col_sums)
+        # median = np.median(col_sums)
+        # std = np.std(col_sums)
+
+        # arr = np.array([mean, median, stats[0], stats[1]])
+        # mean_arr = np.mean(arr)
+        # std_arr = np.std(arr)
+        # zscore = z_score(arr, mean_arr, std_arr)
+        # x_coords = np.where(abs(zscore) < 3)
+        # if x_coords[0].size > 0: continue
+
+        # 去除误报
+        bbx_ = [x1_draw, y1_draw, x2_draw, y2_draw]
+        bbx_croped = img0[bbx_[1]:bbx_[3], bbx_[0]:bbx_[2]]
+        if bbx_croped.size == 0: continue
+        m = np.mean(bbx_croped)
+        if m < 50 or m > 200: continue
+
+
+        dis = cal_distance(points_draw_i, points_draw_i_1)
+        wides.append(dis)
+
+        # 为了和reduce_sum、z_score方法统一，固定框的y值. 2025.03.28, WJH.
+        y1_draw = y_draw
+        y2_draw = imgsz[0] - y_draw
+
+        dst_bp = [[x1_draw, y1_draw, x2_draw, y2_draw], [list(points_draw_i), list(points_draw_i_1)]]
+        dst_bbx_pts.append(dst_bp)
+
+        # cv2.rectangle(img, (x1_draw, y1_draw), (x2_draw, y2_draw), (255, 0, 255), 2)
+        # if draw_circle:
+        #     cv2.circle(img, tuple(points_draw_i), 5, (255, 56, 56), -1, lineType=cv2.LINE_AA)
+        #     cv2.circle(img, tuple(points_draw_i_1), 5, (255, 157, 151), -1, lineType=cv2.LINE_AA)
+        # (text_width, text_height), baseline = cv2.getTextSize(str(dis), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+        # if y1_draw - text_height - 10 < 0:  # 如果文本超出图像上边缘
+        #     text_y = y2_draw + text_height + 8  # 将文本显示在框的下方
+        # else:
+        #     text_y = y1_draw - 5  # 将文本显示在框的上方
+
+        # cv2.putText(img, "{:.2f}".format(dis), (x1_draw, text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
+
+    return img, dst_bbx_pts, wides
+
+
+def reduceSum_zScore(img0, img, reducesum_thr=100, zscore_thr=3, group_thr=15, flag_no_gap_abnormal=True, abnormal_mean_r=3):
+    imgsz = img.shape[:2]
+    col_sums = np.sum(img0, axis=0)
+
+    dst_bbx_pts = []
+    wides = []
+
+    if col_sums.size > 0:
+        mean_value = np.mean(col_sums)
+        median_value = np.median(col_sums)
+        std_value = np.std(col_sums)
+
+        zscore = z_score(col_sums, mean_value, std_value)
+
+        x_coords1 = np.where(col_sums < reducesum_thr)
+        x_coords2 = np.where(abs(zscore) > zscore_thr)
+
+        x_coords = merge_sorted_unique(x_coords1[0], x_coords2[0])
+        groups = group_numpy_array(x_coords, thr=group_thr)
+
+        for g in groups:
+            if g.shape[0] > 0:
+                bbx_org, bbx_exp = get_bbx_btd(g, imgsz, expand_pixels=10, y_draw=25)
+                g_mean = np.mean(col_sums[bbx_org[0]:bbx_org[2]])
+
+                if g_mean < reducesum_thr:
+                    if abs(bbx_org[0] - 0) < 15 or abs(bbx_org[2] - imgsz[1]) < 15:
+                        if g_mean < 5:
+                            # cv2.rectangle(img, (bbx_exp[0], bbx_exp[1]), (bbx_exp[2], bbx_exp[3]), (255, 0, 255), 2)
+                            dst_bp = [bbx_exp, [[bbx_org[0], imgsz[0] // 2], [bbx_org[2], imgsz[0] // 2]]]
+                            dst_bbx_pts.append(dst_bp)
+                            wides.append(abs(bbx_org[2] - bbx_org[0]))
+                    else:
+                        # cv2.rectangle(img, (bbx_exp[0], bbx_exp[1]), (bbx_exp[2], bbx_exp[3]), (255, 0, 255), 2)
+                        dst_bp = [bbx_exp, [[bbx_org[0], imgsz[0] // 2], [bbx_org[2], imgsz[0] // 2]]]
+                        dst_bbx_pts.append(dst_bp)
+                        wides.append(abs(bbx_org[2] - bbx_org[0]))
+                else:
+                    if flag_no_gap_abnormal:
+                        if g_mean > abnormal_mean_r * median_value:
+                            dst_bp = [bbx_exp, [[bbx_org[0], imgsz[0] // 2], [bbx_org[2], imgsz[0] // 2]]]
+                            dst_bbx_pts.append(dst_bp)
+                            wides.append(abs(bbx_org[2] - bbx_org[0]))
+
+    return img, dst_bbx_pts, wides
+
+
+def merge_bbx(img, input_trad, input_pose, iou_thr=0.80, dis_thresh=15, draw_circle=False):
+    imgsz = img.shape[:2]
+
+    img_vis_trad, dst_bbx_pts_trad, wides_trad = input_trad
+    img_vis_pose, dst_bbx_pts_pose, wides_pose = input_pose
+    
+    if len(dst_bbx_pts_trad) == 0 and len(dst_bbx_pts_pose) > 0:
+        for d in dst_bbx_pts_pose:
+            dis = cal_distance(d[1][0], d[1][1])
+            # wides.append(dis)
+
+            cv2.rectangle(img, (d[0][0], d[0][1]), (d[0][2], d[0][3]), (255, 0, 255), 2)
+            if draw_circle:
+                cv2.circle(img, tuple(map(round, d[1][0])), 5, (255, 56, 56), -1, lineType=cv2.LINE_AA)
+                cv2.circle(img, tuple(map(round, d[1][1])), 5, (255, 157, 151), -1, lineType=cv2.LINE_AA)
+            # cv2.putText(img, "{}".format(dis), (d[0][0], d[0][1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+            (text_width, text_height), baseline = cv2.getTextSize(str(dis), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            if d[0][1] - text_height - 10 < 0:  # 如果文本超出图像上边缘
+                text_y = d[0][3] + text_height + 8  # 将文本显示在框的下方
+            else:
+                text_y = d[0][1] - 5  # 将文本显示在框的上方
+
+            cv2.putText(img, "{:.2f}".format(dis), (d[0][0], text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
+
+        return img, dst_bbx_pts_pose, wides_pose
+    
+    elif len(dst_bbx_pts_trad) > 0 and len(dst_bbx_pts_pose) == 0:
+        for d in dst_bbx_pts_trad:
+            dis = cal_distance(d[1][0], d[1][1])
+            # wides.append(dis)
+
+            cv2.rectangle(img, (d[0][0], d[0][1]), (d[0][2], d[0][3]), (255, 0, 255), 2)
+            if draw_circle:
+                cv2.circle(img, tuple(map(round, d[1][0])), 5, (255, 56, 56), -1, lineType=cv2.LINE_AA)
+                cv2.circle(img, tuple(map(round, d[1][1])), 5, (255, 157, 151), -1, lineType=cv2.LINE_AA)
+            # cv2.putText(img, "{}".format(dis), (d[0][0], d[0][1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+            (text_width, text_height), baseline = cv2.getTextSize(str(dis), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            if d[0][1] - text_height - 10 < 0:  # 如果文本超出图像上边缘
+                text_y = d[0][3] + text_height + 8  # 将文本显示在框的下方
+            else:
+                text_y = d[0][1] - 5  # 将文本显示在框的上方
+
+            cv2.putText(img, "{:.2f}".format(dis), (d[0][0], text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
+
+        return img, dst_bbx_pts_trad, wides_trad
+    else:
+        dst1 = []
+        dst2 = []
+        wides = []
+        for i in range(len(dst_bbx_pts_trad)):
+            ib = dst_bbx_pts_trad[i][0]
+            ip0 = dst_bbx_pts_trad[i][1][0]
+            ip1 = dst_bbx_pts_trad[i][1][1]
+            ip_center = [(ip0[0] + ip1[0]) / 2, (ip0[1] + ip1[1]) / 2]
+
+            # 判断当前的框是否是唯一的，也就是dst_bbx_pts_trad有，dst_bbx_pts_pose没有
+            check_unique_num = 0
+            for j in range(len(dst_bbx_pts_pose)):
+                jp0 = dst_bbx_pts_pose[j][1][0]
+                jp1 = dst_bbx_pts_pose[j][1][1]
+                jp_center = [(jp0[0] + jp1[0]) / 2, (jp0[1] + jp1[1]) / 2]
+                dis_ip_jp = cal_distance(ip_center, jp_center)
+                if dis_ip_jp > dis_thresh:
+                    check_unique_num += 1
+
+            for j in range(len(dst_bbx_pts_pose)):
+                jb = dst_bbx_pts_pose[j][0]
+                iou = cal_iou(ib, jb)
+                if iou > iou_thr:
+                    if dst_bbx_pts_pose[j] not in dst2:
+                        dst2.append(dst_bbx_pts_pose[j])
+                else:
+                    if iou == 0 and check_unique_num == len(dst_bbx_pts_pose) and dst_bbx_pts_trad[i] not in dst1:
+                        dst1.append(dst_bbx_pts_trad[i])
+                    if iou == 0 and dst_bbx_pts_pose[j] not in dst2:
+                        dst2.append(dst_bbx_pts_pose[j])
+        dst = dst1 + dst2
+
+        for d in dst:
+            dis = cal_distance(d[1][0], d[1][1])
+            wides.append(dis)
+
+            cv2.rectangle(img, (d[0][0], d[0][1]), (d[0][2], d[0][3]), (255, 0, 255), 2)
+            if draw_circle:
+                cv2.circle(img, tuple(map(round, d[1][0])), 5, (255, 56, 56), -1, lineType=cv2.LINE_AA)
+                cv2.circle(img, tuple(map(round, d[1][1])), 5, (255, 157, 151), -1, lineType=cv2.LINE_AA)
+            # cv2.putText(img, "{}".format(dis), (d[0][0], d[0][1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+            (text_width, text_height), baseline = cv2.getTextSize(str(dis), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            if d[0][1] - text_height - 10 < 0:  # 如果文本超出图像上边缘
+                text_y = d[0][3] + text_height + 8  # 将文本显示在框的下方
+            else:
+                text_y = d[0][1] - 5  # 将文本显示在框的上方
+
+            cv2.putText(img, "{:.2f}".format(dis), (d[0][0], text_y), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 0, 255), 2)
+
+        return img, dst, wides
+
+
+def btd_test():
+    # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\大唐发耳皮带撕裂告警图片\24"
+    # save_path = make_save_path(data_path, ".", "results")
+    # file_list = get_file_list(data_path)
+    # for f in file_list:
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     img = opencv_imread_filename_contain_chinese(f_abs_path)
+    #     res = cv2.medianBlur(img, 7)
+    #     f_dst_path = save_path + "/{}".format(f)
+    #     opencv_imwrite_filename_contain_chinese(f_dst_path, res)
+
+    thresh = 100
+    data_path = r"D:\Gosion\Projects\data\silie_data_cp\train\tear"
+    # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\rare_samples\000"
+    # data_path = r"D:\Gosion\Projects\data\silie_data_cp\train\not_torn"
+    # data_path = r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231_frames\Video_2025_03_27_172528_4"
+    # data_path = r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231_frames\cross_test2"
+    # data_path = r"D:\Gosion\Projects\data\silie_data_cp\train\not_torn_selected"
+    # data_path = r"D:\Gosion\Projects\data\silie_data_cp\train\not_torn_selected2"
+    save_path = make_save_path(data_path, ".", "results-mean")
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        img_vis = img.copy()
+        
+        img0 = img[:, :, 0]
+        
+        # -----------------------------------------------------------------------------------------
+        # 方法1：连通域分析
+        analysis_output = connected_components_analysis_btd(img0, connectivity=8, area_thr=200, h_thr=8, w_thr=8)
+        img_vis_cca, dst_bbx_pts_cca, wides_cca = get_connected_components_analysis_bbx(img0, img, analysis_output, expand_pixels=10, draw_circle=False)
+
+        # 方法2：统计每一列的像素值和（reduce sum）、异常分析方法（z_score）
+        img_vis_rszs, dst_bbx_pts_rszs, wides_rszs = reduceSum_zScore(img0, img, reducesum_thr=100, zscore_thr=3, group_thr=15, flag_no_gap_abnormal=True, abnormal_mean_r=3)
+        
+        # 合并方法1和方法2的结果
+        input_cca = (img_vis_cca, dst_bbx_pts_cca, wides_cca)
+        input_rszs = (img_vis_rszs, dst_bbx_pts_rszs, wides_rszs)
+        img_vis, dst_bbx_pts, wides = merge_bbx(img_vis, input_cca, input_rszs, iou_thr=0.005, dis_thresh=50)
+        print("wides: {}".format(wides))
+        if len(dst_bbx_pts) > 0:
+            cv2.imwrite(save_path + "/{}".format(f), img_vis)
+
+
+
+def median_filter_1d_v2(signal, kernel_size):
+    pad = kernel_size // 2
+    signal_padded = np.pad(signal, (pad, pad), mode='edge')
+    filtered = np.zeros_like(signal)
+    for i in range(len(signal)):
+        filtered[i] = np.median(signal_padded[i:i+kernel_size])
+    return filtered
+
+
+def detect_gap(image_path):
+    # 读取图像并转为灰度图
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        print("Image not found")
+        return None
+
+    # 二值化处理
+    _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+
+    # 计算垂直投影寻找主横线位置
+    sum_rows = cv2.reduce(binary, 1, cv2.REDUCE_SUM, dtype=cv2.CV_32S).flatten()
+    max_sum = 0
+    best_y = 0
+    height = binary.shape[0]
+
+    for y in range(height - 9):
+        current_sum = sum_rows[y:y+10].sum()
+        if current_sum > max_sum:
+            max_sum = current_sum
+            best_y = y
+
+    # 裁剪主横线区域
+    cropped = binary[best_y:best_y+10, :]
+
+    # 计算水平投影并处理
+    sum_cols = cv2.reduce(cropped, 0, cv2.REDUCE_SUM, dtype=cv2.CV_32S).flatten()
+    sum_cols_smoothed = median_filter_1d_v2(sum_cols, 5)
+
+    # 创建缺口掩膜
+    threshold_value = 255  # 基于10%的阈值设定
+    gap_mask = (sum_cols_smoothed < threshold_value).astype(np.uint8) * 255
+
+    # 寻找缺口轮廓
+    contours, _ = cv2.findContours(gap_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    gaps = []
+    for contour in contours:
+        x, _, w, _ = cv2.boundingRect(contour)
+        gaps.append((x, w))
+
+    if not gaps:
+        print("未检测到缺口")
+        return None
+
+    # 选择最大宽度的缺口
+    gaps.sort(key=lambda x: x[1], reverse=True)
+    gap_start, gap_width = gaps[0]
+
+    return (gap_start, gap_width)
+
+
+
 
 
 if __name__ == '__main__':
@@ -10811,7 +11414,7 @@ if __name__ == '__main__':
 
     # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3_\train\labelbee_format\500_yolo_format".replace("\\", "/"), select_num=54, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\video\videos\20250308", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -10890,9 +11493,53 @@ if __name__ == '__main__':
     # create_cls_negatives_via_random_crop(data_path=r"E:\wujiahu\coco\train2017", random_size=(64, 96, 100, 128, 160, 180, 200, 256), randint_low=2, randint_high=6, hw_dis=100, dst_num=5000)
 
     # seamless_clone(fg_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\2_random_selected_100", bg_path=r"E:\wujiahu\coco\Random_Selected\train2017_random_cropped_random_selected_500", dst_num=5000)
+
+    # img_path = r"E:\wujiahu\006.Belt_Torn_Det\data\20250327\src\1743044234.5645235.jpg"
+    # img = cv2.imread(img_path)
+    # res = bilateral_filter(img)
+    # save_path = img_path.replace(".jpg", "_bilateral_filter.jpg")
+    # cv2.imwrite(save_path, res)
+
+    btd_test()
+
+    # # 使用示例
+    # result = detect_gap(r"D:\Gosion\Projects\006.Belt_Torn_Det\data\rare_samples\20250327203539000.png")
+    # if result:
+    #     print(f"缺口起始位置：{result[0]}，缺口宽度：{result[1]}")
+
+    # image_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\rare_samples\20250327203539000.png"
+    # img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    # _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+    # save_path = image_path.replace(".png", "_binary.png")
+    # cv2.imwrite(save_path, binary)
+
+    # image_path = r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231_frames\cross_test\Video_2025_03_27_172528_4_output_0000000010000.jpg"
+    # img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    # _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+    # save_path = image_path.replace(".jpg", "_binary.jpg")
+    # cv2.imwrite(save_path, binary)
+
+    # image_path = r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231_frames\cross_test\Video_2025_03_27_172528_4_output_0000000010000_binary.jpg"
+    # img = cv2.imread(image_path)
+
+    # # k1 = np.array([[1, 0, 1], [0, 1, 0], [1, 0, 1]])
+    # # k2 = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
+    # k1 = np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]]) * 20
+    # k2 = np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]]) * 20
+
+    # res1 = cv2.filter2D(img, -1, k1)
+    # res2 = cv2.filter2D(img, -1, k2)
+    # cv2.imwrite(image_path.replace(".jpg", "_res1.jpg"), res1)
+    # cv2.imwrite(image_path.replace(".jpg", "_res2.jpg"), res2)
+
+
+    # image_path = r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231_frames\cross_test\Video_2025_03_27_172528_4_output_0000000010000_binary.jpg"
+    # img = cv2.imread(image_path)
+    # img_vis, dst_bbx_pts, wides = corner_detect_v2(img, expand_pixels=25, brightness_thresh=2, dilate_pixels=2)
+    # cv2.imwrite(image_path.replace(".jpg", "_corner_detect_v2.jpg"), img_vis)
+
     
-
-
+    
     
     
 

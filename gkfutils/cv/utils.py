@@ -3903,7 +3903,11 @@ def list_yolo_labels(label_path):
         with open(f_abs_path, "r", encoding="utf-8") as fr:
             lines = fr.readlines()
             for l in lines:
-                cls = int(l.strip().split(" ")[0])
+                try:
+                    cls = int(l.strip().split(" ")[0])
+                except Exception as Error:
+                    print(Error)
+                    print(l)
                 if cls not in labels:
                     labels.append(cls)
 
@@ -8299,6 +8303,8 @@ def remove_yolo_label_specific_class(data_path, rm_cls=(1, 2,)):
         lines = txt_data.readlines()
         for l in lines:
             cls = l.strip().split(" ")[0]
+            if l.strip() == "":
+                continue
             correctN = 0
             for rmclsi in rm_cls:
                 if int(cls) != rmclsi:
@@ -10278,6 +10284,41 @@ def apply_mask_area(img, flag=True):
 
     return img
 
+
+def draw_rectangle_mask(img, areas):
+    """
+    在图像中划定一个三角形区域，并将区域内的像素值设置为0。
+    
+    参数:
+        image: 输入图像。
+        vertices: 三角形的三个顶点坐标，格式为[[x1, y1], [x2, y2], [x3, y3]]。
+        [[100, 100], [200, 300], [300, 100]]
+    
+    返回:
+        masked_image: 处理后的图像。
+    """
+    mask = 255 * np.ones_like(img)
+    
+    for a in areas:
+        a = np.array(a, dtype=np.int32)
+        mask = cv2.fillPoly(mask, [a], (0, 0, 0))
+    
+    return mask
+
+
+def apply_mask_area_v2(img, miny, maxy, flag=True):
+    # 去除干扰，屏蔽不是roi区域，roi区域是激光线附近的区域
+    if flag:
+        imgsz = img.shape[:2]
+        areas = [
+            [[0, 0], [imgsz[1], 0], [imgsz[1], miny], [0, miny]],
+            [[0, maxy], [imgsz[1], maxy], [imgsz[1], imgsz[0]], [0, imgsz[0]]]
+        ]
+        masked_image = draw_rectangle_mask(img, areas)
+        img = cv2.bitwise_and(img, masked_image)
+
+    return img
+
     
 def corner_detect_test():
     expand_pixels = 25
@@ -11293,6 +11334,702 @@ def detect_gap(image_path):
     return (gap_start, gap_width)
 
 
+def stats_btd(file_path, start=0, end=100, baseline=[3, [2, 4, 6]]):
+    with open(file_path, "r", encoding="utf-8") as f_read:
+        lines = f_read.readlines()
+
+    selected = lines[start - 1:end]
+
+    has_res = []
+    no_res = []
+    correct = 0
+    rela_correct = 0
+    for line in selected:
+        l = line.strip()
+        if "-----------------------可能存在" in l:
+            if "可能存在 0 个裂痕: 宽 [] 像素" in l:
+                no_res.append(0)
+            else:
+                res = l.split("-----------------------")[1].strip(" 像素----------------------")
+                detect_num = int(res[5])
+                detect_wides = eval(res.split("宽 ")[1])
+                res_i = [detect_num, detect_wides]
+                has_res.append(res_i)
+
+                if res_i == baseline:
+                    correct += 1
+
+                if detect_num == baseline[0]:
+                    rela_correct += 1
+
+    abs_acc = correct / (len(has_res) + len(no_res))
+    rela_acc = rela_correct / (len(has_res) + len(no_res))
+    print("len_no_res: {}".format(len(no_res)))
+    print("len_has_res: {}".format(len(has_res)))
+    print("has_res: {}".format(has_res))
+    print("abs_acc: {:.2f}".format(abs_acc))
+    print("rela_acc: {:.2f}".format(rela_acc))
+
+
+
+def reduceSumMaskArea(img):
+    imgsz = img.shape[:2]
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+
+    blurred = cv2.medianBlur(enhanced, 3) 
+
+    _, binary = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+    row_sums = np.sum(binary, axis=1)
+
+    # if row_sums.size > 0:
+    mean_value = np.mean(row_sums)
+    median_value = np.median(row_sums)
+    std_value = np.std(row_sums)
+
+    zscore = z_score(row_sums, median_value, std_value)
+
+    x_coords1 = np.where(row_sums > 10000)
+    x_coords2 = np.where(abs(zscore) > 3)
+
+    x_coords = merge_sorted_unique(x_coords1[0], x_coords2[0])
+    groups = group_numpy_array(x_coords, thr=15)
+
+    # print("x_coords1: {}".format(x_coords1))
+    # print("x_coords2: {}".format(x_coords2))
+    # print("x_coords: {}".format(x_coords))
+    # print("groups: {}".format(groups))
+
+    # common_elements = x_coords2[0][np.isin(x_coords2[0], x_coords1[0])]
+
+    y_min = np.min(x_coords1) - 45
+    y_max = np.max(x_coords1) + 45
+
+    if y_min < 0:
+        y_min = np.min(x_coords1) - 25
+    if y_max > imgsz[0]:
+        y_max = np.max(x_coords1) + 25
+
+    if y_min < 0:
+        y_min = np.min(x_coords1) - 10
+    if y_max > imgsz[0]:
+        y_max = np.max(x_coords1) + 10
+
+    if y_min < 0:
+        y_min = np.min(x_coords1)
+    if y_max > imgsz[0]:
+        y_max = np.max(x_coords1)
+
+    masked = apply_mask_area_v2(img, y_min, y_max, flag=True)
+
+    masked_gray = cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY)
+    masked_enhanced = clahe.apply(masked_gray)
+    masked_enhanced2 = clahe.apply(masked_enhanced)
+
+    masked_blurred = cv2.medianBlur(masked_enhanced, 3)
+
+    masked_thresh = cv2.adaptiveThreshold(
+        masked_blurred, 255, 
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY_INV, 11, 2
+    )
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+    masked_cleaned = cv2.morphologyEx(masked_thresh, cv2.MORPH_OPEN, kernel)  # 开运算去噪
+
+    return masked, masked_enhanced, masked_enhanced2, masked_blurred, masked_cleaned
+
+       
+def reduceSumMaskArea_v2(img, reduceSumThr=10000, zScoreThr=3, yExpand=45):
+    imgsz = img.shape[:2]
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+    blurred = cv2.medianBlur(enhanced, 3) 
+
+    _, binary = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+    row_sums = np.sum(binary, axis=1)
+
+    # if row_sums.size > 0:
+    mean_value = np.mean(row_sums)
+    median_value = np.median(row_sums)
+    std_value = np.std(row_sums)
+
+    zscore = z_score(row_sums, median_value, std_value)
+
+    x_coords1 = np.where(row_sums > reduceSumThr)
+    # x_coords2 = np.where(abs(zscore) > zScoreThr)
+
+    # x_coords = merge_sorted_unique(x_coords1[0], x_coords2[0])
+    # groups = group_numpy_array(x_coords, thr=15)
+
+    y_min_orig = np.min(x_coords1)
+    y_max_orig = np.max(x_coords1)
+
+    y_min = y_min_orig - yExpand
+    y_max = y_max_orig + yExpand
+
+    if y_min < 0:
+        y_min = np.min(x_coords1) - yExpand // 2
+    if y_max > imgsz[0]:
+        y_max = np.max(x_coords1) + yExpand // 2
+
+    if y_min < 0:
+        y_min = np.min(x_coords1) - yExpand // 4
+    if y_max > imgsz[0]:
+        y_max = np.max(x_coords1) + yExpand // 4
+
+    if y_min < 0:
+        y_min = np.min(x_coords1)
+    if y_max > imgsz[0]:
+        y_max = np.max(x_coords1)
+
+    masked = apply_mask_area_v2(img, y_min, y_max, flag=True)
+
+    return masked, (y_min_orig, y_max_orig), (y_min, y_max)
+
+
+
+def connected_components_analysis_20250401(img, connectivity=8, area_thr=100, h_thr=8, w_thr=8):
+    """
+    stats: [x, y, w, h, area]
+    """
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=connectivity)
+    
+    stats_new = []
+    stats_new_idx = []
+    areas = stats[:, -1]  # stats[:, cv2.CC_STAT_AREA]
+    for i in range(1, num_labels):
+        # if areas[i] > area_thr and stats[i, 2] / stats[i, 3] < 2:
+        #     labels[labels == i] = 0
+        # else:
+        #     if stats[i, 2] < w_thr or stats[i, 3] < h_thr:
+        #         labels[labels == i] = 0
+        #     else:
+        #         stats_new.append(stats[i])
+        #         stats_new_idx.append(i)
+
+        if areas[i] < area_thr:
+            labels[labels == i] = 0
+        # else:
+        #     if areas[i] > area_thr and stats[i, 2] > stats[i, 3] * 1.5:
+        #         stats_new.append(stats[i])
+        #         stats_new_idx.append(i)
+        #     elif stats[i, 2] < w_thr or stats[i, 3] < h_thr:
+        #         labels[labels == i] = 0
+
+        # if areas[i] > area_thr and stats[i, 2] > stats[i, 3] * 2:
+        #     stats_new.append(stats[i])
+        #     stats_new_idx.append(i)
+
+    # 不同的连通域赋予不同的颜色
+    output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for i in range(1, num_labels):
+        mask = labels == i
+        output[:, :, 0][mask] = np.random.randint(0, 256)
+        output[:, :, 1][mask] = np.random.randint(0, 256)
+        output[:, :, 2][mask] = np.random.randint(0, 256)
+
+
+    four_points = []
+    for si in stats_new_idx:
+        mask = np.uint8(labels == si)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        assert len(contours) == 1, "len(contours) != 1"
+        contour = contours[0]
+        points = contour.reshape(-1, 2)
+        top_left = points[np.argmin(points[:, 0] + points[:, 1])]
+        bottom_right = points[np.argmax(points[:, 0] + points[:, 1])]
+        bottom_left = points[np.argmin(points[:, 0] - points[:, 1])]
+        top_right = points[np.argmax(points[:, 0] - points[:, 1])]
+        four_points.append([top_left, top_right, bottom_right, bottom_left])
+
+    stats_new = sorted(stats_new, key=lambda x: x[0])
+    four_points = sorted(four_points, key=lambda x: x[0][0])
+    
+    return output, num_labels, labels, stats, centroids, stats_new, four_points
+    
+
+
+def find_intersections(img):
+    # 读取灰度图
+    # img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    h, w = img.shape
+
+    # 预处理：高斯模糊降噪
+    blurred = cv2.GaussianBlur(img, (5,5), 0)
+
+    # ========== 提取横向曲线 ==========
+    # 高阈值提取亮色横线（>200）
+    _, th_high = cv2.threshold(blurred, 200, 255, cv2.THRESH_BINARY)
+    # 横向闭运算（强化水平线）
+    kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (15,1))
+    horizontal = cv2.morphologyEx(th_high, cv2.MORPH_CLOSE, kernel_h)
+
+    # ========== 提取纵向曲线 ==========
+    # 低阈值提取暗色竖线（<100）
+    _, th_low = cv2.threshold(blurred, 100, 255, cv2.THRESH_BINARY_INV)
+    # 纵向闭运算（强化垂直线）
+    kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1,15))
+    vertical = cv2.morphologyEx(th_low, cv2.MORPH_CLOSE, kernel_v)
+
+    # ========== 检测交叉点 ==========
+    # 计算交叉区域
+    intersections = cv2.bitwise_and(horizontal, vertical)
+    
+    # 优化交叉点检测
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
+    intersections = cv2.morphologyEx(intersections, cv2.MORPH_OPEN, kernel)
+
+    # 寻找连通区域
+    contours, _ = cv2.findContours(intersections, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # 转换为彩色图用于标注
+    result = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    
+    # 存储交点坐标
+    points = []
+    for cnt in contours:
+        # 计算最小外接矩形
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        
+        # 计算中心点
+        M = cv2.moments(cnt)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            points.append((cx, cy))
+            
+            # 绘制标记
+            cv2.circle(result, (cx, cy), 8, (0,0,255), -1)
+            cv2.drawContours(result, [box], 0, (0,255,0), 2)
+
+    # # 保存结果
+    # cv2.imwrite(output_path, result)
+    return points, result
+
+
+
+
+def btd_test_20250401():
+    data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
+    save_path = make_save_path(data_path, ".", "results")
+    change_brt_save_path = save_path + "/change_brightness"
+    equalized_image_save_path = save_path + "/equalized_image"
+    enhanced_save_path = save_path + "/enhanced"
+    enhanced2_save_path = save_path + "/enhanced2"
+    enhanced3_save_path = save_path + "/enhanced3"
+    blurred_save_path = save_path + "/blurred"
+    masked_save_path = save_path + "/masked"
+    masked_enhanced_save_path = save_path + "/masked_enhanced"
+    masked_enhanced2_save_path = save_path + "/masked_enhanced2"
+    masked_blurred_save_path = save_path + "/masked_blurred"
+    masked_cleaned_save_path = save_path + "/masked_cleaned"
+    binary_save_path = save_path + "/binary"
+    cd_save_path = save_path + "/corner_detect"
+    sharpened_save_path = save_path + "/sharpened"
+    os.makedirs(change_brt_save_path, exist_ok=True)
+    os.makedirs(equalized_image_save_path, exist_ok=True)
+    os.makedirs(enhanced_save_path, exist_ok=True)
+    os.makedirs(enhanced2_save_path, exist_ok=True)
+    os.makedirs(enhanced3_save_path, exist_ok=True)
+    os.makedirs(blurred_save_path, exist_ok=True)
+    os.makedirs(masked_save_path, exist_ok=True)
+    os.makedirs(masked_enhanced_save_path, exist_ok=True)
+    os.makedirs(masked_enhanced2_save_path, exist_ok=True)
+    os.makedirs(masked_blurred_save_path, exist_ok=True)
+    os.makedirs(masked_cleaned_save_path, exist_ok=True)
+    os.makedirs(binary_save_path, exist_ok=True)
+    os.makedirs(cd_save_path, exist_ok=True)
+    os.makedirs(sharpened_save_path, exist_ok=True)
+
+
+
+    file_list = get_file_list(data_path)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        img_vis = img.copy()
+
+        changed_brt = change_brightness(img, random=True, p=1, value=(-50, 50))
+
+        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+        # equalize the histogram of the Y channel
+        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+        # convert the YUV image back to RGB format
+        equalized_image = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        enhanced2 = clahe.apply(enhanced)
+        enhanced3 = clahe.apply(enhanced2)
+        # enhanced_bgr = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+
+
+        # kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (15,1))
+        # horizontal = cv2.morphologyEx(enhanced2, cv2.MORPH_CLOSE, kernel_h)
+        # kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1,15))
+        # vertical = cv2.morphologyEx(enhanced2, cv2.MORPH_CLOSE, kernel_v)
+        # intersections = cv2.bitwise_and(horizontal, vertical)
+        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
+        # intersections2 = cv2.morphologyEx(intersections, cv2.MORPH_OPEN, kernel)
+
+        # horizontal_path = save_path + "/{}_horizontal.jpg".format(fname) 
+        # vertical_path = save_path + "/{}_vertical.jpg".format(fname) 
+        # intersections_path = save_path + "/{}_intersections.jpg".format(fname) 
+        # intersections2_path = save_path + "/{}_intersections2.jpg".format(fname)
+        # cv2.imwrite(horizontal_path, horizontal)
+        # cv2.imwrite(vertical_path, vertical)
+        # cv2.imwrite(intersections_path, intersections)
+        # cv2.imwrite(intersections2_path, intersections2)
+
+
+        # # 使用示例
+        # points, intersection_result = find_intersections(enhanced2)
+        # print(f"检测到交点坐标：{points}")
+
+
+        blurred = cv2.medianBlur(enhanced, 3)  # 或 cv2.GaussianBlur()
+
+        change_brt_path = change_brt_save_path + "/{}_change_brt.jpg".format(fname) 
+        equalized_image_path = equalized_image_save_path + "/{}_enhanced.jpg".format(fname) 
+        enhanced_path = enhanced_save_path + "/{}_enhanced.jpg".format(fname) 
+        enhanced2_path = enhanced2_save_path + "/{}_enhanced2.jpg".format(fname) 
+        enhanced3_path = enhanced3_save_path + "/{}_enhanced3.jpg".format(fname) 
+        # enhanced_bgr_path = save_path + "/{}_enhanced_bgr.jpg".format(fname) 
+        blurred_path = blurred_save_path + "/{}_blurred.jpg".format(fname) 
+        # intersection_result_path = save_path + "/{}_intersection_result.jpg".format(fname) 
+        cv2.imwrite(change_brt_path, changed_brt)
+        cv2.imwrite(equalized_image_path, equalized_image)
+        cv2.imwrite(enhanced_path, enhanced)
+        cv2.imwrite(enhanced2_path, enhanced2)
+        cv2.imwrite(enhanced3_path, enhanced3)
+        # cv2.imwrite(enhanced_bgr_path, enhanced_bgr)
+        cv2.imwrite(blurred_path, blurred)
+        # cv2.imwrite(intersection_result_path, intersection_result)
+        # print("========")
+
+
+
+        
+
+        # thresh = cv2.adaptiveThreshold(
+        #     blurred, 255, 
+        #     cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        #     cv2.THRESH_BINARY_INV, 11, 2
+        # )
+
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+        # cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)  # 开运算去噪
+        # cleaned_path = save_path + "/{}_cleaned.jpg".format(fname) 
+        # cv2.imwrite(cleaned_path, cleaned)
+
+        # # median_blurred = cv2.medianBlur(cleaned, 3)
+        # # median_blurred_path = save_path + "/{}_median_blurred.jpg".format(fname) 
+        # # cv2.imwrite(median_blurred_path, median_blurred)
+
+        binary_path = binary_save_path + "/{}_binary.jpg".format(fname) 
+        cv2.imwrite(binary_path, binary)
+
+        try:
+            masked, masked_enhanced, masked_enhanced2, masked_blurred, masked_cleaned = reduceSumMaskArea(img)
+
+            masked_path = masked_save_path + "/{}_masked.jpg".format(fname) 
+            masked_enhanced_path = masked_enhanced_save_path + "/{}_masked_enhanced.jpg".format(fname) 
+            masked_enhanced2_path = masked_enhanced2_save_path + "/{}_masked_enhanced2.jpg".format(fname) 
+            masked_blurred_path = masked_blurred_save_path + "/{}_masked_blurred.jpg".format(fname) 
+            masked_cleaned_path = masked_cleaned_save_path + "/{}_masked_cleaned.jpg".format(fname) 
+            cv2.imwrite(masked_path, masked)
+            cv2.imwrite(masked_enhanced_path, masked_enhanced)
+            cv2.imwrite(masked_enhanced2_path, masked_enhanced2)
+            cv2.imwrite(masked_blurred_path, masked_blurred)
+            cv2.imwrite(masked_cleaned_path, masked_cleaned)
+
+            cd_res = corner_detect_v3(masked_enhanced2)
+            cd_path = cd_save_path + "/{}_cd_res.jpg".format(fname) 
+            cv2.imwrite(cd_path, cd_res)
+
+            sharpen_kernel = np.array([[-1,-1,-1], 
+                           [-1, 9,-1],
+                           [-1,-1,-1]])
+ 
+            # 应用滤波器核进行锐化
+            sharpened_image = cv2.filter2D(masked_enhanced2, -1, sharpen_kernel)
+            sharpened_path = sharpened_save_path + "/{}_sharpened_.jpg".format(fname) 
+            cv2.imwrite(sharpened_path, sharpened_image)
+
+
+        except Exception as e:
+            print(e)
+
+
+            
+        # res = connected_components_analysis_20250401(masked_cleaned, area_thr=5000)
+        # masked_cleaned_cca_path = save_path + "/{}_masked_cleaned_cca.jpg".format(fname) 
+        # cv2.imwrite(masked_cleaned_cca_path, res[2])
+
+
+
+        # bilateral_img = cv2.bilateralFilter(img, 9, 75, 75)
+        # bilateral_enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+        # bilateral_img_path = save_path + "/{}_bilateral_img.jpg".format(fname) 
+        # bilateral_enhanced_path = save_path + "/{}_bilateral_enhanced.jpg".format(fname)
+        # cv2.imwrite(bilateral_img_path, bilateral_img)
+        # cv2.imwrite(bilateral_enhanced_path, bilateral_enhanced)
+
+        print("========")
+
+
+    
+def corner_detect_v3(img):
+    # =======================================================================================
+    # https://www.cnblogs.com/GYH2003/articles/GYH-PythonOpenCV-FeatureDetection-Corner.html
+    imgsz = img.shape
+    if len(imgsz) == 3:
+        img_vis = img.copy()
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray = np.float32(gray)  # 转换为浮点型
+    else:
+        img_vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        gray = np.float32(img)  # 转换为浮点型
+    
+    # dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)  # Harris 角点检测
+    t1 = time.time()
+    # dst = cv2.cornerHarris(gray, blockSize=10, ksize=7, k=0.04)  # Harris 角点检测
+    dst = cv2.cornerHarris(gray, blockSize=10, ksize=15, k=0.04)  # Harris 角点检测
+    t2 = time.time()
+    # print("Harris角点检测耗时：", t2 - t1)
+
+    r, dst = cv2.threshold(dst, 0.01 * dst.max(), 255, 0)  # 二值化阈值处理
+    dst = np.uint8(dst)  # 转换为整型
+    # cv2.imshow('dst', dst)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+
+    # 不同的连通域赋予不同的颜色
+    output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for i in range(1, num_labels):
+        mask = labels == i
+        output[:, :, 0][mask] = np.random.randint(0, 256)
+        output[:, :, 1][mask] = np.random.randint(0, 256)
+        output[:, :, 2][mask] = np.random.randint(0, 256)
+
+    # 标记角点
+    dst = cv2.dilate(dst, None)  # 膨胀操作，增强角点标记
+    # print(dst > 0.01 * dst.max())
+    img_vis[dst > 0.01 * dst.max()] = [0, 0, 255]  # 将角点标记为红色
+
+    # # 显示结果
+    # cv2.imshow('Harris Corners', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    return img_vis
+    
+
+def test_20250401():
+    src_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\pose_yolo_format\images"
+    lbl_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\pose_yolo_format\labels"
+    data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src_results"
+    file_list = get_file_list(src_path)
+    dir_list = get_dir_list(data_path)
+
+    save_path = r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000"
+
+    for d in dir_list:
+        d_path = os.path.join(data_path, d)
+
+        d_img_save_path = save_path + "/{}/images".format(d)
+        d_lbl_save_path = save_path + "/{}/labels".format(d)
+        os.makedirs(d_img_save_path, exist_ok=True)
+        os.makedirs(d_lbl_save_path, exist_ok=True)
+       
+        for f in file_list:
+            fname = os.path.splitext(f)[0]
+            
+            if d == "equalized_image":
+                f_abs_path = d_path + "/{}_{}.jpg".format(fname, "enhanced")
+                f_dst_path = d_img_save_path + "/{}_{}.jpg".format(fname, "enhanced")
+                shutil.copy(f_abs_path, f_dst_path)
+                f_lbl_abs_path = lbl_path + "/{}.txt".format(fname)
+                f_lbl_dst_path = d_lbl_save_path + "/{}_{}.txt".format(fname, "enhanced")
+                shutil.copy(f_lbl_abs_path, f_lbl_dst_path)
+            elif d == "sharpened":
+                f_abs_path = d_path + "/{}_{}.jpg".format(fname, "sharpened_")
+                f_dst_path = d_img_save_path + "/{}_{}.jpg".format(fname, "sharpened_")
+                shutil.copy(f_abs_path, f_dst_path)
+                f_lbl_abs_path = lbl_path + "/{}.txt".format(fname)
+                f_lbl_dst_path = d_lbl_save_path + "/{}_{}.txt".format(fname, "sharpened_")
+                shutil.copy(f_lbl_abs_path, f_lbl_dst_path)
+            else:
+                f_abs_path = d_path + "/{}_{}.jpg".format(fname, d)
+                f_dst_path = d_img_save_path + "/{}_{}.jpg".format(fname, d)
+                shutil.copy(f_abs_path, f_dst_path)
+                f_lbl_abs_path = lbl_path + "/{}.txt".format(fname)
+                f_lbl_dst_path = d_lbl_save_path + "/{}_{}.txt".format(fname, d)
+                shutil.copy(f_lbl_abs_path, f_lbl_dst_path)
+
+        
+def extract_specific_color(img, lower, upper, color="green"):
+    """
+    提取图中指定颜色区域
+    :param img: 输入图像
+    :param lower: 颜色下限
+    :param upper: 颜色上限
+    :param color: 颜色名称
+    :return: mask, result, binary, binary_otsu
+    
+    https://news.sohu.com/a/569474695_120265289
+    https://blog.csdn.net/yuan2019035055/article/details/140495066
+    """
+    assert len(img.shape) == 3, "len(img.shape) != 3"
+
+    if color == "black":
+        lower = (0, 0, 0)
+        upper = (180, 255, 46)
+    elif color == "gray":
+        lower = (0, 0, 46)
+        upper = (180, 43, 220)
+    elif color == "white":
+        lower = (0, 0, 221)
+        upper = (180, 30, 255)
+    elif color == "red":
+        lower0 = (0, 43, 46)
+        upper0 = (10, 255, 255)
+        lower1 = (156, 43, 46)
+        upper1 = (180, 255, 255)
+    elif color == "orange":
+        lower = (11, 43, 46)
+        upper = (25, 255, 255)
+    elif color == "yellow":
+        lower = (26, 43, 46)
+        upper = (34, 255, 255)
+    elif color == "green":
+        lower = (35, 43, 46)
+        upper = (77, 255, 255)
+    elif color == "cyan":
+        lower = (78, 43, 46)
+        upper = (99, 255, 255)
+    elif color == "blue":
+        lower = (100, 43, 46)
+        upper = (124, 255, 255)
+    elif color == "purple":
+        lower = (125, 43, 46)
+        upper = (155, 255, 255)
+    else:
+        assert lower is not None and upper is not None and color not in ['black', 'gray', 'white', 'red', 'orange', 'yellow','green', 'cyan', 'blue', 'purple'], "Please choose color \
+        from ['black', 'gray', 'white', 'red', 'orange', 'yellow','green', 'cyan', 'blue', 'purple']. If not in the list, please input the 'lower' and 'upper' HSV value of the color."
+        
+    hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    if color == "red":
+        mask0 = cv2.inRange(hsv_img, lower0, upper0)
+        mask1 = cv2.inRange(hsv_img, lower1, upper1)
+        mask = cv2.bitwise_or(mask0, mask1)
+    else:
+        mask = cv2.inRange(hsv_img, lower, upper)
+
+    # 可视化结果（可选）
+    # 将掩码应用到原图上，显示提取的颜色区域
+    result = cv2.bitwise_and(img, img, mask=mask)
+
+    gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    _, binary_otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    return mask, result, binary, binary_otsu
+
+
+def ransac_parabola(points, select_num=10, num_iterations=1000, threshold=15.0):
+    """
+    # # 生成测试数据
+    # np.random.seed(42)
+    # x = np.linspace(-10, 10, 100)
+    # y_true = 0.5 * x**2 + 2 * x + 3
+    # y = y_true + np.random.normal(scale=3.0, size=x.shape)  # 添加噪声
+    # # 添加外点
+    # outlier_indices = np.random.choice(len(x), size=20, replace=False)
+    # y[outlier_indices] += np.random.normal(scale=30, size=20)
+    # points = np.column_stack((x, y))
+
+    # # 运行RANSAC
+    # model = ransac_parabola(points, num_iterations=1000, threshold=3.0)
+    # if model is not None:
+    #     a, b, c = model
+    #     print(f"拟合的抛物线方程: y = {a:.3f}x² + {b:.3f}x + {c:.3f}")
+    # else:
+    #     print("拟合失败")
+    """
+    best_model = None
+    best_inliers = []
+    max_inliers = 0
+
+    n_points = points.shape[0]
+    if n_points < select_num:
+        return None  # 无法拟合
+
+    for _ in range(num_iterations):
+        # 随机选择三个点
+        sample_indices = random.sample(range(n_points), select_num)
+        sample_points = points[sample_indices]
+        sx = sample_points[:, 0]
+        sy = sample_points[:, 1]
+
+        model = np.polyfit(sx, sy, 2)
+
+        # 计算所有点的垂直距离
+        x_all = points[:, 0]
+        y_all = points[:, 1]
+        y_pred = model[0] * x_all**2 + model[1] * x_all + model[2]
+        distances = np.abs(y_all - y_pred)
+
+        # 统计内点
+        inliers = np.where(distances < threshold)[0]
+        n_inliers = inliers.size
+
+        # 更新最佳模型
+        if n_inliers > max_inliers:
+            max_inliers = n_inliers
+            best_inliers = inliers
+            best_model = model
+
+    # 使用所有内点重新拟合
+    if best_model is not None and len(best_inliers) >= select_num:
+        x_inliers = points[best_inliers, 0]
+        y_inliers = points[best_inliers, 1]
+        model = np.polyfit(x_inliers, y_inliers, 2)
+        best_model = model
+    else:
+        return None  # 无有效模型
+
+    return best_model
+
+
+def plot_fit_parabola(img, model, color=(255, 0, 255)):
+    """
+    a, b, c = model
+    print(f"拟合的抛物线方程: y = {a:.3f}x² + {b:.3f}x + {c:.3f}")
+    """
+    imgsz = img.shape[:2]
+    x = np.linspace(0, imgsz[1], imgsz[1] - 1)
+    y = model[0] * x**2 + model[1] * x + model[2]
+    for i in range(len(x)):
+        cv2.circle(img, (int(x[i]), int(y[i])), 2, color, -1)
+
+    return img
+
+
+def parabola(x, a, b, c):
+    return a*x**2 + b*x + c
 
 
 
@@ -11339,7 +12076,7 @@ if __name__ == '__main__':
 
     # random_select_yolo_images_and_labels(data_path="", select_num=500, move_or_copy="copy", select_mode=0)
     # vis_yolo_label(data_path="", print_flag=False, color_num=1000, rm_small_object=False, rm_size=32)  # TODO: 1.rm_small_object have bugs.
-    # list_yolo_labels(label_path="")
+    # list_yolo_labels(label_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\labels")
     # change_txt_content(txt_base_path="")
     # remove_yolo_txt_contain_specific_class(data_path="", rm_cls=(0, ))
     # remove_yolo_txt_small_bbx(data_path="", rm_cls=(0, ), rmsz=(48, 48))
@@ -11396,33 +12133,33 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\003_1255_yolo_format\labels")
+    # change_txt_content(txt_path=r"G:\Gosion\data\007.PPE_Det\data\v1\v4_add\labels")
     # for i in range(10, 12):
     #     change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_labelbee_format\{}_yolo_format\labels".format(i))
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4_add")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det\v1")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\train")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\val_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
-    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3_\train\labelbee_format\500", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
-    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\val_labelbee_format", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3_\train\labelbee_format\500_yolo_format".replace("\\", "/"), select_num=54, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\yitiji".replace("\\", "/"), select_num=54, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
-    # vis_yolo_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train_selected_aug_1")
+    # vis_yolo_labels(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\val")
 
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
 
-    # remove_yolo_label_specific_class(data_path=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\003_1255_yolo_format", rm_cls=(2, ))
+    # remove_yolo_label_specific_class(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet", rm_cls=(2, ))
 
     # make_border_and_change_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4_exp_make_border\train_base", dstsz=(1080 + 1920, 1920 + 1920))
 
@@ -11500,7 +12237,7 @@ if __name__ == '__main__':
     # save_path = img_path.replace(".jpg", "_bilateral_filter.jpg")
     # cv2.imwrite(save_path, res)
 
-    btd_test()
+    # btd_test()
 
     # # 使用示例
     # result = detect_gap(r"D:\Gosion\Projects\006.Belt_Torn_Det\data\rare_samples\20250327203539000.png")
@@ -11537,6 +12274,101 @@ if __name__ == '__main__':
     # img = cv2.imread(image_path)
     # img_vis, dst_bbx_pts, wides = corner_detect_v2(img, expand_pixels=25, brightness_thresh=2, dilate_pixels=2)
     # cv2.imwrite(image_path.replace(".jpg", "_corner_detect_v2.jpg"), img_vis)
+
+    # file_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\皮带撕裂检测日志"
+    # stats_btd(file_path=file_path, start=5, end=168, baseline=[2, [2, 6]])
+
+    # btd_test_20250401()
+    # test_20250401()
+
+    # data_path = r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged"
+    data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
+    save_path = make_save_path(data_path, relative='.', add_str="extract_specific_color_result")
+
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        mask, result, binary, binary_otsu = extract_specific_color(img, lower=None, upper=None, color="green")
+        bitand = cv2.bitwise_and(binary, binary_otsu)
+        bitor = cv2.bitwise_or(binary, binary_otsu)
+
+        points = np.where(binary_otsu == 255)
+        points = np.hstack((points[1].reshape(-1, 1), points[0].reshape(-1, 1)))
+        # 运行RANSAC
+        model = ransac_parabola(points, select_num=1000, num_iterations=1000, threshold=50)
+        if model is not None:
+            a, b, c = model
+            print(f"拟合的抛物线方程: y = {a:.12f}x² + {b:.12f}x + {c:.12f}")
+            
+            img = plot_fit_parabola(img, model, color=(255, 0, 255))
+
+        else:
+            print("拟合失败")
+
+        # # a = 2.845889*1e-4
+        # a = 3.905889*1e-4
+        # b = -0.413223
+        # # b = -0.453223
+        # c = 200
+        # model = (a, b, c)
+        # img = plot_fit_parabola(img, model, color=(255, 0, 255))
+
+
+        fit = np.polyfit(points[:, 0], points[:, 1], 2)
+        f = np.poly1d(fit)
+
+        img = plot_fit_parabola(img, fit, color=(255, 255, 0))
+
+        # fit_params, pcov = scipy.optimize.curve_fit(parabola, points[:, 0], points[:, 1])
+        # y_fit = parabola(points[:, 0], *fit_params)
+
+        save_path_img_parabola = "{}/{}_img_parabola.jpg".format(save_path, fname)
+        save_path_mask = "{}/{}_mask.jpg".format(save_path, fname)
+        save_path_result = "{}/{}_result.jpg".format(save_path, fname)
+        save_path_binary = "{}/{}_binary.jpg".format(save_path, fname)
+        save_path_binary_otsu = "{}/{}_binary_otsu.jpg".format(save_path, fname)
+        save_path_bitand = "{}/{}_bitand.jpg".format(save_path, fname)
+        save_path_bitor = "{}/{}_bitor.jpg".format(save_path, fname)
+        cv2.imwrite(save_path_img_parabola, img)
+        cv2.imwrite(save_path_mask, mask)
+        cv2.imwrite(save_path_result, result)
+        cv2.imwrite(save_path_binary, binary)
+        cv2.imwrite(save_path_binary_otsu, binary_otsu)
+        cv2.imwrite(save_path_bitand, bitand)
+        cv2.imwrite(save_path_bitor, bitor)
+
+
+    # # 生成测试数据
+    # np.random.seed(42)
+    # img = np.zeros((1000, 1000, 3), dtype=np.uint8)
+    # x = np.linspace(0, 1000, 1000 - 1)
+    # y_true = 0.5 * x**2 + 2 * x + 3
+    # y = y_true + np.random.normal(scale=3.0, size=x.shape)  # 添加噪声
+    # # 添加外点
+    # outlier_indices = np.random.choice(len(x), size=20, replace=False)
+    # y[outlier_indices] += np.random.normal(scale=30, size=20)
+    # points = np.column_stack((x, y))
+
+    # # 运行RANSAC
+    # model = ransac_parabola(points, num_iterations=1000, threshold=3.0)
+    # if model is not None:
+    #     a, b, c = model
+    #     print(f"拟合的抛物线方程: y = {a:.3f}x² + {b:.3f}x + {c:.3f}")
+    #     # y = -0.017x² + 7.754x + 578.284
+    #     a = -0.017
+    #     b = 7.754
+    #     c = 578.284
+    #     img = plot_fit_parabola(img, model, color=(255, 0, 255))
+    #     cv2.imshow("img", img)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    # else:
+    #     print("拟合失败")
+    
+    
+
 
     
     

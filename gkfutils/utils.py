@@ -668,9 +668,11 @@ def process_via_filename(path1, path2, save_path="", with_suffix=True, flag="dif
     file1_list = get_file_list(path1)
     file2_list = get_file_list(path2)
 
+    par_path = os.path.join(path1, "..")
+
 
     if save_path is None or save_path == "":
-        save_path = make_save_path(path1, relative=".", add_str="Processed_{}_{}".format(dir1_name, dir2_name))
+        save_path = make_save_path(par_path, relative=".", add_str="Processed_{}_{}".format(dir1_name, dir2_name))
     else:
         os.makedirs(save_path, exist_ok=True)
 
@@ -920,6 +922,7 @@ def change_conda_envs_files_content(conda_envs_path):
 
 
 def merge_txt_content(path1, path2):
+    """ path1 <-- path2 """
     txt_list1 = sorted(os.listdir(path1))
     txt_list2 = sorted(os.listdir(path2))
 
@@ -1184,8 +1187,26 @@ def get_system_platform():
         print("当前系统是其他操作系统")
 
 
+def remove_file_by_filename_keywords(data_path, k=""):
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        if k in fname:
+            f_abs_path = data_path + "/{}".format(f)
+            os.remove(f_abs_path)
+            print("{} is removed".format(f_abs_path))
 
 
+def move_file_by_filename_keywords(data_path, k=""):
+    file_list = get_file_list(data_path)
+    save_path = make_save_path(data_path, ".", "moved")
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        if k in fname:
+            f_abs_path = data_path + "/{}".format(f)
+            f_dst_path = save_path + "/{}".format(f)
+            shutil.move(f_abs_path, f_dst_path)
+            print("{} --> {}".format(f_abs_path, f_dst_path))
 
 
 if __name__ == '__main__':
@@ -1197,9 +1218,9 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    # merge_txt_content(path1=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels_1_2", path2=r"D:\Gosion\Projects\004.Out_GuardArea_Det\data\v3\train\004_1427\labels")
-    # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2_merged", new_name_prefix="v5_2_aug_1_20250319_rename", start_num=0)
-    # rename_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\train_aug_1\labels", new_name_prefix="006_Belt_Torn_Det_aug_2", start_num=0)
+    # merge_txt_content(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\train\labels_person", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\train\labels_helmet")
+    rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\images", new_name_prefix="person_helmet_1_20250402", start_num=0)
+    rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\labels", new_name_prefix="person_helmet_1_20250402", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
     # dir_list = os.listdir(data_path)
@@ -1213,12 +1234,12 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    # merge_dirs(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\2")
+    # merge_dirs(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000")
 
 
-    random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500_aug", mvcp="copy", select_num=601)
+    # random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500_aug", mvcp="copy", select_num=601)
 
-    # process_via_filename(path1=r"E:\wujiahu\003\v4_add_aug_0\images", path2=r"E:\wujiahu\003\v4_add_aug_0\labels", save_path="", with_suffix=False, flag="same", mvcp="cp")
+    # process_via_filename(path1=r"G:\Gosion\data\007.PPE_Det\data\helmet\images", path2=r"G:\Gosion\data\007.PPE_Det\data\helmet\labels_new", save_path="", with_suffix=False, flag="same", mvcp="mv")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
@@ -1230,6 +1251,11 @@ if __name__ == '__main__':
     # logger.logger.info("===========================================")
 
     # get_system_platform()
+
+    # remove_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000\labels", k="masked_cleaned")
+    # move_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\train_labelbee_format\jsons", k="aug")
+
+    
 
     
 

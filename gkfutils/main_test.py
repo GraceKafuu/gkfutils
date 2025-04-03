@@ -175,7 +175,7 @@ def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
         img_path = data_path + "/images"
         lbl_path = data_path + "/labels"
         
-        save_path = make_save_path(data_path, relative=".", add_str="aug")
+        save_path = make_save_path(data_path, relative=".", add_str=fname_add_str)
         img_save_path = save_path + "/images"
         lbl_save_path = save_path + "/labels"
         os.makedirs(img_save_path, exist_ok=True)
@@ -183,7 +183,7 @@ def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
     else:
         img_path = data_path
         
-        save_path = make_save_path(data_path, relative=".", add_str="aug")
+        save_path = make_save_path(data_path, relative=".", add_str=fname_add_str)
         img_save_path = save_path
         os.makedirs(img_save_path, exist_ok=True)
     
@@ -198,25 +198,25 @@ def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
 
         if t == "det":
             lbl_abs_path = lbl_path + "/{}.txt".format(fname)
-            lbl_dst_path = lbl_save_path + "/{}.txt".format(fname)
+            lbl_dst_path = lbl_save_path + "/{}_{}.txt".format(fname, fname_add_str)
         
         # img = dilate_erode(img, random=True, p=p, flag=np.random.choice(["dilate", "erode"]))
 
-        rdm0 = np.random.choice(np.arange(2))
-        if rdm0 == 0:
-            img = scale(img, random=True, p=p, fx=(0.5, 1.5), fy=(0.5, 1.5))
-        else:
-            img = stretch(img, random=True, p=p, r=(0.25, 1.25))
+        # rdm0 = np.random.choice(np.arange(2))
+        # if rdm0 == 0:
+        #     img = scale(img, random=True, p=p, fx=(0.5, 1.5), fy=(0.5, 1.5))
+        # else:
+        #     img = stretch(img, random=True, p=p, r=(0.25, 1.25))
 
         rdm1 = np.random.choice(np.arange(5))
         if rdm1 == 0:
             img = change_brightness(img, random=True, p=p, value=(-25, 25))
         elif rdm1 == 1:
             img = gamma_correction(img, random=True, p=p, value=(0.5, 1.5))
-        # elif rdm1 == 2:
-        #     img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 25))
-        # elif rdm1 == 3:
-        #     img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
+        elif rdm1 == 2:
+            img = change_contrast_and_brightness(img, random=True, p=p, alpha=(0.25, 0.75), beta=(0, 25))
+        elif rdm1 == 3:
+            img = clahe(img, random=True, p=p, m=np.random.choice([0, 1]),  clipLimit=(2.0, 4.0), tileGridSize=(4, 16))
         # else:
         #     img = log_transformation(img, random=True, p=p)
 
@@ -234,14 +234,14 @@ def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
         else:
             img = median_blur(img, random=True, p=p)
         
-        # rdm3 = np.random.choice(np.arange(2))
-        # # img = color_distortion(img, random=True, p=p, value=(-360, 360))
-        # # img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.95), sgain=(0.25, 0.95), vgain=(0.25, 0.95))
-        # img = change_color(img, random=True, p=1, hue_shift=30)
-        # if rdm3 == 0:
-        #     img = color_distortion(img, random=True, p=p, value=(-360, 360))
-        # else:
-        #     img = change_hsv(img, random=True, p=p, hgain=(0.45, 0.95), sgain=(0.45, 0.95), vgain=(0.45, 0.95))
+        rdm3 = np.random.choice(np.arange(2))
+        # img = color_distortion(img, random=True, p=p, value=(-360, 360))
+        # img = change_hsv(img, random=True, p=p, hgain=(0.25, 0.95), sgain=(0.25, 0.95), vgain=(0.25, 0.95))
+        img = change_color(img, random=True, p=1, hue_shift=30)
+        if rdm3 == 0:
+            img = color_distortion(img, random=True, p=p, value=(-360, 360))
+        else:
+            img = change_hsv(img, random=True, p=p, hgain=(0.45, 0.95), sgain=(0.45, 0.95), vgain=(0.45, 0.95))
         
         # img = transperent_overlay(img, random=True, p=p, max_h_r=1.0, max_w_r=0.5, alpha=(0.1, 0.6))
 
@@ -265,7 +265,7 @@ def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
         # img = rotate(img, random=True, p=p, algorithm="pil", angle=(-45, 45), expand=True)
 
         # 以下OCR数据增强时不建议使用:
-        img = flip(img, random=True, p=p, m=np.random.choice([-1, 0, 1]))  # m=np.random.choice([-1, 0, 1])
+        # img = flip(img, random=True, p=p, m=np.random.choice([-1, 0, 1]))  # m=np.random.choice([-1, 0, 1])
         # img = equalize_hist(img, random=True, p=p, m=1)  # m=np.random.choice([0, 1])
         # img = translate(img, random=True, p=p, tx=(-50, 50), ty=(-50, 50), dstsz=None)
 
@@ -274,12 +274,12 @@ def image_processing_aug_det_data(data_path, t="det", fname_add_str="new"):
         # img = normalize(img, random=True, p=p, alpha=0, beta=1, norm_type=np.random.choice([cv2.NORM_MINMAX, cv2.NORM_L2]))  # 容易变黑图
 
         brightness = cal_brightness_v2(img)
-        if brightness > 200: continue
+        if brightness > 200 or brightness < 2: continue
 
         
 
         if t == "det":
-            img_dst_path = img_save_path + "/{}".format(f)
+            img_dst_path = img_save_path + "/{}_{}.jpg".format(fname, fname_add_str)
             cv2.imwrite(img_dst_path, img)
             shutil.copy(lbl_abs_path, lbl_dst_path)
         else:
@@ -783,7 +783,7 @@ def cal_params_flops_test():
 if __name__ == '__main__':
     # image_processing()
     # image_processing_aug()
-    image_processing_aug_det_data(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500", t="cls", fname_add_str="aug_new2_20250320")
+    image_processing_aug_det_data(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000", t="det", fname_add_str="aug_yitiji_20250402_3")
     # make_border()
 
     # det_labels_convertion()

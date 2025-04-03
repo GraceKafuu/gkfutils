@@ -10,8 +10,8 @@ import time
 class YOLOv5_ONNX(object):
     def __init__(self, onnx_path):
         cuda = torch.cuda.is_available()
-        # providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-        providers = ['CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+        # providers = ['CPUExecutionProvider']
         self.session = onnxruntime.InferenceSession(onnx_path, providers=providers)
         self.input_names = self.session.get_inputs()[0].name
         self.output_names = self.session.get_outputs()[0].name
@@ -278,9 +278,9 @@ def bbox_voc_to_yolo(imgsz, box):
     return [x, y, w, h]
 
 
-def yolo_inference_save_labels(data_path, model_path):
+def yolo_inference_save_labels(data_path, model_path, addStr=""):
     base_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../labels".format(base_name)))
+    save_path = os.path.abspath(os.path.join(data_path, "../labels_{}".format(addStr)))
     os.makedirs(save_path, exist_ok=True)
     file_list = os.listdir(data_path)
     
@@ -305,12 +305,12 @@ def yolo_inference_save_labels(data_path, model_path):
                     x1, y1, x2, y2, conf, cls = b
                     bbox_yolo = bbox_voc_to_yolo(src_size, [x1, y1, x2, y2])
 
-                    # if int(cls) == 0:
-                    #     txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
-                    #     fw.write(txt_content)
+                    if int(cls) == 0:
+                        txt_content = "{}".format(cls + 1) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                        fw.write(txt_content)
 
-                    txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
-                    fw.write(txt_content)
+                    # txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                    # fw.write(txt_content)
 
                     # if int(cls) == 1 or int(cls) == 2:
                     #     txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
@@ -398,9 +398,9 @@ if __name__ == '__main__':
     # model_path=r"D:\Gosion\Python\yolov5-master\runs\train\001.leaking_liquid_det_v2_780\weights\best.onnx"
     # yolo_inference_save_labels(data_path=data_path, model_path=model_path)
 
-    data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4\images"
-    model_path=r"D:\Gosion\Projects\管网LNG\gitee\pipechina_beihaihaikou\weights\violated_sitting_detection\violated_sitting_det_yolov5s_640_640_v1.0.2.onnx"
-    yolo_inference_save_labels(data_path=data_path, model_path=model_path)
+    data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\train\images"
+    model_path=r"D:\Gosion\code\gitee\GuanWangLNG\src\pipechina_beihaihaikou\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.1.onnx"
+    yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="helmet")
     
 
 

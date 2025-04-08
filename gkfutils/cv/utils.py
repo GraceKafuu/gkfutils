@@ -9432,13 +9432,23 @@ def change_txt_content(txt_path):
 
         f_dst_path = save_path + "/{}".format(f)
         with open(f_dst_path, "w", encoding="utf-8") as fw:
+            # for line in txt_content:
+            #     l = line.strip().split(" ")
+            #     cls = int(l[0])
+            #     if cls == 1:
+            #         cls_new = cls - 1
+            #     else:
+            #         cls_new = cls
+            #     l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #     fw.write(l_new)
+
             for line in txt_content:
                 l = line.strip().split(" ")
                 cls = int(l[0])
                 if cls == 1:
-                    cls_new = cls - 1
+                    cls_new = 0
                 else:
-                    cls_new = cls
+                    cls_new = 1
                 l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
                 fw.write(l_new)
 
@@ -11805,8 +11815,9 @@ def corner_detect_v3(img):
     
     # dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)  # Harris 角点检测
     t1 = time.time()
-    # dst = cv2.cornerHarris(gray, blockSize=10, ksize=7, k=0.04)  # Harris 角点检测
-    dst = cv2.cornerHarris(gray, blockSize=10, ksize=15, k=0.04)  # Harris 角点检测
+    dst = cv2.cornerHarris(gray, blockSize=8, ksize=15, k=0.04)  # Harris 角点检测
+    # dst = cv2.cornerHarris(gray, blockSize=16, ksize=7, k=0.04)  # Harris 角点检测
+    # dst = cv2.cornerHarris(gray, blockSize=10, ksize=15, k=0.04)  # Harris 角点检测
     t2 = time.time()
     # print("Harris角点检测耗时：", t2 - t1)
 
@@ -12032,6 +12043,413 @@ def parabola(x, a, b, c):
     return a*x**2 + b*x + c
 
 
+def contrast_stretch(img):
+    assert len(img.shape) == 2, "len(img.shape) != 2"
+    input_min, input_max = img.min(), img.max()
+    out = (img - input_min) * (255 / (input_max - input_min))
+    out = np.clip(out, 0, 255).astype(np.uint8)
+
+    return out
+
+
+def stretch_opencv(img, alpha=1.5, beta=0):
+    out = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+    return out
+
+
+
+def test_20250407():
+    data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
+    save_path = make_save_path(data_path, ".", "results_20250407")
+    enhanced_save_path = save_path + "/enhanced"
+    enhanced2_save_path = save_path + "/enhanced2"
+    contrast_stretch_save_path = save_path + "/contrast_stretch"
+    orig_contrast_stretch_save_path = save_path + "/orig_contrast_stretch"
+    enhanced2_inv_save_path = save_path + "/enhanced2_inv"
+
+    blurred_save_path = save_path + "/blurred"
+    binary_save_path = save_path + "/binary"
+    orig_cd_save_path = save_path + "/orig_corner_detect"
+    cd_save_path = save_path + "/corner_detect"
+    sharpened_save_path = save_path + "/sharpened"
+    sharpened_corner_detect_save_path = save_path + "/sharpened_corner_detect"
+    os.makedirs(enhanced_save_path, exist_ok=True)
+    os.makedirs(contrast_stretch_save_path, exist_ok=True)
+    os.makedirs(orig_contrast_stretch_save_path, exist_ok=True)
+    os.makedirs(enhanced2_save_path, exist_ok=True)
+    os.makedirs(enhanced2_inv_save_path, exist_ok=True)
+    os.makedirs(blurred_save_path, exist_ok=True)
+    os.makedirs(binary_save_path, exist_ok=True)
+    os.makedirs(orig_cd_save_path, exist_ok=True)
+    os.makedirs(cd_save_path, exist_ok=True)
+    os.makedirs(sharpened_save_path, exist_ok=True)
+    os.makedirs(sharpened_corner_detect_save_path, exist_ok=True)
+
+
+    file_list = get_file_list(data_path)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+
+        orig_cd_res = corner_detect_v3(img)
+        orig_cd_path = orig_cd_save_path + "/{}_orig_cd_res.jpg".format(fname) 
+        cv2.imwrite(orig_cd_path, orig_cd_res)
+
+        img_vis = img.copy()
+
+        changed_brt = change_brightness(img, random=True, p=1, value=(-50, 50))
+
+        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+        # equalize the histogram of the Y channel
+        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+        # convert the YUV image back to RGB format
+        equalized_image = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        enhanced2 = clahe.apply(enhanced)
+
+        blurred = cv2.medianBlur(enhanced, 3)  # 或 cv2.GaussianBlur()
+
+        enhanced_path = enhanced_save_path + "/{}_enhanced.jpg".format(fname) 
+        enhanced2_path = enhanced2_save_path + "/{}_enhanced2.jpg".format(fname) 
+        # enhanced_bgr_path = save_path + "/{}_enhanced_bgr.jpg".format(fname) 
+        blurred_path = blurred_save_path + "/{}_blurred.jpg".format(fname) 
+        # intersection_result_path = save_path + "/{}_intersection_result.jpg".format(fname) 
+        cv2.imwrite(enhanced_path, enhanced)
+        cv2.imwrite(enhanced2_path, enhanced2)
+        # cv2.imwrite(enhanced_bgr_path, enhanced_bgr)
+        cv2.imwrite(blurred_path, blurred)
+        # cv2.imwrite(intersection_result_path, intersection_result)
+        # print("========")
+
+        
+        enhanced2_inv = 255 - enhanced2
+        enhanced2_inv_path = enhanced2_inv_save_path + "/{}_enhanced2_inv.jpg".format(fname)
+        cv2.imwrite(enhanced2_inv_path, enhanced2_inv)
+
+        contrast_stretch_img = contrast_stretch(enhanced2)
+        contrast_stretch_path = contrast_stretch_save_path + "/{}_contrast_stretch.jpg".format(fname)
+        cv2.imwrite(contrast_stretch_path, contrast_stretch_img)
+
+
+
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+        # cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)  # 开运算去噪
+        # cleaned_path = save_path + "/{}_cleaned.jpg".format(fname) 
+        # cv2.imwrite(cleaned_path, cleaned)
+
+        # # median_blurred = cv2.medianBlur(cleaned, 3)
+        # # median_blurred_path = save_path + "/{}_median_blurred.jpg".format(fname) 
+        # # cv2.imwrite(median_blurred_path, median_blurred)
+
+        binary_path = binary_save_path + "/{}_binary.jpg".format(fname) 
+        cv2.imwrite(binary_path, binary)
+
+        cd_res = corner_detect_v3(enhanced2)
+        cd_path = cd_save_path + "/{}_cd_res.jpg".format(fname) 
+        cv2.imwrite(cd_path, cd_res)
+
+        sharpen_kernel = np.array([[-1,-1,-1], 
+                        [-1, 9,-1],
+                        [-1,-1,-1]])
+
+        # 应用滤波器核进行锐化
+        sharpened_image = cv2.filter2D(enhanced2, -1, sharpen_kernel)
+        sharpened_path = sharpened_save_path + "/{}_sharpened_.jpg".format(fname) 
+        cv2.imwrite(sharpened_path, sharpened_image)
+
+        sp_cd_res = corner_detect_v3(sharpened_image)
+        sp_cd_path = sharpened_corner_detect_save_path + "/{}_sp_cd_res.jpg".format(fname) 
+        cv2.imwrite(sp_cd_path, sp_cd_res)
+
+        print("========")
+
+
+def high_reserve(img,ksize,sigm):
+    img = img * 1.0
+    gauss_out = cv2.GaussianBlur(img,(ksize,ksize),sigm)
+    img_out = img - gauss_out + 128
+    img_out = img_out/255.0
+    # 饱和处理
+    mask_1 = img_out  < 0
+    mask_2 = img_out  > 1
+    img_out = img_out * (1-mask_1)
+    img_out = img_out * (1-mask_2) + mask_2
+    return img_out
+
+def usm(img ,number):
+    blur_img = cv2.GaussianBlur(img, (0, 0), number)
+    usm = cv2.addWeighted(img, 1.5, blur_img, -0.5, 0)
+
+    return usm
+
+
+def Overlay(target, blend):
+    mask = blend < 0.5
+    img = 2 * target * blend * mask + (1 - mask) * (1 - 2 * (1 - target) * (1 - blend))
+    return img
+
+
+def merge_lines(lines, e0, e1):
+    merged_lines = []
+    # 遍历每条直线
+    for i, line in enumerate(lines):
+        if len(merged_lines) == 0:
+            merged_lines.append(line)
+        else:
+            merged = False
+            # 遍历已合并的直线
+            for i, merged_line in enumerate(merged_lines):
+                theta = line[1]
+                distan= line[0]
+                mtheta = merged_line[1]
+                mdistan= merged_line[0]
+                dtheta=abs(np.sin(theta))-abs(np.sin(mtheta))
+                ds=abs(abs(mdistan)-abs(distan))
+                # 判断两条直线是否可合并
+                if dtheta < e0 and ds < e1 :
+                    merged_lines[i] = [(line[0] + merged_line[0]) / 2, (line[1] + merged_line[1]) / 2]
+                    merged = True
+                    break
+            # 如果不能合并，则将直线添加到已合并的直线列表中
+            if not merged:
+                merged_lines.append(line)
+    return merged_lines
+
+
+def extend_lines(lines, img_shape):
+    extended_lines = []
+    # 遍历每条直线
+    for line in lines:
+        rho = line[0]
+        theta = line[1]
+        a = np.cos(theta)
+        b = np.sin(theta)
+        x0 = a * rho
+        y0 = b * rho
+        x1 = int(x0 + 1000 * (-b))
+        y1 = int(y0 + 1000 * (a))
+        x2 = int(x0 - 1000 * (-b))
+        y2 = int(y0 - 1000 * (a))
+        extended_lines.append([(x1, y1), (x2, y2)])
+    return extended_lines
+
+
+def find_intersections(lines):
+    intersections = []
+    # 遍历每条直线的组合
+    for i in range(len(lines)):
+        for j in range(i+1, len(lines)):
+            line1 = lines[i]
+            line2 = lines[j]
+            x1, y1 = line1[0]
+            x2, y2 = line1[1]
+            x3, y3 = line2[0]
+            x4, y4 = line2[1]
+            denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+            # 判断两条直线是否相交
+            if denominator != 0:
+                x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denominator
+                y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denominator
+                intersections.append((int(x), int(y)))
+    return intersections
+
+
+def draw_lines(img, lines):
+    for line in lines:
+        cv2.line(img, line[0], line[1], (0, 0, 255), 2)
+
+
+def draw_intersections(img, intersections):
+    for intersection in intersections:
+        cv2.circle(img, intersection, 5, (0, 255, 0), -1)
+
+
+def detect_lines(img, e0, e1, rho, threshold):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    lines = cv2.HoughLines(edges, rho, np.pi/180, threshold)
+    lines = lines[:, 0, :]
+    merged_lines = merge_lines(lines, e0, e1)
+    extended_lines = extend_lines(merged_lines, img.shape)
+    intersections = find_intersections(extended_lines)
+    draw_lines(img, extended_lines)
+    draw_intersections(img, intersections)
+    return img
+
+
+
+def test_20250407_2():
+    img_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src\1743418859.9315038.jpg"
+    fname = os.path.splitext(os.path.basename(img_path))[0]
+    img = cv2.imread(img_path)
+    img_vis = img.copy()
+
+    save_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src_1743418859.9315038_results"
+    os.makedirs(save_path, exist_ok=True)
+
+    orig_cd_res = corner_detect_v3(img)
+    orig_cd_path = save_path + "/{}_orig_cd_res.jpg".format(fname) 
+    cv2.imwrite(orig_cd_path, orig_cd_res)
+
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    enhanced2 = clahe.apply(enhanced)
+
+    blurred = cv2.medianBlur(enhanced2, 7)  # 或 cv2.GaussianBlur()
+
+    enhanced_path = save_path + "/{}_enhanced.jpg".format(fname)
+    enhanced2_path = save_path + "/{}_enhanced2.jpg".format(fname)
+    blurred_path = save_path + "/{}_blurred.jpg".format(fname)
+    cv2.imwrite(enhanced_path, enhanced)
+    cv2.imwrite(enhanced2_path, enhanced2)
+    cv2.imwrite(blurred_path, blurred)
+
+    
+    enhanced2_inv = 255 - enhanced2
+    enhanced2_inv_path = save_path + "/{}_enhanced2_inv.jpg".format(fname)
+    cv2.imwrite(enhanced2_inv_path, enhanced2_inv)
+
+    contrast_stretch_img = contrast_stretch(enhanced2)
+    contrast_stretch_path = save_path + "/{}_contrast_stretch.jpg".format(fname)
+    cv2.imwrite(contrast_stretch_path, contrast_stretch_img)
+
+
+    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    binary_path = save_path + "/{}_binary.jpg".format(fname) 
+    cv2.imwrite(binary_path, binary)
+
+    cd_res = corner_detect_v3(enhanced2)
+
+    cd_path = save_path + "/{}_cd_res.jpg".format(fname) 
+    cv2.imwrite(cd_path, cd_res)
+
+    sharpen_kernel = np.array([[-1,-1,-1], 
+                    [-1, 9,-1],
+                    [-1,-1,-1]])
+
+    # 应用滤波器核进行锐化
+    # sharpened_image = cv2.filter2D(enhanced2, -1, sharpen_kernel)
+    sharpened_image = cv2.filter2D(img, -1, sharpen_kernel)
+    sharpened_path = save_path + "/{}_sharpened.jpg".format(fname) 
+    cv2.imwrite(sharpened_path, sharpened_image)
+
+    sp_cd_res = corner_detect_v3(sharpened_image)
+    sp_cd_path = save_path + "/{}_sp_cd_res.jpg".format(fname) 
+    cv2.imwrite(sp_cd_path, sp_cd_res)
+
+
+    enhanced2_inv_cd_res = corner_detect_v3(enhanced2_inv)
+    enhanced2_inv_cd_path = save_path + "/{}_enhanced2_inv_cd_res.jpg".format(fname) 
+    cv2.imwrite(enhanced2_inv_cd_path, enhanced2_inv_cd_res)
+
+
+    sharpened_image_cd_res = corner_detect_v3(sharpened_image)
+    sharpened_image_cd_path = save_path + "/{}_sharpened_image_cd_res.jpg".format(fname) 
+    cv2.imwrite(sharpened_image_cd_path, sharpened_image_cd_res)
+
+
+    blurred_image_cd_res = corner_detect_v3(blurred)
+    blurred_image_cd_path = save_path + "/{}_blurred_image_cd_res.jpg".format(fname) 
+    cv2.imwrite(blurred_image_cd_path, blurred_image_cd_res)
+
+
+
+
+    img_gas = cv2.GaussianBlur(img, (3,3), 1.5)
+    high = high_reserve(img_gas,11,5)
+    usm1 = usm(high,11)
+    add = (Overlay(img_gas/255,usm1)*255).astype(np.uint8)
+    # add = cv2.medianBlur((add*255).astype(np.uint8),3)
+    add_path = save_path + "/{}_add.jpg".format(fname)
+    cv2.imwrite(add_path, add)
+
+
+    # ----
+    # laplacian = cv2.Laplacian(enhanced2, cv2.CV_64F)
+    # sharp_img = cv2.subtract(enhanced2, laplacian)
+    # sharp_img = cv2.convertScaleAbs(sharp_img)
+    # sharp_img_path = save_path + "/{}_sharp_img.jpg".format(fname)
+    # cv2.imwrite(sharp_img_path, sharp_img)
+
+    # blurred = cv2.GaussianBlur(enhanced2, (5, 5), 0)
+    # laplacian2 = cv2.Laplacian(blurred, cv2.CV_64F)
+    # sharp2 = cv2.addWeighted(enhanced2, 1.5, laplacian2, -0.5, 0)
+    # sharp2_path = save_path + "/{}_sharp2.jpg".format(fname)
+    # cv2.imwrite(sharp2_path, sharp2)
+
+
+
+    # e0 = 10 # 角度误差阈值
+    # e1 = 10 # 距离误差阈值
+    # rho = 2 # 像素偏差
+    # threshold = 260 # 投票数阈值
+    # lines_result = detect_lines(cv2.cvtColor(enhanced2_inv, cv2.COLOR_GRAY2BGR), np.sin(e0/180*np.pi/2), e1, rho, threshold)
+    # lines_result_path = save_path + "/{}_lines_result.jpg".format(fname)
+    # cv2.imwrite(lines_result_path, lines_result)
+
+
+
+def main_test_20250408():
+    data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
+    save_path = make_save_path(data_path, ".", "results_20250408")
+    enhanced2_save_path = save_path + "/enhanced2"
+    blurred_save_path = save_path + "/blurred"
+    orig_cd_save_path = save_path + "/orig_corner_detect"
+    enhanced2_cd_save_path = save_path + "/enhanced2_corner_detect"
+    blurred_cd_save_path = save_path + "/blurred_corner_detect"
+    os.makedirs(enhanced2_save_path, exist_ok=True)
+    os.makedirs(blurred_save_path, exist_ok=True)
+    os.makedirs(orig_cd_save_path, exist_ok=True)
+    os.makedirs(enhanced2_cd_save_path, exist_ok=True)
+    os.makedirs(blurred_cd_save_path, exist_ok=True)
+
+    file_list = get_file_list(data_path)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+
+        orig_cd_res = corner_detect_v3(img)
+        orig_cd_path = orig_cd_save_path + "/{}_orig_cd_res.jpg".format(fname) 
+        cv2.imwrite(orig_cd_path, orig_cd_res)
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        enhanced2 = clahe.apply(enhanced)
+        blurred = cv2.medianBlur(enhanced2, 7)
+
+        enhanced2_path = enhanced2_save_path + "/{}_enhanced2.jpg".format(fname) 
+        cv2.imwrite(enhanced2_path, enhanced2)
+
+        blurred_path = blurred_save_path + "/{}_blurred.jpg".format(fname) 
+        cv2.imwrite(blurred_path, blurred)
+
+        enhanced2_cd_res = corner_detect_v3(enhanced2)
+        enhanced2_cd_path = enhanced2_cd_save_path + "/{}_enhanced2_cd_res.jpg".format(fname) 
+        cv2.imwrite(enhanced2_cd_path, enhanced2_cd_res)
+
+        blurred_cd_res = corner_detect_v3(blurred)
+        blurred_cd_path = blurred_cd_save_path + "/{}_blurred_cd_res.jpg".format(fname) 
+        cv2.imwrite(blurred_cd_path, blurred_cd_res)
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     pass
@@ -12133,14 +12551,14 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"G:\Gosion\data\007.PPE_Det\data\v1\v4_add\labels")
+    # change_txt_content(txt_path=r"G:\Gosion\data\007.PPE_Det\data\v1\fande_yolo_format\labels")
     # for i in range(10, 12):
     #     change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_labelbee_format\{}_yolo_format\labels".format(i))
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\train")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\val_labelbee_format")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\fande_yolo_format")  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all")  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\val_labelbee_format", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -12281,63 +12699,63 @@ if __name__ == '__main__':
     # btd_test_20250401()
     # test_20250401()
 
-    # data_path = r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged"
-    data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
-    save_path = make_save_path(data_path, relative='.', add_str="extract_specific_color_result")
+    # # data_path = r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged"
+    # data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
+    # save_path = make_save_path(data_path, relative='.', add_str="extract_specific_color_result")
 
-    file_list = get_file_list(data_path)
-    for f in file_list:
-        fname = os.path.splitext(f)[0]
-        f_abs_path = data_path + "/{}".format(f)
-        img = cv2.imread(f_abs_path)
-        mask, result, binary, binary_otsu = extract_specific_color(img, lower=None, upper=None, color="green")
-        bitand = cv2.bitwise_and(binary, binary_otsu)
-        bitor = cv2.bitwise_or(binary, binary_otsu)
+    # file_list = get_file_list(data_path)
+    # for f in file_list:
+    #     fname = os.path.splitext(f)[0]
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     img = cv2.imread(f_abs_path)
+    #     mask, result, binary, binary_otsu = extract_specific_color(img, lower=None, upper=None, color="green")
+    #     bitand = cv2.bitwise_and(binary, binary_otsu)
+    #     bitor = cv2.bitwise_or(binary, binary_otsu)
 
-        points = np.where(binary_otsu == 255)
-        points = np.hstack((points[1].reshape(-1, 1), points[0].reshape(-1, 1)))
-        # 运行RANSAC
-        model = ransac_parabola(points, select_num=1000, num_iterations=1000, threshold=50)
-        if model is not None:
-            a, b, c = model
-            print(f"拟合的抛物线方程: y = {a:.12f}x² + {b:.12f}x + {c:.12f}")
+    #     points = np.where(binary_otsu == 255)
+    #     points = np.hstack((points[1].reshape(-1, 1), points[0].reshape(-1, 1)))
+    #     # 运行RANSAC
+    #     model = ransac_parabola(points, select_num=1000, num_iterations=1000, threshold=50)
+    #     if model is not None:
+    #         a, b, c = model
+    #         print(f"拟合的抛物线方程: y = {a:.12f}x² + {b:.12f}x + {c:.12f}")
             
-            img = plot_fit_parabola(img, model, color=(255, 0, 255))
+    #         img = plot_fit_parabola(img, model, color=(255, 0, 255))
 
-        else:
-            print("拟合失败")
+    #     else:
+    #         print("拟合失败")
 
-        # # a = 2.845889*1e-4
-        # a = 3.905889*1e-4
-        # b = -0.413223
-        # # b = -0.453223
-        # c = 200
-        # model = (a, b, c)
-        # img = plot_fit_parabola(img, model, color=(255, 0, 255))
+    #     # # a = 2.845889*1e-4
+    #     # a = 3.905889*1e-4
+    #     # b = -0.413223
+    #     # # b = -0.453223
+    #     # c = 200
+    #     # model = (a, b, c)
+    #     # img = plot_fit_parabola(img, model, color=(255, 0, 255))
 
 
-        fit = np.polyfit(points[:, 0], points[:, 1], 2)
-        f = np.poly1d(fit)
+    #     fit = np.polyfit(points[:, 0], points[:, 1], 2)
+    #     f = np.poly1d(fit)
 
-        img = plot_fit_parabola(img, fit, color=(255, 255, 0))
+    #     img = plot_fit_parabola(img, fit, color=(255, 255, 0))
 
-        # fit_params, pcov = scipy.optimize.curve_fit(parabola, points[:, 0], points[:, 1])
-        # y_fit = parabola(points[:, 0], *fit_params)
+    #     # fit_params, pcov = scipy.optimize.curve_fit(parabola, points[:, 0], points[:, 1])
+    #     # y_fit = parabola(points[:, 0], *fit_params)
 
-        save_path_img_parabola = "{}/{}_img_parabola.jpg".format(save_path, fname)
-        save_path_mask = "{}/{}_mask.jpg".format(save_path, fname)
-        save_path_result = "{}/{}_result.jpg".format(save_path, fname)
-        save_path_binary = "{}/{}_binary.jpg".format(save_path, fname)
-        save_path_binary_otsu = "{}/{}_binary_otsu.jpg".format(save_path, fname)
-        save_path_bitand = "{}/{}_bitand.jpg".format(save_path, fname)
-        save_path_bitor = "{}/{}_bitor.jpg".format(save_path, fname)
-        cv2.imwrite(save_path_img_parabola, img)
-        cv2.imwrite(save_path_mask, mask)
-        cv2.imwrite(save_path_result, result)
-        cv2.imwrite(save_path_binary, binary)
-        cv2.imwrite(save_path_binary_otsu, binary_otsu)
-        cv2.imwrite(save_path_bitand, bitand)
-        cv2.imwrite(save_path_bitor, bitor)
+    #     save_path_img_parabola = "{}/{}_img_parabola.jpg".format(save_path, fname)
+    #     save_path_mask = "{}/{}_mask.jpg".format(save_path, fname)
+    #     save_path_result = "{}/{}_result.jpg".format(save_path, fname)
+    #     save_path_binary = "{}/{}_binary.jpg".format(save_path, fname)
+    #     save_path_binary_otsu = "{}/{}_binary_otsu.jpg".format(save_path, fname)
+    #     save_path_bitand = "{}/{}_bitand.jpg".format(save_path, fname)
+    #     save_path_bitor = "{}/{}_bitor.jpg".format(save_path, fname)
+    #     cv2.imwrite(save_path_img_parabola, img)
+    #     cv2.imwrite(save_path_mask, mask)
+    #     cv2.imwrite(save_path_result, result)
+    #     cv2.imwrite(save_path_binary, binary)
+    #     cv2.imwrite(save_path_binary_otsu, binary_otsu)
+    #     cv2.imwrite(save_path_bitand, bitand)
+    #     cv2.imwrite(save_path_bitor, bitor)
 
 
     # # 生成测试数据
@@ -12366,6 +12784,10 @@ if __name__ == '__main__':
     #     cv2.destroyAllWindows()
     # else:
     #     print("拟合失败")
+
+    # test_20250407()
+    # test_20250407_2()
+    main_test_20250408()
     
     
 

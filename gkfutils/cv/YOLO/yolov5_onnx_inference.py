@@ -306,7 +306,7 @@ def yolo_inference_save_labels(data_path, model_path, addStr=""):
                     bbox_yolo = bbox_voc_to_yolo(src_size, [x1, y1, x2, y2])
 
                     if int(cls) == 0:
-                        txt_content = "{}".format(cls + 1) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                        txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
                         fw.write(txt_content)
 
                     # txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
@@ -398,9 +398,13 @@ if __name__ == '__main__':
     # model_path=r"D:\Gosion\Python\yolov5-master\runs\train\001.leaking_liquid_det_v2_780\weights\best.onnx"
     # yolo_inference_save_labels(data_path=data_path, model_path=model_path)
 
-    data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\train\images"
-    model_path=r"D:\Gosion\code\gitee\GuanWangLNG\src\pipechina_beihaihaikou\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.1.onnx"
-    yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="helmet")
+    # data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\train\images"
+    # model_path=r"D:\Gosion\code\gitee\GuanWangLNG\src\pipechina_beihaihaikou\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.1.onnx"
+    # yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="helmet")
+
+    data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\images"
+    model_path=r"D:\Gosion\code\others\Python\yolov5-master\yolov5s.onnx"
+    yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="person")
     
 
 

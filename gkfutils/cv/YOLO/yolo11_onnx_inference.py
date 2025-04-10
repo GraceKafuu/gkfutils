@@ -986,6 +986,59 @@ class YOLO11_ORT:
                         line = "0 " + " ".join([str(bi) for bi in yolo_box]) + " " + pts_yolo + "\n"
                         f_wirte.write(line)
 
+    def pose_detect_up_down_flip_image(self, data_path):
+        """
+        通过人来检测上下翻转的图片，头在下面，腿在上面的认为是上下翻转了
+        """
+        dirname = os.path.basename(data_path)
+        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_up_down_flip".format(dirname)
+        img_path = data_path + "/images"
+        jsn_path = data_path + "/jsons"
+        img_save_path = save_path + "/images"
+        jsn_save_path = save_path + "/jsons"
+        os.makedirs(img_save_path, exist_ok=True)
+        os.makedirs(jsn_save_path, exist_ok=True)
+
+
+
+        file_list = sorted(os.listdir(img_path))
+        for f in tqdm(file_list):
+            fname = os.path.splitext(f)[0]
+            f_abs_path = img_path + "/{}".format(f)
+            img = cv2.imread(f_abs_path)
+            imgsz = img.shape[:2]
+
+            j_abs_path = jsn_path + "/{}.json".format(f)
+
+            img_data = self.preprocess(img)
+
+            # Run inference using the preprocessed image data
+            outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+
+            boxes, scores, keypoints = self.pose_postprocess(
+                outputs[0][0],
+                width_radio=self.img_width / self.input_width,
+                height_radio=self.img_height / self.input_height,
+                filter_threshold=0.60,
+                iou_threshold=0.45
+            )
+
+            try:
+                front7_kpts = keypoints[:, :7, :]
+                back4_kpts = keypoints[:, -4:, :]
+
+                front7_meany = np.mean(front7_kpts[:, :, 1])
+                back4_meany = np.mean(back4_kpts[:, :, 1])
+
+                if back4_meany < front7_meany:
+                    f_dst_path = img_save_path + "/{}".format(f)
+                    j_dst_path = jsn_save_path + "/{}.json".format(f)
+                    shutil.move(f_abs_path, f_dst_path)
+                    shutil.move(j_abs_path, j_dst_path)
+            except Exception as e:
+                print(e)
+
+
                     
 
 
@@ -998,10 +1051,11 @@ class YOLO11_ORT:
 
 
 if __name__ == "__main__":
-    # model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s.onnx"
-    # model_path = r"D:\Gosion\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
-    model_path = r"D:\Gosion\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v2\weights\best.onnx"
-    model = YOLO11_ORT(model_path, num_kpt=2)
+    # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\weights\yolo11s.onnx"
+    model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
+    # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v2\weights\best.onnx"
+    # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v2\weights\best.onnx"
+    model = YOLO11_ORT(model_path, num_kpt=17)
 
     # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images"
     # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_images"
@@ -1045,5 +1099,8 @@ if __name__ == "__main__":
     #     cv2.imwrite(f_dst_path, output)
 
 
-    data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\val\images"
-    model.pose_detect_generate_yolo_labels(data_path)
+    # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\val\images"
+    # model.pose_detect_generate_yolo_labels(data_path)
+
+    data_path = r"G:\Gosion\data\007.PPE_Det\data\v1\all"
+    model.pose_detect_up_down_flip_image(data_path)

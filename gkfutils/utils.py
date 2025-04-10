@@ -1218,9 +1218,9 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    # merge_txt_content(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\train\labels_person", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\train\labels_helmet")
-    rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\images", new_name_prefix="person_helmet_1_20250402", start_num=0)
-    rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\labels", new_name_prefix="person_helmet_1_20250402", start_num=0)
+    merge_txt_content(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\labels_person", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\labels")
+    # rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\images", new_name_prefix="person_helmet_1_20250402", start_num=0)
+    # rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\labels", new_name_prefix="person_helmet_1_20250402", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
     # dir_list = os.listdir(data_path)
@@ -1231,7 +1231,7 @@ if __name__ == '__main__':
 
     # remove_corrupt_img(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\New_All\Add\Det\v1_add\v2\train\images")
 
-    # move_same_file(data_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v1\train\images")
+    # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
     # merge_dirs(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000")
@@ -1239,7 +1239,7 @@ if __name__ == '__main__':
 
     # random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500_aug", mvcp="copy", select_num=601)
 
-    # process_via_filename(path1=r"G:\Gosion\data\007.PPE_Det\data\helmet\images", path2=r"G:\Gosion\data\007.PPE_Det\data\helmet\labels_new", save_path="", with_suffix=False, flag="same", mvcp="mv")
+    # process_via_filename(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="mv")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")

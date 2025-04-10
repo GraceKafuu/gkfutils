@@ -9902,7 +9902,11 @@ def delete_yolo_labels_high_iou_bbox(data_path, iou_thr=0.8, target_cls=(0, 1), 
         f_abs_path = lbl_path + "/{}".format(f)
         f_abs_path_new = lbl_path_new + "/{}".format(f)
         img_abs_path = img_path + "/{}.jpg".format(fname)
+        if not os.path.exists(img_abs_path):
+            img_abs_path = img_path + "/{}.png".format(fname)
+            
         img = cv2.imread(img_abs_path)
+        if img is None: continue
         imgsz = img.shape[:2]
 
         with open(f_abs_path, "r") as f_read:
@@ -12445,6 +12449,62 @@ def main_test_20250408():
         cv2.imwrite(blurred_cd_path, blurred_cd_res)
 
 
+def select_specific_hw_images(data_path, hw=(1920, 1080)):
+    """
+    (h, w): (1920, 1080)
+    """
+    save_path = make_save_path(data_path, ".", "results_{}_{}".format(hw[0], hw[1]))
+    img_save_path = save_path + "/images"
+    jsn_save_path = save_path + "/jsons"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(jsn_save_path, exist_ok=True)
+
+    img_path = data_path + "/images"
+    jsn_path = data_path + "/jsons"
+
+    file_list = get_file_list(img_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = img_path + "/{}".format(f)
+        j_abs_path = jsn_path + "/{}.json".format(f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape
+        if imgsz[0] == hw[0] and imgsz[1] == hw[1]:
+            f_dst_path = img_save_path + "/{}".format(f)
+            j_dst_path = jsn_save_path + "/{}.json".format(f)
+            shutil.move(f_abs_path, f_dst_path)
+            shutil.move(j_abs_path, j_dst_path)
+
+
+def detect_horizontal_line(img, m=0):
+    assert m in [0, 1], "m must be 0 or 1"
+    imgsz = img.shape[:2]
+    if m == 0:
+        # CLAHE增强
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+
+        _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # 横线检测
+        k1 = np.array([
+            [-1, -1, -1], 
+            [0, 0, 0],
+            [1, 1, 1]
+        ])
+        k1_filtered = cv2.filter2D(binary, -1, k1)
+
+        # 连通域分析去除一些小点
+        num_labels, labels, stats, centroids, output = connected_components_analysis(k1_filtered, connectivity=8, area_thr=25, h_thr=20, w_thr=50)
+        _, labels_binary = cv2.threshold(np.uint8(labels), 0, 255, cv2.THRESH_BINARY)
+
+        return labels_binary
+    else:
+        hk = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 1))
+        himg = cv2.morphologyEx(img, cv2.MORPH_CLOSE, hk, iterations=1)
+
+        return himg
 
 
 
@@ -12557,8 +12617,8 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\fande_yolo_format")  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all")  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_labelbee_format_yolo_format", copy_images=False)  # yolo_format 路径下是 images 和 labels
+    labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\val_labelbee_format", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -12595,7 +12655,7 @@ if __name__ == '__main__':
 
     # check_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4\train")
 
-    # delete_yolo_labels_high_iou_bbox(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v4", iou_thr=0.95, target_cls=(0, 1), del_cls=1)
+    # delete_yolo_labels_high_iou_bbox(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person", iou_thr=0.90, target_cls=(0, 1), del_cls=0)
 
     # select_specific_images_and_labels(data_path=r"D:\Gosion\Projects\003.Violated_Sitting_Det\data\v2\train")
 
@@ -12787,7 +12847,9 @@ if __name__ == '__main__':
 
     # test_20250407()
     # test_20250407_2()
-    main_test_20250408()
+    # main_test_20250408()
+
+    # select_specific_hw_images(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", hw=(704, 576))
     
     
 

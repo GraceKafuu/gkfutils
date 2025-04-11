@@ -5,16 +5,31 @@ import torch
 import torchvision
 import numpy as np
 import time
+from time import perf_counter
+
+
+# wrapper functions to execute time of functions
+def timeit(func):
+    def wrapper(*args, **kwargs):
+        start_time = perf_counter()
+        result = func(*args, **kwargs)
+        # count time (ms)
+        exec_time = (perf_counter() - start_time) * 1000
+        print(f"Execution time: {exec_time:.2f} ms")
+        return result
+    return wrapper
 
 
 class YOLOv5_ONNX(object):
-    def __init__(self, onnx_path):
+    def __init__(self, onnx_path, num_classes=80):
         cuda = torch.cuda.is_available()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         # providers = ['CPUExecutionProvider']
         self.session = onnxruntime.InferenceSession(onnx_path, providers=providers)
         self.input_names = self.session.get_inputs()[0].name
         self.output_names = self.session.get_outputs()[0].name
+
+        self.num_classes = num_classes
 
     def letterbox(self, im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
         # Resize and pad image while meeting stride-multiple constraints
@@ -213,6 +228,7 @@ class YOLOv5_ONNX(object):
     
     def pre_process(self, img_path, img_size=(640, 640), stride=32):
         img0 = cv2.imread(img_path)
+        self.img0 = img0.copy()
         src_size = img0.shape[:2]
         img = self.letterbox(img0, img_size, stride=stride, auto=False)[0]
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
@@ -222,6 +238,7 @@ class YOLOv5_ONNX(object):
         img = np.expand_dims(img, axis=0)
         return img0, img, src_size
     
+    @timeit
     def inference(self, img):
         # im = img.cpu().numpy()  # torch to numpy
         pred = self.session.run([self.output_names], {self.input_names: img})[0]
@@ -240,6 +257,28 @@ class YOLOv5_ONNX(object):
                     out_bbx.append(x1y1x2y2_VOC)
 
         return out_bbx
+    
+    def random_color(self):
+        b = np.random.randint(0, 256)
+        g = np.random.randint(0, 256)
+        r = np.random.randint(0, 256)
+
+        return (b, g, r)
+
+    
+    def vis_result(self, out_bbx):
+        colors = []
+        for i in range(self.num_classes):
+            colors.append(self.random_color())
+
+        for b in out_bbx:
+            cls = int(b[5])
+            cv2.rectangle(self.img0, (b[0], b[1]), (b[2], b[3]), colors[cls], 2)
+            cv2.putText(self.img0, "{}: {:.2f}".format(cls, b[4]), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, colors[cls], 2)
+
+        cv2.imshow("result", self.img0)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
     
 
 def bbox_voc_to_yolo(imgsz, box):
@@ -320,7 +359,16 @@ def yolo_inference_save_labels(data_path, model_path, addStr=""):
             print(e)
                 
 
+def inference_one(onnx_path, img_path):
+    model = YOLOv5_ONNX(onnx_path)
+    # model_input_size = (448, 768)
+    model_input_size = (640, 640)
+    img0, img, src_size = model.pre_process(img_path, img_size=model_input_size)
 
+    pred = model.inference(img)
+
+    out_bbx = model.post_process(pred, src_size, img_size=model_input_size)
+    model.vis_result(out_bbx)
 
 
 
@@ -402,12 +450,13 @@ if __name__ == '__main__':
     # model_path=r"D:\Gosion\code\gitee\GuanWangLNG\src\pipechina_beihaihaikou\weights\helmet_detection\helmet_det_yolov5s_640_640_v1.0.1.onnx"
     # yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="helmet")
 
-    data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\images"
-    model_path=r"D:\Gosion\code\others\Python\yolov5-master\yolov5s.onnx"
-    yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="person")
+    # data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\images"
+    # model_path=r"D:\Gosion\code\others\Python\yolov5-master\yolov5s.onnx"
+    # yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="person")
     
-
-
+    onnx_path=r"D:\Gosion\code\others\Python\yolov5-master\runs\train\007.PPE_Det_v1\weights\best.onnx"
+    img_path=r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\SafetyHelmet\images\train2028\000002.jpg"
+    inference_one(onnx_path, img_path)
 
             
 

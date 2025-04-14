@@ -430,17 +430,18 @@ def detect_oil_level_by_xfeat_onnx_v2(ort_session, im1, im2, roi_rect=None, alg=
     alg 2: 综合0和1
     alg 3: 其他方法(备用, 例如深度学习算法)
 
-    oil_range: 油位计量程, 油位计最高位和最低位位于 ROI小图中的位置, 默认使用百分比形式, 也可以是小数形式(百分比除以100)和像素值y坐标形式
-    reduce_sum_thr: 
-    area_thresh: 
-    color: 
-
+    oil_range: 油位计量程, 油位计最高位和最低位位于 ROI小图中的y轴位置, 默认使用百分比形式, 也可以是小数形式(百分比除以100)和像素值y坐标形式
+    reduce_sum_thr: alg 0使用到的一个参数, 默认为500
+    area_thresh: 面积过滤阈值
+    color: roi区域框的颜色
+    thickness: roi区域框的线宽
     """
     assert alg in [0, 1, 2, 3], "alg should be in [0, 1, 2, 3]!"
 
     im1_vis = im1.copy()
 
     if roi_rect is not None:
+        assert type(roi_rect) == np.ndarray, "roi_rect should be np.ndarray!"
         im1 = perspective_transform(im1, roi_rect)
         im1_vis = draw_roi(im1_vis, roi_rect, color=(255, 0, 255), thickness=5)
 
@@ -659,7 +660,7 @@ def main_test_20250411(data_path):
         im2 = cv2.imread(f_abs_path)
         imgsz = im2.shape[:2]
 
-        matched, res, l, lp = detect_oil_level_by_xfeat_onnx_v2(ort_session, im1, im2, roi_rect=rect, alg=1, oil_range=(24.11, 68.13), reduce_sum_thr=500, area_thresh=100, color=(255, 0, 255), thickness=4)
+        matched, res, l, lp = detect_oil_level_by_xfeat_onnx_v2(ort_session, im1, im2, roi_rect=rect, alg=0, oil_range=(24.11, 68.13), reduce_sum_thr=500, area_thresh=100, color=(255, 0, 255), thickness=4)
         matched_path = save_path + "/{}_matched_oil_level_{}.jpg".format(fname, lp)
         cv2.imwrite(matched_path, matched)
 

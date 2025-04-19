@@ -417,7 +417,19 @@ def hstack_canvas(img1, img2):
 
 
 
-def detect_oil_level_by_xfeat_onnx_v2(ort_session, im1, im2, roi_rect=None, alg=1, oil_color=["yellow", "orange"], oil_range=(115, 325), reduce_sum_thr=500, area_thresh=100, color=(255, 255, 0), thickness=4):
+def detect_oil_level_by_xfeat_onnx_v2(
+        ort_session,
+        im1,
+        im2,
+        roi_rect=None,
+        alg=1,
+        oil_color=["yellow", "orange"],
+        oil_range=(115, 325),
+        reduce_sum_thr=500,
+        area_thresh=100,
+        color=(255, 255, 0),
+        thickness=4
+    ):
     """
     油位计检测：
     im1: 模板图
@@ -481,23 +493,23 @@ def detect_oil_level_by_xfeat_onnx_v2(ort_session, im1, im2, roi_rect=None, alg=
     oil_range = check_range(oil_range, warpedsz)
     
     if alg == 0:
-        res, l, lp = detect_oil_level_by_edge(warped, reduce_sum_thr=reduce_sum_thr, y_range=oil_range, color=color, thickness=thickness)
+        res, l, lp = detect_oil_level_by_edge(warped, reduce_sum_thr, oil_range, color, thickness)
         lp = check_oil_level_percent(lp)
         canvas = hstack_canvas(canvas, res)
         return canvas, res, l, lp
     
     elif alg == 1:
         res2, l2, lp2 = detect_oil_level_by_color(
-            warped_cp, lower=None, upper=None, object_color=oil_color, reduce_sum_thr=reduce_sum_thr, area_thresh=area_thresh, y_range=oil_range, color=color, thickness=thickness
+            warped_cp, None, None, oil_color, reduce_sum_thr, area_thresh, oil_range, color, thickness
         )
         lp2 = check_oil_level_percent(lp2)
         canvas = hstack_canvas(canvas, res2)
         return canvas, res2, l2, lp2
     
     elif alg == 2:
-        res, l, lp = detect_oil_level_by_edge(warped, reduce_sum_thr=reduce_sum_thr, y_range=oil_range, color=color, thickness=thickness)
+        res, l, lp = detect_oil_level_by_edge(warped, reduce_sum_thr, oil_range, color, thickness)
         res2, l2, lp2 = detect_oil_level_by_color(
-            warped_cp, lower=None, upper=None, object_color=oil_color, reduce_sum_thr=reduce_sum_thr, area_thresh=area_thresh, y_range=oil_range, color=color, thickness=thickness
+            warped_cp, None, None, oil_color, reduce_sum_thr, area_thresh, oil_range, color, thickness
         )
         lp = check_oil_level_percent(lp)
         lp2 = check_oil_level_percent(lp2)

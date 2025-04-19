@@ -28,6 +28,8 @@ class YOLOv5_ONNX(object):
         self.session = onnxruntime.InferenceSession(onnx_path, providers=providers)
         self.input_names = self.session.get_inputs()[0].name
         self.output_names = self.session.get_outputs()[0].name
+        self.input_size = self.session.get_inputs()[0].shape
+        self.output_size = self.session.get_outputs()[0].shape
 
         self.num_classes = num_classes
 
@@ -454,9 +456,17 @@ if __name__ == '__main__':
     # model_path=r"D:\Gosion\code\others\Python\yolov5-master\yolov5s.onnx"
     # yolo_inference_save_labels(data_path=data_path, model_path=model_path, addStr="person")
     
+    # onnx_path=r"D:\Gosion\code\others\Python\yolov5-master\runs\train\007.PPE_Det_v1\weights\best.onnx"
+    # img_path=r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\SafetyHelmet\images\train2028\000002.jpg"
+    # inference_one(onnx_path, img_path)
+
     onnx_path=r"D:\Gosion\code\others\Python\yolov5-master\runs\train\007.PPE_Det_v1\weights\best.onnx"
-    img_path=r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\SafetyHelmet\images\train2028\000002.jpg"
-    inference_one(onnx_path, img_path)
+    data_path = r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\JPEGImages"
+    file_list = sorted(os.listdir(data_path))
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        inference_one(onnx_path, f_abs_path)
 
             
 

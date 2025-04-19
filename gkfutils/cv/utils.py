@@ -12029,6 +12029,84 @@ def ransac_parabola(points, select_num=10, num_iterations=1000, threshold=15.0):
     return best_model
 
 
+def get_y_pred(model, x, n=1):
+    if n == 1:
+        # "y = {:.3f}x + {:.3f}"
+        y_pred = model[0] * x + model[1]
+        return y_pred
+    elif n == 2:
+        # "y = {:.3f}x² + {:.3f}x + {:.3f}"
+        y_pred = model[0] * x**2 + model[1] * x + model[2]
+        return y_pred
+    elif n == 3:
+        # "y = {:.3f}x³ + {:.3f}x² + {:.3f}x + {:.3f}"
+        y_pred = model[0] * x**3 + model[1] * x**2 + model[2] * x + model[3]
+        return y_pred
+
+
+def ransac_fit_curve(points, n=1, select_num=10, num_iterations=1000, threshold=15.0):
+    """
+    RANSAC拟合曲线
+    n: 曲线阶数
+    """
+    assert n in [1, 2, 3], "n must be 1, 2, or 3"
+
+    best_model = None
+    best_inliers = []
+    max_inliers = 0
+
+    n_points = points.shape[0]
+    if n_points < select_num:
+        return None  # 无法拟合
+
+    for _ in range(num_iterations):
+        # 随机选择select_num个点
+        sample_indices = random.sample(range(n_points), select_num)
+        sample_points = points[sample_indices]
+        sx = sample_points[:, 0]
+        sy = sample_points[:, 1]
+
+        model = np.polyfit(sx, sy, n)
+
+        # 计算所有点的垂直距离
+        x_all = points[:, 0]
+        y_all = points[:, 1]
+        # y_pred = model[0] * x_all**2 + model[1] * x_all + model[2]
+        y_pred = get_y_pred(model, x_all, n)
+        distances = np.abs(y_all - y_pred)
+
+        # 统计内点
+        inliers = np.where(distances < threshold)[0]
+        n_inliers = inliers.size
+
+        # 更新最佳模型
+        if n_inliers > max_inliers:
+            max_inliers = n_inliers
+            best_inliers = inliers
+            best_model = model
+
+    # 使用所有内点重新拟合
+    if best_model is not None and len(best_inliers) >= select_num:
+        x_inliers = points[best_inliers, 0]
+        y_inliers = points[best_inliers, 1]
+        model = np.polyfit(x_inliers, y_inliers, n)
+        best_model = model
+    else:
+        return None  # 无有效模型
+
+    return best_model
+
+
+def plot_fit_curve(img, model, n=1, color=(255, 0, 255)):
+    imgsz = img.shape[:2]
+    x = np.linspace(0, imgsz[1], imgsz[1] - 1)
+    y = get_y_pred(model, x, n)
+    for i in range(len(x)):
+        cv2.circle(img, (int(x[i]), int(y[i])), 2, color, -1)
+
+    return img
+
+
 def plot_fit_parabola(img, model, color=(255, 0, 255)):
     """
     a, b, c = model
@@ -12508,6 +12586,114 @@ def detect_horizontal_line(img, m=0):
 
 
 
+def compute_cross_correlation(img1, img2):
+    # 转换为灰度图像
+    if len(img1.shape) == 3:
+        img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    if len(img2.shape) == 3:
+        img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    
+    # 转换为浮点类型
+    img1 = img1.astype(np.float32)
+    img2 = img2.astype(np.float32)
+    
+    # 获取图像尺寸
+    h1, w1 = img1.shape
+    h2, w2 = img2.shape
+    
+    # 计算FFT需要的填充尺寸
+    fh = h1 + h2 - 1
+    fw = w1 + w2 - 1
+    
+    # 零填充图像
+    img1_pad = np.pad(img1, ((0, fh - h1), (0, fw - w1)), mode='constant')
+    img2_pad = np.pad(img2, ((0, fh - h2), (0, fw - w2)), mode='constant')
+    
+    # 计算FFT
+    fft1 = np.fft.fft2(img1_pad)
+    fft2_conj = np.conj(np.fft.fft2(img2_pad))
+    
+    # 频域相乘并逆变换
+    cross_corr = np.fft.ifft2(fft1 * fft2_conj).real
+    
+    # 移动零位移到中心
+    cross_corr = np.fft.fftshift(cross_corr)
+    
+    return cross_corr
+
+
+def Normalised_Cross_Correlation(roi, target):
+    # Normalised Cross Correlation Equation
+    cor=np.sum(roi*target)
+    nor = np.sqrt((np.sum(roi**2)))*np.sqrt(np.sum(target**2))
+    return cor / nor
+    
+
+def template_matching(img, target):
+    # initial parameter
+    height,width=img.shape
+    tar_height,tar_width=target.shape
+    (max_Y,max_X)=(0, 0)
+    MaxValue = 0
+
+    # Set image, target and result value matrix
+    img=np.array(img, dtype="int")
+    target=np.array(target, dtype="int")
+    NccValue=np.zeros((height-tar_height,width-tar_width))
+
+    # calculate value using filter-kind operation from top-left to bottom-right
+    for y in range(0,height-tar_height):
+        for x in range(0,width-tar_width):
+            # image roi
+            roi=img[y:y+tar_height,x:x+tar_width]
+            # calculate ncc value
+            NccValue[y,x] = Normalised_Cross_Correlation(roi,target)
+            # find the most match area
+            if NccValue[y,x]>MaxValue:
+                MaxValue=NccValue[y,x]
+                (max_Y,max_X) = (y,x)
+
+    return (max_X,max_Y)
+
+
+
+def ransac_fit_laser_curve(img, n=3, laser_color="green", select_num=1000, num_iterations=1000, threshold=50, color=(255, 0, 255)):
+    mask, result, binary, binary_otsu = extract_specific_color(img, lower=None, upper=None, color=laser_color)
+    # bitand = cv2.bitwise_and(binary, binary_otsu)
+    # bitor = cv2.bitwise_or(binary, binary_otsu)
+
+    points = np.where(binary_otsu == 255)
+    points = np.hstack((points[1].reshape(-1, 1), points[0].reshape(-1, 1)))
+    model = ransac_fit_curve(points, n, select_num, num_iterations, threshold)
+    if model is not None:
+        img = plot_fit_curve(img, model, n, color)
+    else:
+        print("拟合失败")
+
+    return img
+
+
+def main_fit_curve_20250417():
+    # data_path = r"E:\Gosion\data\006.Belt_Torn_Det\data\yitishi\bgr\data\20250331\src"
+    data_path = r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\20250308_frames_merged"
+    n = 3
+    save_path = make_save_path(data_path, relative='.', add_str="ransac_fit_laser_curve_20250417_{}".format(n))
+
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+        out = ransac_fit_laser_curve(img, n, laser_color="green", select_num=1000, num_iterations=1000, threshold=50, color=(255, 0, 255))
+        cv2.imwrite(save_path + "/{}".format(f), out)
+
+
+# def check_false_alarm(img, pts):
+#     imgsz = img.shape
+#     if len(imgsz) == 3:
+#         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+
 
 
 
@@ -12618,7 +12804,7 @@ if __name__ == '__main__':
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
     # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_labelbee_format_yolo_format", copy_images=False)  # yolo_format 路径下是 images 和 labels
-    labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\val_labelbee_format", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -12850,13 +13036,123 @@ if __name__ == '__main__':
     # main_test_20250408()
 
     # select_specific_hw_images(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", hw=(704, 576))
-    
-    
 
 
+    # # 读取图像
+    # img1 = cv2.imread(r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data_xfeat_matching_results_\192.168.31.101_01_20240618151241754_warped.jpg")
+    # img2 = cv2.imread(r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data\192.168.31.101_01_20240618151241754.jpg")
+
+    # if img1 is None or img2 is None:
+    #     raise ValueError("无法读取图像文件")
+
+    # # 计算互相关
+    # correlation = compute_cross_correlation(img1, img2)
+
+    # # 归一化结果以便显示
+    # correlation_norm = (correlation - np.min(correlation)) / (np.max(correlation) - np.min(correlation))
+
+    # # 显示结果
+    # # cv2.imshow('Cross Correlation', correlation_norm)
+    # # cv2.waitKey(0)
+    # # cv2.destroyAllWindows()
+    # cv2.imwrite(r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data\192.168.31.101_01_20240618151241754_warped_correlation.jpg", correlation_norm * 255)
+
+
+
+    # # 读取图像
+    # img1_path = r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data_xfeat_matching_results_\192.168.31.101_01_20240618151241754_warped.jpg"
+    # img2_path = r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data\192.168.31.101_01_20240618151241754.jpg"
+
+    # img_rgb = cv2.imread(img2_path)
+    # assert img_rgb is not None, "file could not be read, check with os.path.exists()"
+    # img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
+    # template = cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE)
+    # assert template is not None, "file could not be read, check with os.path.exists()"
+    # w, h = template.shape[::-1]
+
+    # res = cv2.matchTemplate(img_gray, template, cv2.TM_CCOEFF_NORMED)
+    # threshold = 0.35
+    # loc = np.where( res >= threshold)
+    # for pt in zip(*loc[::-1]):
+    #     cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
+
+    # cv2.imwrite(r'G:\Gosion\data\008.OilLevel_Det\data\xfeat\res.png', img_rgb)
+
+
+    # img1_path = r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data_xfeat_matching_results_\192.168.31.101_01_20240618151241754_warped.jpg"
+    # img2_path = r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data\192.168.31.101_01_20240618151241754.jpg"
+
+
+    # img = cv2.imread(img2_path, cv2.IMREAD_GRAYSCALE)
+    # img2 = img.copy()
+    # template = cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE)
+    # w, h = template.shape[::-1]
+
+    # methods = ['TM_SQDIFF', 'TM_SQDIFF_NORMED', 'TM_CCOEFF', 
+    #        'TM_CCOEFF_NORMED', 'TM_CCORR',  'TM_CCORR_NORMED']
+    
+    # for m in methods:
+    #     img = img2.copy()
+    #     method = getattr(cv2, m)
+
+    #     res = cv2.matchTemplate(img, template, method)
+    #     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+    #     if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+    #         top_left = min_loc
+    #     else:
+    #         top_left = max_loc
+
+    #     bottom_right = (top_left[0] + w, top_left[1] + h)
+    #     cv2.rectangle(img, top_left, bottom_right, 255, 2)
+
+    #     cv2.imshow("img", img)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
     
     
-    
+    # from skimage.feature import match_template
+
+    # img1_path = r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data_xfeat_matching_results_\192.168.31.101_01_20240618151241754_warped.jpg"
+    # img2_path = r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data\192.168.31.101_01_20240618151241754.jpg"
+
+    # # image = data.coins()
+    # # coin = image[170:220, 75:130]
+
+    # img1 = cv2.imread(img1_path)
+    # img2 = cv2.imread(img2_path)
+
+    # result = match_template(img2, img1)
+    # ij = np.unravel_index(np.argmax(result), result.shape)
+    # x, y = ij[::-1]
+
+    # fig = plt.figure(figsize=(8, 3))
+    # ax1 = plt.subplot(1, 3, 1)
+    # ax2 = plt.subplot(1, 3, 2)
+    # ax3 = plt.subplot(1, 3, 3, sharex=ax2, sharey=ax2)
+
+    # ax1.imshow(img1, cmap=plt.cm.gray)
+    # ax1.set_axis_off()
+    # ax1.set_title('template')
+
+    # ax2.imshow(img2, cmap=plt.cm.gray)
+    # ax2.set_axis_off()
+    # ax2.set_title('image')
+    # # highlight matched region
+    # hcoin, wcoin = img1.shape
+    # rect = plt.Rectangle((x, y), wcoin, hcoin, edgecolor='r', facecolor='none')
+    # ax2.add_patch(rect)
+
+    # ax3.imshow(result)
+    # ax3.set_axis_off()
+    # ax3.set_title('`match_template`\nresult')
+    # # highlight matched region
+    # ax3.autoscale(False)
+    # ax3.plot(x, y, 'o', markeredgecolor='r', markerfacecolor='none', markersize=10)
+
+    # plt.show()
+
+    main_fit_curve_20250417()
     
 
     

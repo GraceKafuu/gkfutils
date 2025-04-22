@@ -12693,8 +12693,63 @@ def main_fit_curve_20250417():
 #     if len(imgsz) == 3:
 #         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+def fit_curve(f_abs_path, n=2):
+    img = cv2.imread(f_abs_path)
+    out = ransac_fit_laser_curve(img, n, laser_color="green", select_num=1000, num_iterations=1000, threshold=50, color=(255, 0, 255))
+    cv2.imwrite("out.jpg", out)
 
 
+
+# -----------------------
+def fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(255, 0, 255)):
+    # 生成测试数据
+    img = np.zeros((500, 500, 3), dtype=np.uint8)
+    x = np.linspace(-250, 250, 500)
+    # y_true = 0.5 * x**2 + 2 * x + 3
+    y_true = 0.75 * x + 15
+    y = y_true + np.random.normal(scale=3.0, size=x.shape)  # 添加噪声
+    # 添加外点
+    outlier_indices = np.random.choice(len(x), size=20, replace=False)
+    y[outlier_indices] += np.random.normal(scale=30, size=20)
+    points = np.column_stack((x, y))
+
+    # 运行RANSAC
+    model = ransac_fit_curve(points, n, select_num, num_iterations, threshold)
+    if model is not None:
+        img = plot_fit_curve(img, model, n, color)
+    else:
+        print("拟合失败")
+
+    cv2.imwrite(r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\ransac_curve.jpg", img)
+
+
+    # 示例数据
+    x = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    y = np.array([2, 5, 12, 8, 24, 14, 2, 20, 23, 26])
+    
+    # 使用numpy的polyfit函数进行多项式拟合，这里我们拟合一个一次多项式（即直线）
+    model = np.polyfit(x, y, 1)
+    
+    # coefficients是一个数组，包含了拟合直线的斜率和截距
+    a, b = model
+    
+    # 使用拟合的参数生成拟合直线的y值
+    fitted_y = a * x + b
+    
+    # 绘制原始数据点和拟合直线
+    plt.scatter(x, y)
+    plt.plot(x, fitted_y, color='red')
+    plt.savefig(r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\polyfit.png")
+
+    X = np.vstack([x, np.ones(len(x))]).T
+    a2, b2 = np.linalg.lstsq(X, y, rcond=None)[0]
+    # 使用拟合的参数生成拟合直线的y值
+    fitted_y2 = a2 * x + b2
+    
+    # 绘制原始数据点和拟合直线
+    plt.scatter(x, y)
+    plt.plot(x, fitted_y2, color='red')
+    plt.savefig(r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\polyfit2.png")
 
 
 if __name__ == '__main__':
@@ -13152,8 +13207,9 @@ if __name__ == '__main__':
 
     # plt.show()
 
-    main_fit_curve_20250417()
+    # main_fit_curve_20250417()
     
+    fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(255, 0, 255))
 
     
 

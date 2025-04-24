@@ -12752,6 +12752,21 @@ def fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(25
     plt.savefig(r"D:\Gosion\data\006.Belt_Torn_Det\data\video\video_frames\cropped\polyfit2.png")
 
 
+
+def producer(q):
+    for i in range(5):
+        q.put(i)
+
+def consumer(q):
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        print(f"Consumed: {item}")
+
+
+       
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
@@ -13209,7 +13224,26 @@ if __name__ == '__main__':
 
     # main_fit_curve_20250417()
     
-    fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(255, 0, 255))
+    # fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(255, 0, 255))
+
+    import multiprocessing as mp
+    import queue
+    q = mp.Queue()
+    # q = queue.Queue()
+    p1 = mp.Process(target=producer, args=(q,))
+    p2 = mp.Process(target=consumer, args=(q,))
+
+    p1.start()
+    p2.start()
+
+    while not q.empty():
+        print(q.get())
+
+    # # 通知消费者队列结束
+    # q.put(None)
+
+    # p1.join()
+    # p2.join()
 
     
 

@@ -197,6 +197,29 @@ def save_file_path_to_txt(data_path: str, abspath=True):
     print("Success! --> {}".format(txt_save_path))
 
 
+def save_all_files_path_to_txt(data_path: str, abspath=True):
+    assert type(data_path) == str, "{} should be str!".format(data_path)
+    dirname = os.path.basename(data_path)
+    dirs = sorted(os.listdir(data_path))
+    txt_save_path = os.path.abspath(os.path.join(data_path, "../{}_list.txt".format(dirname)))
+    with open(txt_save_path, 'w', encoding='utf-8') as fw:
+        for d in dirs:
+            d_path = data_path + "/{}".format(d)
+            data_list = sorted(os.listdir(d_path))
+            
+            for f in data_list:
+                if abspath:
+                    f_abs_path = d_path + "/{}".format(f)
+                    f_abs_path = f_abs_path.replace("\\", "/")
+                    fw.write("{}\n".format(f_abs_path))
+                else:
+                    fw.write("{}\n".format(f))
+
+    print("Success! --> {}".format(txt_save_path))
+
+
+
+
 def untar_many_files(data_path):
     tar_list = sorted(os.listdir(data_path))
     for f in tar_list:
@@ -1218,8 +1241,8 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    merge_txt_content(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\labels_person", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\labels")
-    # rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\images", new_name_prefix="person_helmet_1_20250402", start_num=0)
+    # merge_txt_content(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\labels_person", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\no_person\labels")
+    # rename_files(data_path=r"D:\Gosion\code\others\Python\yolov5-face-master\output\zxc", new_name_prefix="zxc", start_num=0)
     # rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\labels", new_name_prefix="person_helmet_1_20250402", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
@@ -1237,14 +1260,15 @@ if __name__ == '__main__':
     # merge_dirs(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000")
 
 
-    # random_select_files(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\0_random_selected_5500_aug", mvcp="copy", select_num=601)
+    # random_select_files(data_path=r"G:\Gosion\data\001.Belt_Torn_Detection\data\cls\v7\train\2", mvcp="move", select_num=902)
 
-    # process_via_filename(path1=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images", path2=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="mv")
+    # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos_yolo_format\images", path2=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="mv")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
 
-    # save_file_path_to_txt(data_path=r"D:\Gosion\Projects\006.if_tear\video_frames\frames_merged", abspath=True)
+    # save_file_path_to_txt(data_path=r"D:\Gosion\code\others\Python\arcface-pytorch-master\data\Datasets\lfw\lfw-align-128", abspath=True)
+    save_all_files_path_to_txt(data_path=r"D:\Gosion\code\others\Python\arcface-pytorch-master\data\Datasets\lfw\lfw-align-128", abspath=True)
 
     # logger = Logger(filename="Test-Logger", level='info', when='D', interval=1, backCount=30)
     # logger.logger.info("test")

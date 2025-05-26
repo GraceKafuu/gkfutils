@@ -12756,6 +12756,7 @@ def fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(25
 def producer(q):
     for i in range(5):
         q.put(i)
+    q.put(None)
 
 def consumer(q):
     while True:
@@ -12765,7 +12766,237 @@ def consumer(q):
         print(f"Consumed: {item}")
 
 
-       
+def corner_detect_v4(img, blockSize=15, ksize=15, k=0.06, vis=False):
+    # =======================================================================================
+    # https://www.cnblogs.com/GYH2003/articles/GYH-PythonOpenCV-FeatureDetection-Corner.html
+    imgsz = img.shape
+    if len(imgsz) == 3:
+        img_vis = img.copy()
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        _, thresh_otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        gray = np.float32(gray)  # 转换为浮点型
+    else:
+        img_vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+        # _, thresh = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+        _, thresh_otsu = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        gray = np.float32(img)  # 转换为浮点型
+
+    # 1. 计算 Harris 角点响应
+    # dst = cv2.cornerHarris(gray, blockSize=15, ksize=15, k=0.06)  # Harris 角点检测
+    dst = cv2.cornerHarris(gray, blockSize=blockSize, ksize=ksize, k=k)  # Harris 角点检测
+
+    # 2. 设置阈值筛选角点
+    threshold = 0.01 * dst.max()  # 通常取最大响应的 1%~5%
+    corners = np.argwhere(dst > threshold)  # 获取符合条件的坐标
+
+    # 3. 转换坐标格式（注意：np.argwhere 返回的是 (y, x) 格式）
+    corners_xy = corners[:, [1, 0]]  # 转换为 (x, y) 格式
+
+    # 4. 可视化角点（可选）
+    if vis:
+        for (x, y) in corners_xy:
+            cv2.circle(img_vis, (x, y), 3, (255, 0, 255), -1)  # 在图像上绘制红色圆点
+
+    return thresh_otsu, corners_xy, img_vis
+
+
+# def corner_detect_filter_false_alarm(gray, blockSize=15, ksize=15, k=0.04, ccn_thr=5):
+#     """
+#     ccn_thr: 连通域数量阈值
+#     """
+#     gray = np.float32(gray)  # 转换为浮点型
+#     dst = cv2.cornerHarris(gray, blockSize=blockSize, ksize=ksize, k=k)  # Harris 角点检测
+
+#     # 2. 设置阈值筛选角点
+#     threshold = 0.01 * dst.max()  # 通常取最大响应的 1%~5%
+#     corners = np.argwhere(dst > threshold)  # 获取符合条件的坐标
+
+#     # 3. 转换坐标格式（注意：np.argwhere 返回的是 (y, x) 格式）
+#     corners_xy = corners[:, [1, 0]]  # 转换为 (x, y) 格式
+
+#     # 4. 可视化角点（可选）
+#     img_vis = np.zeros(shape=(gray.shape[0], gray.shape[1], 3), dtype=np.uint8)
+#     for (x, y) in corners_xy:
+#         cv2.circle(img_vis, (x, y), 3, (255, 0, 255), -1)  # 在图像上绘制红色圆点
+
+#     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_vis)
+
+#     if num_labels - 1 > ccn_thr:
+#         return True
+#     else:
+#         return False
+
+
+
+def corner_detect_test_20250507():
+    data_path = r"G:\Gosion\data\001.Belt_Torn_Detection\data\data_51\data\20250507\src"
+    save_path = r"G:\Gosion\data\001.Belt_Torn_Detection\data\data_51\data\20250507\src_corner_detect_test_20250507"
+    os.makedirs(save_path, exist_ok=True)
+
+    blockSizes = [7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+    ksizes = [7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+    ks = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2, 0.21,0.22, 0.23, 0.24]
+
+    file_list = get_file_list(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = data_path + "/{}".format(f)
+        img = cv2.imread(f_abs_path)
+
+        for k in ks:
+            for (blockSize, ksize) in zip(blockSizes, ksizes):
+                save_path_i = save_path + "/{}_{}_{}".format(blockSize, ksize, k)
+                os.makedirs(save_path_i, exist_ok=True)
+
+                thresh_otsu, corners_xy, img_vis = corner_detect_v4(img, blockSize=blockSize, ksize=ksize, k=k, vis=True)
+                cv2.imwrite(save_path_i + "/{}".format(f), img_vis)
+
+
+
+def check_laser_conditions(image_path):
+    # 读取图像
+    img = cv2.imread(image_path)
+    if img is None:
+        print("无法读取图像")
+        return
+    
+    # 转换到 HSV 颜色空间
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    
+    # 定义绿色范围（可根据实际情况调整）
+    lower_green = np.array([35, 43, 46])
+    upper_green = np.array([85, 255, 255])
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+    
+    # 形态学闭运算，连接断裂并去除小噪声
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    
+    # 统计每一行的白色像素数量
+    row_white_counts = np.sum(mask, axis=1)
+    # 设定阈值（根据激光线宽度调整，假设至少 3 像素宽）
+    threshold = 3
+    break_rows = np.where(row_white_counts < threshold)[0]
+    
+    # 检测结果
+    if len(break_rows) > 0:
+        print("检测到激光线断裂！断裂行：", break_rows)
+    else:
+        print("激光线连续，未检测到断裂")
+    
+    # 检查是否有异物（假设异物导致局部异常，可通过轮廓分析）
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if len(contours) > 1:
+        print("检测到激光线上存在异物或异常！")
+    else:
+        print("激光线无明显异物")
+    
+    # 显示处理后的掩码图像（可选）
+    cv2.imshow('Processed Mask', mask)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+def corner_detect_filter_false_alarm(gray, blockSize=15, ksize=15, k=0.04, ccn_thr=5):
+    """
+    ccn_thr: 连通域数量阈值
+    正常情况下, 就几个地方会有结果
+    假如角点检测的结果非常多, 那么应该是误报.
+    """
+    gray = np.float32(gray)  # 转换为浮点型
+    dst = cv2.cornerHarris(gray, blockSize=blockSize, ksize=ksize, k=k)  # Harris 角点检测
+
+    # 2. 设置阈值筛选角点
+    threshold = 0.01 * dst.max()  # 通常取最大响应的 1%~5%
+    corners = np.argwhere(dst > threshold)  # 获取符合条件的坐标
+
+    # 3. 转换坐标格式（注意：np.argwhere 返回的是 (y, x) 格式）
+    corners_xy = corners[:, [1, 0]]  # 转换为 (x, y) 格式
+
+    # 4. 可视化角点（可选）
+    img_vis = np.zeros(shape=(gray.shape[0], gray.shape[1], 3), dtype=np.uint8)
+    for (x, y) in corners_xy:
+        cv2.circle(img_vis, (x, y), 3, (255, 0, 255), -1)  # 在图像上绘制红色圆点
+
+    img_vis_gray = cv2.cvtColor(img_vis, cv2.COLOR_BGR2GRAY)
+    _, img_vis_thr = cv2.threshold(img_vis_gray, 0, 255, cv2.THRESH_BINARY)
+    img_vis_thr = np.uint8(img_vis_thr)
+    img_vis_thr = cv2.dilate(img_vis_thr, None)   
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_vis_thr)
+
+    if num_labels - 1 > ccn_thr:
+        return True, num_labels, labels, stats, centroids
+    else:
+        return False, num_labels, labels, stats, centroids
+
+
+def corner_detect_crop_img(img, expand_pixels=25):
+    imgsz = img.shape[:2]
+    img_orig= img.copy()
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    falseAlarm, num_labels, labels, stats, centroids = corner_detect_filter_false_alarm(gray, blockSize=15, ksize=15, k=0.04, ccn_thr=3)
+    centroids_new = sorted(centroids[1:], key=lambda x: x[0])
+    stats_new = sorted(stats[1:], key=lambda x: x[0])
+
+    crops = []
+    for i in range(len(stats_new)):
+        bi = stats_new[i][:-1]
+        bi_center = [bi[0] + bi[2] / 2, bi[1] + bi[3] / 2]
+        bi_expand = expand_bbox(bi, imgsz, expand_pixels)
+
+        cropped = img_orig[bi_expand[1]:bi_expand[3], bi_expand[0]:bi_expand[2]]
+        crops.append(cropped)
+
+    return crops
+
+
+def corner_detect_crop_img_main():
+    # data_path = r"D:\Gosion\data\006.Belt_Torn_Det\data\ningmei\data (1)"
+    # save_path = r"G:\Gosion\data\001.Belt_Torn_Detection\data\corner_detect_cropped_52"
+    # os.makedirs(save_path, exist_ok=True)
+
+    # dir_list = os.listdir(data_path)
+    # for d in dir_list:
+    #     dir_path = data_path + "/{}/src".format(d)
+    #     file_list = os.listdir(dir_path)
+    #     for f in file_list:
+    #         fname = os.path.splitext(f)[0]
+    #         img_path = dir_path + "/{}".format(f)
+    #         img = cv2.imread(img_path)
+    #         crops = corner_detect_crop_img(img)
+    #         for i, crop in enumerate(crops):
+    #             cv2.imwrite(save_path + "/{}_{}_{}.jpg".format(d, fname, i), crop)
+
+
+    save_path = r"G:\Gosion\data\006.Belt_Torn_Detection\data\data_51_20250422_vis"
+    os.makedirs(save_path, exist_ok=True)
+
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Detection\data\data_51\data\20250422\src"
+    file_list = os.listdir(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        img_path = data_path + "/{}".format(f)
+        img = cv2.imread(img_path)
+        crops = corner_detect_crop_img(img)
+        for i, crop in enumerate(crops):
+            thresh_otsu, corners_xy, img_vis = corner_detect_v4(crop, blockSize=15, ksize=15, k=0.06, vis=True)
+            cv2.imwrite(save_path + "/{}_{}.jpg".format(fname, i), img_vis)
+                
+
+def resize_ico_image(input_path, output_path, size):
+    img = Image.open(input_path)
+    # img = img.resize((size, size), Image.ANTIALIAS)
+    img = img.resize((size, size))
+    img.save(output_path)
+
+
+
 
 if __name__ == '__main__':
     pass
@@ -12877,15 +13108,15 @@ if __name__ == '__main__':
     # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
-    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\val_labelbee_format", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
-    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\kpt\src_selected\src", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\yitiji".replace("\\", "/"), select_num=54, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\selected\same".replace("\\", "/"), select_num=88, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"E:\wujiahu\006.Belt_Torn_Det\data\A7300MG30_DE36009AAK00231", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\code\others\Python\arcface-pytorch-master\data\Datasets\face_detect_videos", fps=30)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -13226,18 +13457,17 @@ if __name__ == '__main__':
     
     # fit_curve_test(n=1, select_num=2, num_iterations=100, threshold=5, color=(255, 0, 255))
 
-    import multiprocessing as mp
-    import queue
-    q = mp.Queue()
-    # q = queue.Queue()
-    p1 = mp.Process(target=producer, args=(q,))
-    p2 = mp.Process(target=consumer, args=(q,))
+    # import multiprocessing as mp
+    # import queue
+    # q = mp.Queue()
+    # p1 = mp.Process(target=producer, args=(q,))
+    # p2 = mp.Process(target=consumer, args=(q,))
 
-    p1.start()
-    p2.start()
+    # p1.start()
+    # p2.start()
 
-    while not q.empty():
-        print(q.get())
+    # while not q.empty():
+    #     print(q.get())
 
     # # 通知消费者队列结束
     # q.put(None)
@@ -13245,11 +13475,15 @@ if __name__ == '__main__':
     # p1.join()
     # p2.join()
 
+    # corner_detect_test_20250507()
+
+    # img_path = r"G:\Gosion\data\001.Belt_Torn_Detection\data\data_51\data\20250507\src\1746601585.749494.jpg"
+    # check_laser_conditions(img_path)
+
+    # corner_detect_crop_img_main()
+
+
     
-
-
-
-
 
 
 

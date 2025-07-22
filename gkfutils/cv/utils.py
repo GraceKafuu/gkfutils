@@ -3320,67 +3320,75 @@ def convert_points(size, p):
     return res
 
 
-def labelbee_seg_json_to_yolo_txt(data_path):
-    save_path = os.path.abspath(os.path.join(data_path, "../..")) + "/{}".format("labels")
+def labelbee_seg_json_to_yolo_txt(data_path, keypoint_flag=False, cls_plus=-1):
+    dir_name = get_dir_name(data_path)
+    img_path = data_path + "/{}".format("images")
+    json_path = data_path + "/{}".format("jsons")
 
-    removed_damaged_img = os.path.abspath(os.path.join(data_path, "../..")) + "/{}".format("removed")
-    os.makedirs(save_path, exist_ok=True)
-    os.makedirs(removed_damaged_img, exist_ok=True)
+    save_path = os.path.abspath(os.path.join(data_path, "../")) + "/{}_{}".format(dir_name, "yolo_labels")
+    img_save_path = save_path + "/{}".format("images")
+    lbl_save_path = save_path + "/{}".format("labels")
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(lbl_save_path, exist_ok=True)
 
-    keypoint_flag = False
-
-    img_list = []
-    json_list = []
-    file_list = os.listdir(data_path)
-    for f in file_list:
-        if f.endswith(".jpg") or f.endswith(".jpeg"):
-            img_list.append(f)
-        elif f.endswith(".json"):
-            json_list.append(f)
+    json_list = sorted(os.listdir(json_path))
 
     for j in json_list:
-        img_abs_path = data_path + "/{}".format(j.strip(".json"))
-        img_dst_path = removed_damaged_img + "/{}".format(j.strip(".json"))
-        shutil.copy(img_abs_path, img_dst_path)
+        img_abs_path = img_path + "/{}".format(j.strip(".json"))
+        img_dst_path = img_save_path + "/{}".format(j.strip(".json"))
 
-        json_abs_path = data_path + "/{}".format(j)
+        json_abs_path = json_path + "/{}".format(j)
         json_ = json.load(open(json_abs_path, "r", encoding="utf-8"))
         w, h = json_["width"], json_["height"]
 
-        txt_save_path = save_path + "/{}".format(j.replace(".json", ".txt"))
+        len_object = len(json_["step_1"]["result"])
+        if len_object == 0: continue
+        shutil.copy(img_abs_path, img_dst_path)
+
+        txt_save_path = lbl_save_path + "/{}".format(j.replace(".jpg.json", ".txt"))
         with open(txt_save_path, "w", encoding="utf-8") as fw:
-            len_object = len(json_["step_1"]["result"])
+            
             pl = []
             for i in range(len_object):
                 pl_ = json_["step_1"]["result"][i]["pointList"]
+                cls_ = int(json_["step_1"]["result"][i]["attribute"])
 
                 x_, y_ = [], []
                 xy_ = []  # x, y, x, y. x. y, x, y
                 for i in range(len(pl_)):
-                    x_.append(float(pl_[i]["x"]))
-                    y_.append(float(pl_[i]["y"]))
+                    # x_.append(float(pl_[i]["x"]))
+                    # y_.append(float(pl_[i]["y"]))
 
-                    xy_.append(float(pl_[i]["x"]))
-                    xy_.append(float(pl_[i]["y"]))
+                    # xy_.append(float(pl_[i]["x"]))
+                    # xy_.append(float(pl_[i]["y"]))
 
-                # yolov5 keypoint format
-                if keypoint_flag:
-                    if len(xy_) == 8 and len(x_) == 4 and len(y_) == 4:
-                        x_min, x_max = min(x_), max(x_)
-                        y_min, y_max = min(y_), max(y_)
+                    dw = 1. / w
+                    dh = 1. / h
+                    xy_.append(float(pl_[i]["x"] * dw))
+                    xy_.append(float(pl_[i]["y"] * dh))
 
-                        bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
-                        p_res = convert_points((w, h), xy_)
+                txt_content = "{}".format(cls_ + cls_plus) + " " + " ".join([str(a) for a in xy_]) + "\n"
+                fw.write(txt_content)
 
-                        txt_content = "0" + " " + " ".join([str(a) for a in bb]) + " " + " ".join([str(c) for c in p_res]) + "\n"
-                        fw.write(txt_content)
-                else:
-                    x_min, x_max = min(x_), max(x_)
-                    y_min, y_max = min(y_), max(y_)
 
-                    bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
-                    txt_content = "0" + " " + " ".join([str(a) for a in bb]) + "\n"
-                    fw.write(txt_content)
+                # # yolov5 keypoint format
+                # if keypoint_flag:
+                #     if len(xy_) == 8 and len(x_) == 4 and len(y_) == 4:
+                #         x_min, x_max = min(x_), max(x_)
+                #         y_min, y_max = min(y_), max(y_)
+
+                #         bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
+                #         p_res = convert_points((w, h), xy_)
+
+                #         txt_content = "{}".format(cls_ + cls_plus) + " " + " ".join([str(a) for a in bb]) + " " + " ".join([str(c) for c in p_res]) + "\n"
+                #         fw.write(txt_content)
+                # else:
+                #     x_min, x_max = min(x_), max(x_)
+                #     y_min, y_max = min(y_), max(y_)
+
+                #     bb = bbox_voc_to_yolo((h, w), (x_min, y_min, x_max, y_max))
+                #     txt_content = "{}".format(cls_ + cls_plus) + " " + " ".join([str(a) for a in bb]) + "\n"
+                #     fw.write(txt_content)
 
             print("Saved --> {}".format(txt_save_path))
 
@@ -13088,18 +13096,18 @@ if __name__ == '__main__':
     #     f.write(byte_data.decode('utf-8'))
 
 
-    txt = open(r"D:\Gosion\code\gitee\BeltTornDetection_C++\src\BeltTornDetection_C++\BeltTornDetection_C++\ZBase64_test2.txt", "r")
-    data = txt.readlines()
-    txt.close()
+    # txt = open(r"D:\Gosion\code\gitee\BeltTornDetection_C++\src\BeltTornDetection_C++\BeltTornDetection_C++\ZBase64_test2.txt", "r")
+    # data = txt.readlines()
+    # txt.close()
 
-    data_new = ""
-    for i in data:
-        data_new += i.strip().replace("\n", "")
+    # data_new = ""
+    # for i in data:
+    #     data_new += i.strip().replace("\n", "")
 
-    # byte_data = b"{}".format(data_new)
-    byte_data = bytes(data_new.encode("utf-8"))
-    img = byte2img(byte_data)
-    cv2.imwrite(r'G:\Gosion\data\000.Test_Data\images\test_res_20250611_2.jpg', img)
+    # # byte_data = b"{}".format(data_new)
+    # byte_data = bytes(data_new.encode("utf-8"))
+    # img = byte2img(byte_data)
+    # cv2.imwrite(r'G:\Gosion\data\000.Test_Data\images\test_res_20250611_2.jpg', img)
 
 
 
@@ -13131,7 +13139,8 @@ if __name__ == '__main__':
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
     # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\kpt\src_selected\src", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
-    
+    labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
+
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 

@@ -21,7 +21,7 @@ def timeit(func):
 
 
 class YOLOv5_ONNX(object):
-    def __init__(self, onnx_path, num_classes=80):
+    def __init__(self, onnx_path, num_classes=80, conf_thres=0.60, iou_thres=0.45):
         cuda = torch.cuda.is_available()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         # providers = ['CPUExecutionProvider']
@@ -32,6 +32,8 @@ class YOLOv5_ONNX(object):
         self.output_size = self.session.get_outputs()[0].shape
 
         self.num_classes = num_classes
+        self.conf_thres = conf_thres
+        self.iou_thres = iou_thres
 
     def letterbox(self, im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
         # Resize and pad image while meeting stride-multiple constraints
@@ -247,7 +249,7 @@ class YOLOv5_ONNX(object):
         return pred
 
     def post_process(self, pred, src_size, img_size):
-        output = self.non_max_suppression(pred, conf_thres=0.60, iou_thres=0.45, agnostic=False)
+        output = self.non_max_suppression(pred, self.conf_thres, self.iou_thres, agnostic=False)
         out_bbx = []
         for i, det in enumerate(output):  # detections per image
             if len(det):
@@ -319,13 +321,13 @@ def bbox_voc_to_yolo(imgsz, box):
     return [x, y, w, h]
 
 
-def yolo_inference_save_labels(data_path, model_path, addStr=""):
+def yolo_inference_save_labels(data_path, model_path, model_label=0, dst_label=0, cls_name="person"):
     base_name = os.path.basename(data_path)
-    save_path = os.path.abspath(os.path.join(data_path, "../labels_{}".format(addStr)))
+    save_path = os.path.abspath(os.path.join(data_path, "../labels_{}".format(cls_name)))
     os.makedirs(save_path, exist_ok=True)
     file_list = os.listdir(data_path)
     
-    model = YOLOv5_ONNX(model_path)
+    model = YOLOv5_ONNX(model_path, conf_thres=0.60, iou_thres=0.45)
     model_input_size = (640, 640)
 
     for f in file_list:
@@ -346,8 +348,11 @@ def yolo_inference_save_labels(data_path, model_path, addStr=""):
                     x1, y1, x2, y2, conf, cls = b
                     bbox_yolo = bbox_voc_to_yolo(src_size, [x1, y1, x2, y2])
 
-                    if int(cls) == 0:
-                        txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                    # txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
+                    # fw.write(txt_content)
+
+                    if int(cls) == model_label:
+                        txt_content = "{}".format(dst_label) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
                         fw.write(txt_content)
 
                     # txt_content = "{}".format(cls) + " " + " ".join([str(b) for b in bbox_yolo]) + "\n"
@@ -460,13 +465,21 @@ if __name__ == '__main__':
     # img_path=r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\SafetyHelmet\images\train2028\000002.jpg"
     # inference_one(onnx_path, img_path)
 
-    onnx_path=r"D:\Gosion\code\others\Python\yolov5-master\runs\train\007.PPE_Det_v1\weights\best.onnx"
-    data_path = r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\JPEGImages"
-    file_list = sorted(os.listdir(data_path))
-    for f in file_list:
-        fname = os.path.splitext(f)[0]
-        f_abs_path = data_path + "/{}".format(f)
-        inference_one(onnx_path, f_abs_path)
+    # onnx_path=r"D:\Gosion\code\others\Python\yolov5-master\runs\train\007.PPE_Det_v1\weights\best.onnx"
+    # data_path = r"G:\Gosion\data\000.OpenDatasets\VOC2028\VOC2028\JPEGImages"
+    # file_list = sorted(os.listdir(data_path))
+    # for f in file_list:
+    #     fname = os.path.splitext(f)[0]
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     inference_one(onnx_path, f_abs_path)
+
+
+    data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\images"
+    # model_path=r"D:\Gosion\code\gitee\GuanWangLNG\src\pipechina_beihaihaikou\weights\smoking_detection\smoking_det_yolov5s_640_640_v1.0.0.onnx"
+    # model_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\helmet_head_model\helmet_det_yolov5s_640_640_v1.0.1.onnx"
+    # model_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\cotta_model\best.onnx"
+    model_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\model\best.onnx"
+    yolo_inference_save_labels(data_path=data_path, model_path=model_path, model_label=3, dst_label=3, cls_name="T-shirt")
 
             
 

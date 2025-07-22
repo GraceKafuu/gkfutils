@@ -12998,6 +12998,8 @@ def resize_ico_image(input_path, output_path, size):
 
 
 
+
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
@@ -13074,13 +13076,32 @@ if __name__ == '__main__':
     # random_select_images_from_ocr_train_txt(data_path="", select_num= 5000)
     # ocr_train_txt_split_to_train_and_test(data_path="", train_percent=0.8)
 
-    # byte_data = 
+    # byte_data = b""
     # img = byte2img(byte_data)
-    # cv2.imwrite(r'D:\Gosion\Projects\data\images\test_res_20250222_1.jpg', img)
+    # cv2.imwrite(r'G:\Gosion\data\000.Test_Data\images\test_res_20250611.jpg', img)
 
-    # img_path = r'D:\Gosion\Projects\data\res2.jpg'
+    # img_path = "G:\\Gosion\\data\\000.Test_Data\\images\\20250520142551.png"
     # byte_data = img2byte(img_path)
-    # print(byte_data)
+    # # print(byte_data)
+
+    # with open(r'D:\Gosion\code\gitee\BeltTornDetection_C++\src\BeltTornDetection_C++\BeltTornDetection_C++\ZBase64_test_python.txt', 'w') as f:
+    #     f.write(byte_data.decode('utf-8'))
+
+
+    txt = open(r"D:\Gosion\code\gitee\BeltTornDetection_C++\src\BeltTornDetection_C++\BeltTornDetection_C++\ZBase64_test2.txt", "r")
+    data = txt.readlines()
+    txt.close()
+
+    data_new = ""
+    for i in data:
+        data_new += i.strip().replace("\n", "")
+
+    # byte_data = b"{}".format(data_new)
+    byte_data = bytes(data_new.encode("utf-8"))
+    img = byte2img(byte_data)
+    cv2.imwrite(r'G:\Gosion\data\000.Test_Data\images\test_res_20250611_2.jpg', img)
+
+
 
     # img = cv2.imread(r'D:\Gosion\Projects\data\202206070916487.png')
     # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -13104,8 +13125,8 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_labelbee_format_yolo_format", copy_images=False)  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\New\zhanting_v2\train", copy_images=False)  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -13114,9 +13135,9 @@ if __name__ == '__main__':
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\selected\same".replace("\\", "/"), select_num=88, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v1\train".replace("\\", "/"), select_num=2500, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"D:\Gosion\code\others\Python\arcface-pytorch-master\data\Datasets\face_detect_videos", fps=30)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\pexels", fps=3)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -13481,6 +13502,7 @@ if __name__ == '__main__':
     # check_laser_conditions(img_path)
 
     # corner_detect_crop_img_main()
+
 
 
     

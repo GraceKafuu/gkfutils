@@ -663,7 +663,7 @@ def main_test_20250411(data_path):
 
     # rect = np.array([[804, 651], [862, 644], [884, 917], [823, 924]], dtype='float32')
     rect = np.array([[779, 549], [871, 541], [903, 1013], [815, 1023]], dtype='float32')
-    im1 = cv2.imread(r'G:\Gosion\data\008.OilLevel_Det\data\xfeat\ref.jpg')
+    im1 = cv2.imread(r'G:\Gosion\data\008.Oil_Level_Det\data\xfeat\ref.jpg')
 
     file_list = sorted(os.listdir(data_path))
     for f in tqdm.tqdm(file_list):
@@ -757,7 +757,7 @@ if __name__ == '__main__':
     # plt.show()
 
     # main_test_20250410(data_path=r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data")
-    main_test_20250411(data_path=r"G:\Gosion\data\008.OilLevel_Det\data\xfeat\data")
+    main_test_20250411(data_path=r"G:\Gosion\data\008.Oil_Level_Det\data\xfeat\data")
 
 
 

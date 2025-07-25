@@ -13004,6 +13004,299 @@ def resize_ico_image(input_path, output_path, size):
     img.save(output_path)
 
 
+def extract_mnist():
+    import os
+    import torch
+    import torchvision
+    from torchvision import datasets
+    from torch.utils.data import DataLoader
+    from torchvision.transforms import ToTensor
+    from PIL import Image
+
+    # 设置参数
+    download_path = 'F:/downloads/MNIST/MNIST_data'  # 数据集下载路径
+    save_path = 'F:/downloads/MNIST/MNIST_images'  # 图片保存路径
+    batch_size = 64                 # 数据加载批大小
+
+    # 创建保存目录
+    os.makedirs(download_path, exist_ok=True)
+    os.makedirs(save_path, exist_ok=True)
+
+    # 下载训练集和测试集
+    train_data = datasets.MNIST(
+    root=download_path,
+    train=True,
+    transform=ToTensor(),
+    download=True
+    )
+
+    test_data = datasets.MNIST(
+    root=download_path,
+    train=False,
+    transform=ToTensor(),
+    download=True
+    )
+
+    # 创建数据加载器
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+
+    # 保存训练集图片
+    for batch_idx, (images, labels) in enumerate(train_loader):
+        for i in range(images.size(0)):
+        # 生成唯一文件名：类型_批次序号_图片序号_标签.png
+            filename = f"train_{batch_idx:04d}_{i:03d}_label{labels[i].item()}.png"
+            img_path = os.path.join(save_path, filename)
+
+            # 转换并保存图片（移除批次维度，转换为PIL图像）
+            img = Image.fromarray(images[i].squeeze().numpy() * 255).convert('L')
+            img.save(img_path)
+
+        print(f"保存训练集批次: {batch_idx+1}/{len(train_loader)}")
+
+    # 保存测试集图片
+    for batch_idx, (images, labels) in enumerate(test_loader):
+        for i in range(images.size(0)):
+            filename = f"test_{batch_idx:04d}_{i:03d}_label{labels[i].item()}.png"
+            img_path = os.path.join(save_path, filename)
+
+            img = Image.fromarray(images[i].squeeze().numpy() * 255).convert('L')
+            img.save(img_path)
+
+        print(f"保存测试集批次: {batch_idx+1}/{len(test_loader)}")
+
+    print("所有图片保存完成！")
+    print(f"训练图片数量: {len(train_data)}")
+    print(f"测试图片数量: {len(test_data)}")
+    print(f"总图片数量: {len(train_data) + len(test_data)}")
+    print(f"图片保存位置: {os.path.abspath(save_path)}")
+
+
+def save_cifar_images(dataset, dataset_name, split='train'):
+    """
+    保存CIFAR数据集图片到本地文件夹
+    
+    参数:
+        dataset: CIFAR数据集对象
+        dataset_name: 数据集名称 ('cifar10' 或 'cifar100')
+        split: 数据集分割类型 ('train' 或 'test')
+    """
+    # 创建保存目录
+    save_dir = os.path.join(os.getcwd(), f"{dataset_name}_{split}")
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 获取类别名称
+    if dataset_name == 'cifar10':
+        classes = ('plane', 'car', 'bird', 'cat', 'deer', 
+                   'dog', 'frog', 'horse', 'ship', 'truck')
+    else:  # cifar100
+        # 使用细粒度标签名称
+        classes = dataset.classes
+    
+    # 创建类别子目录
+    for class_name in classes:
+        class_dir = os.path.join(save_dir, class_name)
+        os.makedirs(class_dir, exist_ok=True)
+    
+    print(f"正在保存 {dataset_name} {split} 数据集...")
+    
+    # 保存每张图片
+    for idx in range(len(dataset)):
+        image, label = dataset[idx]
+        
+        # 获取类别名称
+        class_name = classes[label]
+        
+        # 构建保存路径
+        class_dir = os.path.join(save_dir, class_name)
+        img_path = os.path.join(class_dir, f"{idx:05d}.png")
+        
+        # 保存图片
+        image.save(img_path)
+        
+        # 每1000张打印一次进度
+        if (idx + 1) % 1000 == 0:
+            print(f"已保存 {idx+1}/{len(dataset)} 张图片")
+    
+    print(f"保存完成! 图片已存储在: {save_dir}\n")
+
+
+def extract_cifar():
+    from torchvision.datasets import CIFAR10, CIFAR100
+
+    # 设置数据集下载路径
+    data_root_CIFAR10 = "F:\downloads\CIFAR10"
+    data_root_CIFAR100 = "F:\downloads\CIFAR100"
+    os.makedirs(data_root_CIFAR10, exist_ok=True)
+    os.makedirs(data_root_CIFAR100, exist_ok=True)
+    
+    # 下载并保存CIFAR-10
+    for split in ['train', 'test']:
+        cifar10_set = CIFAR10(root=data_root_CIFAR10, 
+                              train=(split == 'train'), 
+                              download=True)
+        save_cifar_images(cifar10_set, 'cifar10', split)
+    
+    # 下载并保存CIFAR-100
+    for split in ['train', 'test']:
+        cifar100_set = CIFAR100(root=data_root_CIFAR100, 
+                                train=(split == 'train'), 
+                                download=True)
+        save_cifar_images(cifar100_set, 'cifar100', split)
+    
+    print("所有数据集处理完成!")
+
+
+def save_caltech_images(dataset, dataset_name, root_dir):
+    """
+    保存Caltech数据集图片到本地文件夹
+    
+    参数:
+        dataset: Caltech数据集对象
+        dataset_name: 数据集名称 ('caltech101' 或 'caltech256')
+        root_dir: 根目录路径
+    """
+    # 创建保存目录
+    save_dir = os.path.join(root_dir, f"{dataset_name}_images")
+    os.makedirs(save_dir, exist_ok=True)
+    
+    print(f"正在保存 {dataset_name.upper()} 数据集图片...")
+    print(f"总图片数量: {len(dataset)}")
+    
+    # 保存每张图片
+    for idx in range(len(dataset)):
+        if dataset_name == 'caltech101':
+            # Caltech101返回(image, target)其中target是类别索引
+            image, target = dataset[idx]
+            # 获取类别名称
+            class_name = dataset.categories[target]
+        else:  # Caltech256
+            # Caltech256返回(image, target)其中target是类别索引
+            image, target = dataset[idx]
+            # 类别名称从文件夹名获取
+            class_name = f"{target:03d}"  # 格式化为3位数字
+            
+        # 创建类别子目录
+        class_dir = os.path.join(save_dir, class_name)
+        os.makedirs(class_dir, exist_ok=True)
+        
+        # 构建保存路径
+        img_path = os.path.join(class_dir, f"{dataset_name}_{idx:06d}.jpg")
+        
+        # 保存图片为JPEG格式
+        if not isinstance(image, Image.Image):
+            image = Image.fromarray(image)
+        image.save(img_path)
+        
+        # 每1000张打印一次进度
+        if (idx + 1) % 1000 == 0:
+            print(f"已保存 {idx+1}/{len(dataset)} 张图片")
+    
+    print(f"{dataset_name.upper()} 保存完成! 图片存储在: {save_dir}")
+    print(f"类别数量: {len(os.listdir(save_dir))}\n")
+
+
+def extract_caltech():
+    from torchvision.datasets import Caltech101, Caltech256
+
+    # 设置数据集下载和保存的根目录
+    data_root = r"F:\downloads"
+    os.makedirs(data_root, exist_ok=True)
+    
+    # 确保使用最新版本的torchvision（解决Caltech下载问题）
+    print(f"torchvision版本: {torchvision.__version__}")
+    if torchvision.__version__ < '0.17.1':
+        print("警告: 推荐使用torchvision 0.17.1或更高版本来避免Caltech下载问题")
+        print("请执行: pip install torchvision --upgrade")
+    
+    try:
+        # 下载并保存Caltech101
+        print("="*50)
+        print("开始处理Caltech101数据集...")
+        caltech101_set = Caltech101(root=data_root + "\Caltech101", 
+                                   download=True, 
+                                   target_type="category")
+        save_caltech_images(caltech101_set, 'caltech101', data_root)
+        
+        # 下载并保存Caltech256
+        print("="*50)
+        print("开始处理Caltech256数据集...")
+        caltech256_set = Caltech256(root=data_root + "\Caltech256", 
+                                   download=True)
+        save_caltech_images(caltech256_set, 'caltech256', data_root)
+        
+        print("="*50)
+        print("所有数据集处理完成!")
+        print(f"Caltech101图片总数: {len(caltech101_set)}")
+        print(f"Caltech256图片总数: {len(caltech256_set)}")
+        
+    except RuntimeError as e:
+        print(f"发生错误: {e}")
+        print("可能的解决方案:")
+        print("1. 确保使用最新版torchvision: pip install torchvision --upgrade")
+        print("2. 安装gdown库: pip install gdown")
+        print("3. 手动下载数据集:")
+        print("   Caltech101: https://www.juhe.cn/market/product/id/10180")
+        print("   Caltech256: 官方源或备用镜像")
+        print("4. 将下载的文件放在对应目录后重新运行程序")
+
+
+def save_fashion_mnist_images(dataset, save_dir):
+    """保存数据集中的图片到指定目录"""
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
+    # 保存图片和标签文件
+    for idx, (image, label) in enumerate(dataset):
+        # 创建子文件夹：按类别存储
+        class_dir = os.path.join(save_dir, str(label))
+        if not os.path.exists(class_dir):
+            os.makedirs(class_dir)
+        
+        # 生成唯一文件名
+        img_path = os.path.join(class_dir, f"image_{idx:05d}.png")
+        
+        # 转换并保存图片
+        image.save(img_path)
+        
+        # 每1000张打印一次进度
+        if idx % 1000 == 0:
+            print(f"已保存 {idx}/{len(dataset)} 张图片")
+    
+
+def extract_fashion_mnist():
+    from torchvision.datasets import FashionMNIST
+
+    # 设置数据集路径
+    data_root = "F:\downloads\FashionMNIST"
+    os.makedirs(data_root, exist_ok=True)
+    
+    # 下载训练集和测试集
+    train_set = FashionMNIST(
+        root=data_root, 
+        train=True,
+        download=True,
+        transform=torchvision.transforms.ToTensor()
+    )
+    
+    test_set = FashionMNIST(
+        root=data_root, 
+        train=False,
+        download=True,
+        transform=torchvision.transforms.ToTensor()
+    )
+    
+    print("数据集下载完成！")
+    print(f"训练集大小: {len(train_set)} 张图片")
+    print(f"测试集大小: {len(test_set)} 张图片")
+    
+    # 保存图片
+    save_fashion_mnist_images(train_set, data_root + "fashion_mnist_images/train")
+    save_fashion_mnist_images(test_set, data_root + "fashion_mnist_images/test")
+    
+    print("所有图片保存完成！")
+    print(f"训练集保存路径: ./fashion_mnist_images/train")
+    print(f"测试集保存路径: ./fashion_mnist_images/test")
 
 
 
@@ -13139,7 +13432,7 @@ if __name__ == '__main__':
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
     # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\kpt\src_selected\src", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
-    labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
+    # labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
@@ -13511,6 +13804,11 @@ if __name__ == '__main__':
     # check_laser_conditions(img_path)
 
     # corner_detect_crop_img_main()
+
+    # extract_mnist()
+    # extract_cifar()
+    # extract_caltech()
+    extract_fashion_mnist()
 
 
 

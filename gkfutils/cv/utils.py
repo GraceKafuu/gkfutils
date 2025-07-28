@@ -13257,7 +13257,10 @@ def save_fashion_mnist_images(dataset, save_dir):
         img_path = os.path.join(class_dir, f"image_{idx:05d}.png")
         
         # 转换并保存图片
-        image.save(img_path)
+        image = image.squeeze().numpy()
+        # image.save(img_path)
+        image = cv2.cvtColor(image * 255, cv2.COLOR_GRAY2BGR)
+        cv2.imwrite(img_path, image)
         
         # 每1000张打印一次进度
         if idx % 1000 == 0:
@@ -13291,8 +13294,8 @@ def extract_fashion_mnist():
     print(f"测试集大小: {len(test_set)} 张图片")
     
     # 保存图片
-    save_fashion_mnist_images(train_set, data_root + "fashion_mnist_images/train")
-    save_fashion_mnist_images(test_set, data_root + "fashion_mnist_images/test")
+    save_fashion_mnist_images(train_set, data_root + "/fashion_mnist_images/train")
+    save_fashion_mnist_images(test_set, data_root + "/fashion_mnist_images/test")
     
     print("所有图片保存完成！")
     print(f"训练集保存路径: ./fashion_mnist_images/train")

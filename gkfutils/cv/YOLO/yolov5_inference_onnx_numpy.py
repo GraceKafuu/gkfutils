@@ -1,8 +1,22 @@
 import time
+import os
 import cv2
 import logging
 import numpy as np
 import onnxruntime as ort
+from time import perf_counter
+
+
+# wrapper functions to execute time of functions
+def timeit(func):
+    def wrapper(*args, **kwargs):
+        start_time = perf_counter()
+        result = func(*args, **kwargs)
+        # count time (ms)
+        exec_time = (perf_counter() - start_time) * 1000
+        print(f"Execution time: {exec_time:.2f} ms")
+        return result
+    return wrapper
 
 
 class YOLOv5_ORT(object):
@@ -81,7 +95,6 @@ class YOLOv5_ORT(object):
 
     def nms(self, bboxes, scores, iou_thresh):
         """
-
         :param bboxes: 检测框列表
         :param scores: 置信度列表
         :param iou_thresh: IOU阈值
@@ -136,14 +149,16 @@ class YOLOv5_ORT(object):
         y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
         return y
 
-    def non_max_suppression(self, prediction,
-                            conf_thres=0.25,
-                            iou_thres=0.45,
-                            classes=None,
-                            agnostic=False,
-                            multi_label=False,
-                            labels=(),
-                            max_det=300):
+    def non_max_suppression(
+            self, prediction,
+            conf_thres=0.25,
+            iou_thres=0.45,
+            classes=None,
+            agnostic=False,
+            multi_label=False,
+            labels=(),
+            max_det=300
+    ):
         """Non-Maximum Suppression (NMS) on inference results to reject overlapping bounding boxes
 
         Returns:
@@ -227,8 +242,6 @@ class YOLOv5_ORT(object):
         self.orig_shape = img0.shape
         # Set Dataprocess & Run inference
         img = self.letterbox(img0, new_shape=self.imgsz, auto=False)[0]
-        # print("===", img.shape)
-        # cv2.imwrite('result/0414_auto.jpg', img)
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
@@ -244,6 +257,7 @@ class YOLOv5_ORT(object):
         self.img_shape = img.shape[2:]
         return img
     
+    @timeit
     def inference(self, img):
         pred = self.session.run([self.session.get_outputs()[0].name], {self.session.get_inputs()[0].name: img})[0]
         return pred
@@ -260,45 +274,55 @@ class YOLOv5_ORT(object):
             det[:, :4] = self.scale_coords(self.img_shape, det[:, :4], self.orig_shape).round()
             # Write results
             for *xyxy, conf, cls in reversed(det):
-                label = str(cls)
+                label = int(cls)
                 prob = round(float(conf), 2)  # round 2
                 # c_x = (int(xyxy[0]) + int(xyxy[2])) / 2
                 # c_y = (int(xyxy[1]) + int(xyxy[3])) / 2
                 # Img vis
-                xmin, ymin, xmax, ymax = xyxy
-                newpoints = [(int(xmin), int(ymin)), (int(xmax), int(ymax))]
+                # xmin, ymin, xmax, ymax = xyxy
+                # newpoints = [(int(xmin), int(ymin)), (int(xmax), int(ymax))]
+                box = list(map(round, xyxy))
 
-                result = [newpoints, label, prob]
+                result = [box, label, prob]
                 results.append(result)
                 
         return results
     
     def vis_results(self, img, results):
         for pts, label, prob in results:
-            newpoints = np.array(pts)    
-            cv2.rectangle(img, newpoints[0], newpoints[1], (0,255,0), 2) 
-            cv2.putText(img, label + '_' + str(prob), newpoints[0], cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 1, cv2.LINE_AA)
+            cv2.rectangle(img, (pts[0], pts[1]), (pts[2], pts[3]), (0,255,0), 2) 
+            cv2.putText(img, str(label) + ' ' + str(prob), (pts[0], pts[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 1, cv2.LINE_AA)
 
         return img
     
-    def detect(self, img0):
-
-        """
-        对输入的图片进行目标检测，返回对应的类别的检测框,并可视化输出
-        #输出后自己做对应的逻辑处理
-        """
-
+    def detect(self, img0, show=False):
         img = self.preprocess(img0)
-        # Inference
         pred = self.inference(img)   
         results = self.postprocess(pred)
-        self.vis_results(img0, results)
-        
-        return img0
+        out = self.vis_results(img0, results)
 
+        if show:
+            cv2.imshow("out", out)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        return out
     
+    def detect_folder(self, imgs_path, out_path):
+        file_list = sorted(os.listdir(imgs_path))
+        if not out_path or out_path is None:
+            out_path = "./output"
+        os.makedirs(out_path, exist_ok=True)
 
- 
+        for f in file_list:
+            f_abs_path = imgs_path + "/{}".format(f)
+            f_dst_path = out_path + "/{}".format(f)
+            img = cv2.imread(f_abs_path)
+            out = self.detect(img)
+            cv2.imwrite(f_dst_path, out)
+            
+
+
  
 if __name__=="__main__":
     onnx_path = r"D:\Gosion\code\others\Python\yolov5-master\yolov5s.onnx"
@@ -307,8 +331,8 @@ if __name__=="__main__":
     yolov5 = YOLOv5_ORT(onnx_path, conf=0.25)
     img = cv2.imread(img_pth)
 
-    out = yolov5.detect(img)
+    # out = yolov5.detect(img, show=True)
 
-    cv2.imshow("out", out)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    imgs_path = r"G:\Gosion\data\000.Test_Data\images\detect_test"
+    save_path = r"G:\Gosion\data\000.Test_Data\images\detect_test_results"
+    yolov5.detect_folder(imgs_path, save_path)

@@ -244,7 +244,6 @@ class YOLOv5_ONNX(object):
     
     @timeit
     def inference(self, img):
-        # im = img.cpu().numpy()  # torch to numpy
         pred = self.session.run([self.output_names], {self.input_names: img})[0]
         return pred
 

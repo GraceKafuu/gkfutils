@@ -1271,7 +1271,7 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels", path2=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels_T-shirt")
-    rename_files(data_path=r"D:\Gosion\code\others\Python\spider\spiderImgFromBingAndBaidu-master\baidu_images_merged", new_name_prefix="violeted_sitting_20250726", start_num=1500)
+    # rename_files(data_path=r"F:\downloads\bvwb09xhmchmcibvwb09x\MV-A7300CG30_DL56380CAK00099\FFOutput\Video_2025_07_31_115353_3", new_name_prefix="Video_2025_07_31_115353_3", start_num=0)
     # rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\labels", new_name_prefix="person_helmet_1_20250402", start_num=0)
 
     # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
@@ -1286,12 +1286,12 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    # merge_dirs(data_path=r"D:\Gosion\code\others\Python\spider\spiderImgFromBingAndBaidu-master\bing_images")
+    # merge_dirs(data_path=r"F:\downloads\bvwb09xhmchmcibvwb09x\FFOutput")
 
 
-    # random_select_files(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\pexels_frames\train\images", mvcp="move", select_num=500)
+    random_select_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\test\images", mvcp="move", select_num=1000)
 
-    # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos_yolo_format\images", path2=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos_yolo_format\labels", save_path="", with_suffix=False, flag="same", mvcp="mv")
+    # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train\converted\images_select", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train\converted\masks", save_path="", with_suffix=False, flag="same", mvcp="mv")
     
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")

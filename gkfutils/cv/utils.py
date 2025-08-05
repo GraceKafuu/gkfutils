@@ -3238,7 +3238,7 @@ def labelbee_kpt_to_dbnet(data_path, copy_image=True):
             print(Error)
 
 
-def parse_json(json_abs_path):
+def labelbee_seg_to_png_parse_json(json_abs_path):
     json_data = json.load(open(json_abs_path, "r", encoding="utf-8"))
     w, h = json_data["width"], json_data["height"]
     len_object = len(json_data["step_1"]["result"])
@@ -3266,34 +3266,32 @@ def labelbee_seg_to_png(data_path):
     images_path = data_path + "/{}".format("images")
     json_path = data_path + "/{}".format("jsons")
 
-    seg_images_path = data_path + "/{}".format("images_select")
-    png_vis_path = data_path + "/{}".format("masks_vis")
-    png_path = data_path + "/{}".format("masks")
+    save_path = make_save_path(data_path, add_str="seg_images_labels")
+    seg_images_path = save_path + "/{}".format("images_select")
+    png_vis_path = save_path + "/{}".format("masks_vis")
+    png_path = save_path + "/{}".format("masks")
     os.makedirs(seg_images_path, exist_ok=True)
     os.makedirs(png_vis_path, exist_ok=True)
     os.makedirs(png_path, exist_ok=True)
 
-    json_list = []
-    file_list = os.listdir(json_path)
-    for f in file_list:
-        if f.endswith(".json"):
-            json_list.append(f)
+    file_list = get_file_list(images_path)
 
-    for j in json_list:
+    for f in file_list:
         try:
-            json_abs_path = json_path + "/{}".format(j)
-            polygon_list, label_list, img_size = parse_json(json_abs_path)
+            fname = os.path.splitext(f)[0]
+            json_abs_path = json_path + "/{}.json".format(f)
+            polygon_list, label_list, img_size = labelbee_seg_to_png_parse_json(json_abs_path)
 
             if not polygon_list: continue
 
             img_vis, img = draw_label(size=(img_size[1], img_size[0], 3), polygon_list=polygon_list)
-            png_vis_save_path = png_vis_path + "/{}".format(j.split(".")[0] + ".png")
+            png_vis_save_path = png_vis_path + "/{}.png".format(fname)
             img_vis.save(png_vis_save_path)
-            png_save_path = png_path + "/{}".format(j.split(".")[0] + ".png")
+            png_save_path = png_path + "/{}.png".format(fname)
             img.save(png_save_path)
 
-            img_src_path = images_path + "/{}".format(j.replace(".json", ""))
-            img_dst_path = seg_images_path + "/{}".format(j.replace(".json", ""))
+            img_src_path = images_path + "/{}".format(f)
+            img_dst_path = seg_images_path + "/{}".format(f)
             shutil.copy(img_src_path, img_dst_path)
             print("{} copy to --> {}".format(img_src_path, img_dst_path))
 
@@ -3997,6 +3995,44 @@ def random_select_yolo_images_and_labels(data_path, select_num=1000, move_or_cop
 
         img_dst_path = selected_img_save_path + "/{}".format(f)
         lbl_dst_path = selected_lbl_save_path + "/{}.txt".format(f_name)
+
+        if move_or_copy == "copy":
+            try:
+                shutil.copy(img_src_path, img_dst_path)
+                shutil.copy(lbl_src_path, lbl_dst_path)
+            except Exception as Error:
+                print(Error)
+        elif move_or_copy == "move":
+            shutil.move(img_src_path, img_dst_path)
+            shutil.move(lbl_src_path, lbl_dst_path)
+        else:
+            print("Error!")
+
+
+def random_select_yolo_images_and_masks(data_path, select_num=1000, move_or_copy="copy", select_mode=0):
+    orig_img_path = data_path + "/images"
+    orig_lbl_path = data_path + "/masks"
+    data_list = sorted(os.listdir(orig_img_path))
+
+    assert select_num <= len(data_list), "{} is grater than total num!".format(select_num)
+
+    selected_img_save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_random_selected_{}/images".format(data_path.split("/")[-1], select_num)
+    selected_lbl_save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_random_selected_{}/masks".format(data_path.split("/")[-1], select_num)
+    os.makedirs(selected_img_save_path, exist_ok=True)
+    os.makedirs(selected_lbl_save_path, exist_ok=True)
+
+    if select_mode == 0:
+        selected = random.sample(data_list, select_num)
+    else:
+        selected = random.sample(data_list, len(data_list) - select_num)
+
+    for f in tqdm(selected):
+        f_name = os.path.splitext(f)[0]
+        img_src_path = orig_img_path + "/{}".format(f)
+        lbl_src_path = orig_lbl_path + "/{}.png".format(f_name)
+
+        img_dst_path = selected_img_save_path + "/{}".format(f)
+        lbl_dst_path = selected_lbl_save_path + "/{}.png".format(f_name)
 
         if move_or_copy == "copy":
             try:
@@ -13302,6 +13338,12 @@ def extract_fashion_mnist():
     print(f"测试集保存路径: ./fashion_mnist_images/test")
 
 
+def filter_array(arr, threshold):
+    """
+    过滤元素
+    """
+    return np.where(arr < threshold, 0, arr)
+
 
 
 if __name__ == '__main__':
@@ -13433,14 +13475,16 @@ if __name__ == '__main__':
     # labelbee_to_yolo(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
-    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\ningmei\nos", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"F:\downloads\bvwb09xhmchmcibvwb09x\FFOutput_merged", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
     # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\kpt\src_selected\src", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     # labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
+    # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v1\train".replace("\\", "/"), select_num=2500, move_or_copy="move", select_mode=0)
+    random_select_yolo_images_and_labels(data_path=r"F:\downloads\bvwb09xhmchmcibvwb09x\FFOutput_merged_yolo_format".replace("\\", "/"), select_num=294, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
     # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\pexels", fps=3)
 
@@ -13811,7 +13855,7 @@ if __name__ == '__main__':
     # extract_mnist()
     # extract_cifar()
     # extract_caltech()
-    extract_fashion_mnist()
+    # extract_fashion_mnist()
 
 
 

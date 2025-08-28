@@ -920,8 +920,8 @@ class YOLO11_ORT:
             outputs[0][0],
             width_radio=self.img_width / self.input_width,
             height_radio=self.img_height / self.input_height,
-            filter_threshold=0.60,
-            iou_threshold=0.45
+            filter_threshold=self.confidence_thres,
+            iou_threshold=self.iou_thres
         )
 
         for b, s, k in zip(boxes, scores, keypoints):
@@ -957,8 +957,8 @@ class YOLO11_ORT:
                 outputs[0][0],
                 width_radio=self.img_width / self.input_width,
                 height_radio=self.img_height / self.input_height,
-                filter_threshold=0.60,
-                iou_threshold=0.45
+                filter_threshold=self.confidence_thres,
+                iou_threshold=self.iou_thres
             )
 
             img_dst_path = img_save_path + "/{}".format(f)
@@ -1052,10 +1052,11 @@ class YOLO11_ORT:
 
 if __name__ == "__main__":
     # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\weights\yolo11s.onnx"
-    model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
+    # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
+    model_path = r"D:\Gosion\code\gitee\BeltTornDetection_BGR\build\others\BeltTornDetection_v2.2.7\BeltTornDetection_v2.2.7\weights\belt_torn_kpt_yolo11s_256_256_v1.0.1.onnx"
     # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v2\weights\best.onnx"
     # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v2\weights\best.onnx"
-    model = YOLO11_ORT(model_path, num_kpt=17)
+    model = YOLO11_ORT(model_path, num_kpt=2)
 
     # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\images"
     # # data_path = r"D:\Gosion\Projects\003.Sitting_Det\v1\val\test_images"
@@ -1099,8 +1100,8 @@ if __name__ == "__main__":
     #     cv2.imwrite(f_dst_path, output)
 
 
-    # data_path = r"D:\Gosion\Projects\006.Belt_Torn_Det\data\pose\v3\val\images"
-    # model.pose_detect_generate_yolo_labels(data_path)
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected\images"
+    model.pose_detect_generate_yolo_labels(data_path)
 
-    data_path = r"G:\Gosion\data\007.PPE_Det\data\v1\all"
-    model.pose_detect_up_down_flip_image(data_path)
+    # data_path = r"G:\Gosion\data\007.PPE_Det\data\v1\all"
+    # model.pose_detect_up_down_flip_image(data_path)

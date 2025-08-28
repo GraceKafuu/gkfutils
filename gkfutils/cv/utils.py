@@ -8061,7 +8061,7 @@ def seamless_clone(fg_path, bg_path, dst_num=5000):
 
 def draw_label(size=(384, 384, 3), polygon_list=None):
     image = np.zeros(size, np.uint8)
-    img_vis = cv2.fillPoly(image, polygon_list, (128, 128, 128))
+    img_vis = cv2.fillPoly(image, polygon_list, (255, 255, 255))
     img_vis = Image.fromarray(img_vis)
     img = cv2.fillPoly(image, polygon_list, (1, 1, 1))
     img = Image.fromarray(img)
@@ -13475,18 +13475,18 @@ if __name__ == '__main__':
     # labelbee_to_yolo(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
-    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"F:\downloads\bvwb09xhmchmcibvwb09x\FFOutput_merged", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
-    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Detection\data\kpt\src_selected\src", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected\images_converted_yolo_labels", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     # labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
-    # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train")
+    # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\3d_seg")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    random_select_yolo_images_and_labels(data_path=r"F:\downloads\bvwb09xhmchmcibvwb09x\FFOutput_merged_yolo_format".replace("\\", "/"), select_num=294, move_or_copy="move", select_mode=0)
+    random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected_yolo_format".replace("\\", "/"), select_num=28, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\pexels", fps=3)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250822-大坝纸壳测试\caijishuju_20250823", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 

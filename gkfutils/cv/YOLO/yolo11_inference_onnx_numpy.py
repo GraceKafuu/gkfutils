@@ -1100,7 +1100,7 @@ if __name__ == "__main__":
     #     cv2.imwrite(f_dst_path, output)
 
 
-    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected\images"
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected\images"
     model.pose_detect_generate_yolo_labels(data_path)
 
     # data_path = r"G:\Gosion\data\007.PPE_Det\data\v1\all"

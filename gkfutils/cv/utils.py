@@ -13345,6 +13345,67 @@ def filter_array(arr, threshold):
     return np.where(arr < threshold, 0, arr)
 
 
+def split_img(img, n=3):
+    imgsz = img.shape
+
+    split_width = imgsz[1] // 3
+    img0 = img[:, 0:split_width]
+    img1 = img[:, split_width:2 * split_width]
+    img2 = img[:, 2 * split_width:]
+
+    if len(imgsz) == 3:
+        img0_zeros = np.zeros(shape=(imgsz[0], imgsz[1] - split_width, imgsz[2]), dtype=np.uint8)
+        img1_zeros_0 = np.zeros(shape=(imgsz[0], split_width, imgsz[2]), dtype=np.uint8)
+        img1_zeros_1 = np.zeros(shape=(imgsz[0], imgsz[1] - 2 * split_width, imgsz[2]), dtype=np.uint8)
+        img2_zeros = np.zeros(shape=(imgsz[0], 2 * split_width, imgsz[2]), dtype=np.uint8)
+    elif len(imgsz) == 2:
+        img0_zeros = np.zeros(shape=(imgsz[0], imgsz[1] - split_width), dtype=np.uint8)
+        img1_zeros_0 = np.zeros(shape=(imgsz[0], split_width), dtype=np.uint8)
+        img1_zeros_1 = np.zeros(shape=(imgsz[0], imgsz[1] - 2 * split_width), dtype=np.uint8)
+        img2_zeros = np.zeros(shape=(imgsz[0], 2 * split_width), dtype=np.uint8)
+
+    img0 = np.hstack((img0, img0_zeros))
+    img1 = np.hstack((img1_zeros_0, img1, img1_zeros_1))
+    img2 = np.hstack((img2_zeros, img2))
+
+    out = [img0, img1, img2]
+    return out
+
+
+def change_pixel_value(data_path):
+    file_list = get_file_list(data_path)
+
+    save_path = data_path + "_change_pixel_value"
+    os.makedirs(save_path, exist_ok=True)
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(data_path, f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape
+        if len(imgsz) == 2:
+            c = 1
+        elif len(imgsz) == 3:
+            c = 3
+
+        target = np.where((img[:, :, 0] == 1) & (img[:, :, 1] == 1) & (img[:, :, 2] == 1))
+
+        dst = None
+        if c == 1:
+            dst = np.zeros((img.shape[:2]), dtype=np.int32)
+            dst[target] = 255
+        elif c == 3:
+            dst = np.zeros(img.shape, dtype=np.int32)
+            dst[target] = (255, 255, 255)
+        else:
+            print("Error!")
+
+        dst_save_path = os.path.join(save_path, f)
+        cv2.imwrite(dst_save_path, dst)
+
+
+
+
 
 if __name__ == '__main__':
     pass
@@ -13475,18 +13536,18 @@ if __name__ == '__main__':
     # labelbee_to_yolo(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
-    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
-    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected\images_converted_yolo_labels", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
+    # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
+    # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected\images_converted_yolo_labels", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     # labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\3d_seg")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike\Random_Selected_yolo_format".replace("\\", "/"), select_num=28, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected_yolo_format".replace("\\", "/"), select_num=29, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250822-大坝纸壳测试\caijishuju_20250823", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\Video_2025_08_27_171729_1", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -13857,6 +13918,7 @@ if __name__ == '__main__':
     # extract_caltech()
     # extract_fashion_mnist()
 
+    change_pixel_value(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v2_mini\train\masks")
 
 
     

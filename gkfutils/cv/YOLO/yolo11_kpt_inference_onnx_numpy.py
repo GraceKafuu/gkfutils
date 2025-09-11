@@ -817,9 +817,9 @@ class YOLO11_ORT:
 
 
 if __name__ == '__main__':
-    model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v11_yolo11s\weights\belt_torn_kpt_yolo11s_256_256_v1.0.9.onnx"
-    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\zhike_test\Video_2025_08_22_101516_1"
-    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\zhike_test\Video_2025_08_22_101516_1_results"
+    model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v12_yolo11s\weights\belt_torn_kpt_yolo11s_256_256_v1.1.0.onnx"
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\images"
+    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\images_20250829_results"
     os.makedirs(save_path, exist_ok=True)
 
     model = YOLO11_ORT(model_path, 2, 0.60)

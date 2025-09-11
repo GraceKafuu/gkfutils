@@ -1286,10 +1286,10 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    # merge_dirs(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250822-大坝纸壳测试\caijishuju_20250823_frames")
+    # merge_dirs(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames")
 
 
-    random_select_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250822-大坝纸壳测试\caijishuju_20250823_frames_merged", mvcp="move", select_num=500)
+    random_select_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged", mvcp="move", select_num=1000)
 
     # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images0", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images", save_path="", with_suffix=False, flag="same", mvcp="cp")
     

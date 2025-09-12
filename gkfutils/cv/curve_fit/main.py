@@ -225,7 +225,7 @@ if __name__ == '__main__':
     # img_path = r"G:\Gosion\data\000.Test_Data\images\laser\Video_2025_03_01_165140_1_output_000000003.jpg"
     # img_path = r"D:\GraceKafuu\C++\fake3d\fake3d\weights\image0.jpg"
 
-    deg = 4
+    deg = 2
     save_path = r"G:\Gosion\data\000.Test_Data\images\laser\res\v12_train_res_deg_{}".format(deg)
     os.makedirs(save_path, exist_ok=True)
 

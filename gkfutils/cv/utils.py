@@ -13539,7 +13539,7 @@ if __name__ == '__main__':
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
     # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected\images_converted_yolo_labels", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     # labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
-    # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\3d_seg")
+    labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\3d_seg")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
@@ -13918,7 +13918,7 @@ if __name__ == '__main__':
     # extract_caltech()
     # extract_fashion_mnist()
 
-    change_pixel_value(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v2_mini\train\masks")
+    # change_pixel_value(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v2_mini\train\masks")
 
 
     

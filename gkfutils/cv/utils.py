@@ -13404,7 +13404,22 @@ def change_pixel_value(data_path):
         cv2.imwrite(dst_save_path, dst)
 
 
+def find_nonzero_groups(arr):
+    """高性能版本"""
+    # 创建非零掩码
+    mask = arr != 0
+    
+    if not np.any(mask):
+        return []
 
+    # 找到变化点
+    change_points = np.where(np.diff(np.r_[False, mask, False]))[0]
+    
+    # 重组为(start, end)对
+    starts = change_points[::2]
+    ends = change_points[1::2] - 1
+    
+    return list(zip(starts, ends))
 
 
 if __name__ == '__main__':
@@ -13539,7 +13554,7 @@ if __name__ == '__main__':
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
     # det_kpt_yolo_labels_to_labelbee_multi_step_json(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected\images_converted_yolo_labels", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=1, return_decimal=True)
     # labelbee_seg_json_to_yolo_txt(data_path=r"G:\Gosion\data\009.TuoGun_Det\obb\v1", cls_plus=-1)
-    labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\3d_seg")
+    # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\3d_seg")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
@@ -13547,7 +13562,7 @@ if __name__ == '__main__':
     # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected_yolo_format".replace("\\", "/"), select_num=29, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\Video_2025_08_27_171729_1", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\Qt_Program_test_video\Video_2025_09_16_142920_2", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -13924,7 +13939,13 @@ if __name__ == '__main__':
     
 
 
+    # 使用示例
+    arr = np.array([0, 5, 8, 0, 0, 3, 7, 2, 0, 9, 4, 0, 1, 1, 1, 0])
+    groups = find_nonzero_groups(arr)
 
+    print("数组:", arr)
+    for i, (start, end) in enumerate(groups):
+        print(f"组 {i+1}: 起始={start}, 结束={end}, 值={arr[start:end+1]}")
 
 
 

@@ -1,0 +1,222 @@
+# ----------------------------------- 基础参数 ------------------------------------
+base:
+  # ==============================================================================
+  # 设备类型：一体式、分体式
+  device_type: "一体式"
+  # GINS告警推送地址
+  push_url: "http://10.10.15.199:9996/belt/v1/notify"
+  # 相机ip
+  camera_ip: "10.10.11.100"
+  camera_name: "1"
+  # 皮带id
+  beltId: "1"
+  # 推送设备名称
+  divice_id: "1"
+  # 报警连续帧数
+  action_number: 5
+  #  RTSP推流地址：rtsp://127.0.0.1/live/test1, rtsp://127.0.0.1/live/test2
+  rtsp_name: "test1"
+
+  # 推流延迟时间，单位为秒
+  start_push_sleep: 5
+
+  # 比例（像素宽度换算为实际裂缝的宽度, 根据实际进行修改）
+  # 表示一个像素代表实际多少毫米(mm)
+  wides_ratio: 0.25
+  # ==============================================================================
+
+
+  # ==============================================================================
+  # 视觉检测开关
+  #（判断皮带是否停止不动，vis=True、vis_res=True表示开启，
+  # vis=False、vis_res=False表示不开启）
+  vis: False
+  vis_res: False
+  # 有关玻璃罩
+  before_the_alarm: False
+  after_the_alarm: False
+
+  # cmd_open和cmd_close暂时不清楚是什么用途
+  # 开启电刷指令
+  cmd_open: '02 05 00 00 FF 00 8C 09'
+  # 关闭电刷指令
+  cmd_close: '02 05 00 00 00 00 CD F9'
+
+  # IS_ANOMALY
+  IS_ANOMALY: False
+  # 开多长时间，单位 分钟
+  OPEN_TIME: 1
+  # 关多长时间，单位 分钟,最少20分钟
+  CLOSE_TIME: 0.1
+  # ==============================================================================
+
+
+  # ==============================================================================
+  # 定义串口
+  # [位置, 波特率, 串口读数据超时时间（s）]
+  DATA_TTYS1: ["/dev/ttyS0", 9600, 0.02]  # 新版分体式设备雨刮器和蜂鸣都是ttyS0 9600
+  DATA_TTYS2: ["/dev/ttyS0", 9600, 0.02]  # 雨刮器 115200
+  DATA_TTYS3: ["/dev/ttyS0", 9600, 0.02]  # 蜂鸣器 115200
+  # 定义服务器的主机和端口 (应该是GINS服务器的IP和端口)
+  # 假如皮带停止运行，则发送消息给服务器，显示皮带已停止运行
+  # 和这个IP 一致push_url: "http://10.10.15.199:9996/belt/v1/notify"
+  HOST: '127.0.0.1'
+  PORT: 12345
+
+  # 雨刮的相关参数
+  # 串口数据前几位
+  serial_data_head: "CF C1 54 00 19"
+  # 协议中显示：第20字节：相机仓雨刮是否在移动除尘
+  # 前面还有5位也就是上面的b"\xCF\xC1\x54\x00\x19"，所以是第25位，其index=24
+  wiper_move: '01'
+  wiper_move_idx: 24
+
+  # 有人物联
+  # 定义LIGHT的主机和端口
+  LIGHT_HOST: '192.168.1.61'
+  LIGHT_PORT: 8899
+  # --------------------------------------------------------------------
+  # 注意: zmq_flag为True表示通过ZMQ控制声光报警器（一体式设备，参考宁煤公管）
+  # 注意: zmq_flag为False表示通过串口直接控制蜂鸣器（分体式设备，参考宁煤大坝）
+  # --------------------------------------------------------------------
+  zmq_flag: False
+  youren_alarm: "##YouRenAlarm##"
+  zmq_port: 5555
+  # 一体式声光报警器，假如light_flag为False，的则声光报警器不会响和亮灯
+  light_flag: True
+
+  # 定义蜂鸣器接收关闭消息的主机与端口
+  BUZZER_CLOSE_HOST: '0.0.0.0'
+  BUZZER_CLOSE_PORT: 12345
+
+  # 通过TCP消息来控制蜂鸣器开启和关闭
+  flag_tcp: True
+  tcp_buzzer_stop_msg: '##STOPBUZZER##'
+  tcp_buzzer_alarm_msg: '##ALARMBUZZER##'
+  tcp_buzzer_never_alarm_msg: '##NEVERALARM##'
+
+  # 蜂鸣器报警指令
+  buzzer_alarming: 'DF D1 71 00 02 00 01 12 CB'
+  # 蜂鸣器停止报警指令
+  buzzer_alarming_stop: 'DF D1 71 00 02 00 00 02 EA'
+  # ==============================================================================
+
+  # 图片对比参数，用于判断皮带是否停止转动
+  SSIM_THRESH: 0.98
+  MSE_THRESH: 0.5
+  # TCP心跳间隔时间，单位为秒
+  HEART_BEAT: 5
+  # HTTP请求时间间隔，单位为分钟
+  HTTP_INTERVAL: 5
+
+  # 激光颜色
+  laser_color: green
+  # ==============================================================================
+
+  # 雨刮器扫描间隔（秒）
+  wiper_move_gap: 10
+  # 开启和关闭激光命令
+  open_laser_cmd: 'DF D1 72 00 03 02 FF FF'
+  close_laser_cmd: 'DF D1 72 00 03 02 00 00'
+  # 开启和关闭雨刮命令
+  open_wiper_cmd: 'DF D1 72 00 03 01'
+  close_wiper_cmd: 'DF D1 72 00 03 01 FF FF'
+
+
+# -------------------------------- 关于日志的参数 ---------------------------------
+log:
+  # 表示日志保存时间，单位为天，超过该时间，将自动删除日志文件。
+  log_backup_count: 15
+  # 日志文件名
+  log_file_name: "皮带撕裂检测日志"
+  # 日志等级
+  log_level: "info"
+  # when
+  log_when: "D"
+  # interval
+  log_interval: 1
+  # 是否开启记录没有结果的信息，主要用于统计准确率，实际使用请关闭
+  flag_log_no_res: False
+
+
+# -------------------------------- 关于算法的参数 ---------------------------------
+alg:
+  # 更新时间：2025.03.13
+  # alg_flag 算法类型: 0（主要是传统算法）; 1（DL算法）; 2（0+1）;  [不要输入其他数字]
+  # 默认算法：1    任何环境都适用的算法：0    适应于定制化的环境算法：1
+  # 耗时参考（Windows下测试结果）： 0: 15ms 1: 20ms 2: 40ms
+  alg_flag: 3
+
+  # 这几个参数不要修改
+  # 是否开启图片分类功能，对检测结果（小图）进行过滤
+  flag_cls: False
+  # 膨胀像素
+  dilate_pixels: 6
+  # 检测结果框往外扩展像素值
+  vis_box_expand_pixels: 25
+  # 提取激光区域基于mask图上下扩展像素
+  laser_area_expand_pixels: 25
+  # 极端画面亮度阈值，比如画面全黑或全白
+  extreme_brightness_thresh: 2
+  # 是否过滤无激光的图片
+  flag_filter_no_laser_color: False
+
+  # 角点检测参数
+  corner_blockSize: 10
+  corner_ksize: 7
+  corner_k: 0.04
+
+  # 曲线拟合多项式次数，4表示拟合 y = a0 + a1*x + a2*x^2 + a3*x^3 + a4*x^4
+  fit_deg: 4
+  # 检测结果中心点与拟合曲线的距离阈值（相同x坐标的情况下），单位：像素
+  # 大于这个阈值的认为距离激光线很远，属于误报
+  fit_filter_dis_thresh: 50
+  # 检测结果面积阈值，小于这个阈值的认为面积过小，属于误报
+  fit_filter_area_thresh: 36
+  # 小于这个阈值的认为边缘点，去除这种情况
+  fit_filter_edge_thresh: 5
+  # 存储上一次拟合的曲线方程（非空）
+  last_fit_model: None
+
+  # 是否显示算法耗时
+  flag_print_time_cost: False
+
+  # 深度学习模型路径
+  # -----------------------------------------------------------------------------
+  cls_model_path: "./weights/belt_torn_cls_mbv2_64_64_v1.0.2.onnx"
+  # -----------------------------------------------------------------------------
+  # #### 请注意！！！
+  # #### 实际皮带撕裂检测请使用 belt_torn_xxx.onnx
+  kpt_model_path: "./weights/belt_torn_kpt_yolo11s_256_256_v1.1.0.onnx"
+  # #### 如果拿棍子检测请使用 stick_kpt_yolo11n_256_256_v1.0.0.onnx
+  # #### 此模型后续不会更新, 仅用于测试触发告警或演示使用！
+  # #### 使用棍子测试的话请将下一行取消注释，上面的 "./weights/belt_torn_xxx.onnx" 注释掉
+  # kpt_model_path: "./weights/stick_kpt_yolo11n_256_256_v1.0.0.onnx"
+  # -----------------------------------------------------------------------------
+  laser_model_path: "./weights/laser_det_64_256_v1.0.0.onnx"
+  # -----------------------------------------------------------------------------
+
+  # 模型参数阈值
+  # 置信度：conf_thr 默认0.60
+  # 越高越难检测到目标，目标越可信；越低越容易检测到目标，但是误报越多。
+  conf_thr: 0.75
+  # IoU阈值：iou_thr 默认0.45，不建议修改。
+  iou_thr: 0.45
+
+  # 差分法，相邻帧像素结果的阈值
+  frames_diff_pixels_thr: 20
+  # 图片切分列数
+  col_split_num: 100
+  # z score 阈值
+  zscore_thr: 5
+  #检测结果x距离阈值
+  min_dis: 10
+  max_dis: 1000
+
+  
+
+
+
+
+
+

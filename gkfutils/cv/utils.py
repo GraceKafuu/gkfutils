@@ -10790,10 +10790,6 @@ def classify_image_by_brightness(data_path, show_brightness=False):
                 shutil.move(f_abs_path, f_dst_path)
 
 
-def bilateral_filter(img, d=9, csigma=75, ssigma=75):
-    filtered = cv2.bilateralFilter(img, d, csigma, ssigma)
-    return filtered
-
 
 def opencv_imread_filename_contain_chinese(img_path):
     img = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
@@ -13454,6 +13450,60 @@ def zScoreTest():
 
 
 
+def mean_filter(img, k=(5, 5)):
+    filtered = cv2.blur(img, ksize=k)
+    return filtered
+
+
+def median_filter(img, k=5):
+    filtered = cv2.medianBlur(img, ksize=k)
+    return filtered
+
+
+def gaussian_filter(img, k=(5, 5), sigmaX=1.0):
+    filtered = cv2.GaussianBlur(img, k, sigmaX)
+    return filtered
+
+
+def bilateral_filter(img, d=9, csigma=75, ssigma=75):
+    filtered = cv2.bilateralFilter(img, d, csigma, ssigma)
+    return filtered
+
+
+def morphology_filter(img, k=(5, 5)):
+    # 形态学操作去除噪声
+    # kernel = np.ones((3, 3), np.uint8)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, k)
+    filtered = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
+    filtered = cv2.morphologyEx(filtered, cv2.MORPH_CLOSE, kernel)
+    return filtered
+
+
+def image_filter_test():
+    # img_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\lainjiangsilie\videos\videos_daytime_frames\Video_2025_09_28_092338_1\Video_2025_09_28_092338_1_output_000000001.jpg"
+    img_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\lainjiangsilie\videos\videos_daytime_frames\Video_2025_09_28_093102_2\Video_2025_09_28_093102_2_output_000000001.jpg"
+    img = cv2.imread(img_path)
+    mean_filtered = mean_filter(img)
+    median_filtered = median_filter(img)
+    gaussian_filtered = gaussian_filter(img)
+    bilateral_filtered = bilateral_filter(img)
+    morphology_filtered = morphology_filter(img)
+    median_filtered2 = median_filter(morphology_filtered)
+    median_filtered3 = median_filter(bilateral_filtered)
+
+    cv2.imshow("mean_filtered", mean_filtered)
+    cv2.imshow("median_filtered", median_filtered)
+    cv2.imshow("gaussian_filtered", gaussian_filtered)
+    cv2.imshow("bilateral_filtered", bilateral_filtered)
+    cv2.imshow("morphology_filtered", morphology_filtered)
+    cv2.imshow("median_filtered2", median_filtered2)
+    cv2.imshow("median_filtered3", median_filtered3)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+
+
 
 if __name__ == '__main__':
     pass
@@ -13597,7 +13647,7 @@ if __name__ == '__main__':
     # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected_yolo_format".replace("\\", "/"), select_num=29, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\lainjiangsilie\Video_2025_09_26_103048_1", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\lainjiangsilie\videos\videos_night", fps=25)
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -13971,9 +14021,6 @@ if __name__ == '__main__':
     # change_pixel_value(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v2_mini\train\masks")
 
 
-    
-
-
     # # 使用示例
     # arr = np.array([0, 5, 8, 0, 0, 3, 7, 2, 0, 9, 4, 0, 1, 1, 1, 0])
     # groups = find_nonzero_groups(arr)
@@ -13982,7 +14029,9 @@ if __name__ == '__main__':
     # for i, (start, end) in enumerate(groups):
     #     print(f"组 {i+1}: 起始={start}, 结束={end}, 值={arr[start:end+1]}")
 
-    zScoreTest()
+    # zScoreTest()
+
+    image_filter_test()
 
 
 

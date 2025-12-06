@@ -208,13 +208,13 @@ def main_others():
     add_str = "videos_frames3"
     # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\pexels_frames_labelbee\images"
     # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\videos_frames\2025-05-29 11-23-55~1"
-    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\videos_frames\zhanting\images"
+    data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\videos_frames\zhanting\images"
     # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\New\002\images"
-    data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v1\train\images"
+    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v1\train\images"
     file_list = sorted(os.listdir(data_path))
 
 
-    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\fake_data"
+    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\fake_data_v2\001"
     img_save_path = save_path + "\\images"
     lbl_save_path = save_path + "\\masks"
     os.makedirs(img_save_path, exist_ok=True)
@@ -233,17 +233,70 @@ def main_others():
         if rnd_h1 + rnd_h > imgsz[0]: continue
 
         img_part = img[rnd_h1:rnd_h1 + rnd_h, :]
+        img_partsz = img_part.shape
 
-        img, mask = add_fake_laser(img_part)
+        # img, mask = add_fake_laser(img_part)
+        # img_save_path_i = img_save_path + "\\{}_{:07d}_{}.jpg".format(add_str, i, fname)
+        # lbl_save_path_i = lbl_save_path + "\\{}_{:07d}_{}.png".format(add_str, i, fname)
+        # cv2.imwrite(img_save_path_i, img)
+        # cv2.imwrite(lbl_save_path_i, mask)
+
+        mask = np.zeros((img_partsz[0], img_partsz[1], 3), np.uint8)
         img_save_path_i = img_save_path + "\\{}_{:07d}_{}.jpg".format(add_str, i, fname)
         lbl_save_path_i = lbl_save_path + "\\{}_{:07d}_{}.png".format(add_str, i, fname)
-        cv2.imwrite(img_save_path_i, img)
+        cv2.imwrite(img_save_path_i, img_part)
+        cv2.imwrite(lbl_save_path_i, mask)
+
+
+def main_20251106():
+    add_str = "xianchangshuju"
+    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\pexels_frames_labelbee\images"
+    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\videos_frames\2025-05-29 11-23-55~1"
+    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\videos_frames\zhanting\images"
+    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\New\002\images"
+    # data_path = r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v1\train\images"
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\fake_data_v2\000\images"
+    file_list = sorted(os.listdir(data_path))
+
+
+    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\fake_data_v2\000"
+    # img_save_path = save_path + "\\images"
+    lbl_save_path = save_path + "\\masks"
+    # os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(lbl_save_path, exist_ok=True)
+
+    for i, f in enumerate(file_list):
+        fname = os.path.splitext(f)[0]
+        img_path = os.path.join(data_path, f)
+
+        img = cv2.imread(img_path)
+        imgsz = img.shape
+
+        # rnd_h1 = np.random.randint(0, imgsz[0])
+        # rnd_h = np.random.randint(180, 601)
+
+        # if rnd_h1 + rnd_h > imgsz[0]: continue
+
+        # img_part = img[rnd_h1:rnd_h1 + rnd_h, :]
+        # img_partsz = img_part.shape
+
+        # img, mask = add_fake_laser(img_part)
+        # img_save_path_i = img_save_path + "\\{}_{:07d}_{}.jpg".format(add_str, i, fname)
+        # lbl_save_path_i = lbl_save_path + "\\{}_{:07d}_{}.png".format(add_str, i, fname)
+        # cv2.imwrite(img_save_path_i, img)
+        # cv2.imwrite(lbl_save_path_i, mask)
+
+        mask = np.zeros((imgsz[0], imgsz[1], 3), np.uint8)
+        # img_save_path_i = img_save_path + "\\{}_{:07d}_{}.jpg".format(add_str, i, fname)
+        lbl_save_path_i = lbl_save_path + "\\{}.png".format(fname)
+        # cv2.imwrite(img_save_path_i, img_part)
         cv2.imwrite(lbl_save_path_i, mask)
 
 
 if __name__ == "__main__":
     # main_TUSimple()
-    main_others()
+    # main_others()
+    main_20251106()
 
 
 

@@ -1271,14 +1271,40 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels", path2=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels_T-shirt")
-    # rename_files(data_path=r"G:\Gosion\data\000.Qwen-Omni\v1\images", new_name_prefix="", start_num=0)
-    # rename_files(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet\train\labels", new_name_prefix="person_helmet_1_20250402", start_num=0)
+    # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Jingye\data(1)\20251205", new_name_prefix="Jingye_20251205", start_num=0)
+    # strAdd = "5yi"
+    # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_{}\data_merged".format(strAdd), new_name_prefix="Daba_v2_20251129_rename_{}".format(strAdd), start_num=0)
 
-    # data_path = r"D:\Gosion\Projects\GuanWangLNG\leaking-20250223"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\DataFromDifferentLocations\NinemeiDaba\CollectedDataByProgram\20251030"
+    # dlist = os.listdir(data_path)
+    # for d in dlist:
+    #     # ddlist = os.listdir(data_path + "/{}".format(d))
+    #     # for dd in ddlist:
+    #     #     flist = os.listdir(data_path + "/{}/{}".format(d, dd))
+    #     #     for f in flist:
+    #     #         f_abs_path = data_path + "/{}/{}/{}".format(d, dd, f)
+    #     #         f_new_name = "{}_{}_{}".format(d, dd, f)
+    #     #         f_new_path = data_path + "/{}/{}/{}".format(d, dd, f_new_name)
+    #     #         os.rename(f_abs_path, f_new_path)
+
+    #     dpath =  data_path + "/{}".format(d)
+    #     merge_dirs(dpath)
+
+    # merge_dirs(data_path)
+
+
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\cls2\data\001"
     # dir_list = os.listdir(data_path)
     # for i, d in enumerate(dir_list):
     #     dir_path = data_path + "/{}".format(d)
     #     rename_files(data_path=dir_path, new_name_prefix="leaking-20250223_{}_{}".format(d, i), start_num=0)
+
+    # strAdd = "1yi"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_{}\data".format(strAdd)
+    # dir_list = os.listdir(data_path)
+    # for i, d in enumerate(dir_list):
+    #     dir_path = data_path + "/{}".format(d)
+    #     rename_files(data_path=dir_path, new_name_prefix="Daba_{}_{}".format(d, "{}".format(strAdd)), start_num=0)
 
 
     # remove_corrupt_img(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\New_All\Add\Det\v1_add\v2\train\images")
@@ -1286,10 +1312,10 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    merge_dirs(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\lainjiangsilie\videos-night\videos")
+    # merge_dirs(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_5yi\data")
 
 
-    # random_select_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged", mvcp="move", select_num=1000)
+    random_select_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\cls3\v3\train\1", mvcp="copy", select_num=500)
 
     # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images0", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images", save_path="", with_suffix=False, flag="same", mvcp="cp")
     

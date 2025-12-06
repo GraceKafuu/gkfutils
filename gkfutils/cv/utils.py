@@ -61,6 +61,7 @@ from collections import OrderedDict
 from sklearn.model_selection import train_test_split
 from labelme import utils
 import subprocess
+from skimage.metrics import structural_similarity as ssim
 
 
 # Base utils ===================================================
@@ -3294,6 +3295,78 @@ def labelbee_seg_to_png(data_path):
             img_dst_path = seg_images_path + "/{}".format(f)
             shutil.copy(img_src_path, img_dst_path)
             print("{} copy to --> {}".format(img_src_path, img_dst_path))
+
+        except Exception as Error:
+            print(Error, Error.__traceback__.tb_lineno)
+
+
+def labelbee_line_to_png_parse_json(json_abs_path):
+    json_data = json.load(open(json_abs_path, "r", encoding="utf-8"))
+    w, h = json_data["width"], json_data["height"]
+    len_object = len(json_data["step_1"]["result"])
+    point_list = []
+    # label_list = []
+    for i in range(len_object):
+        pl_ = json_data["step_1"]["result"][0]["pointList"]
+
+        # xy_ = []
+        for j in range(len(pl_)):
+            # xy_.append(float(pl_[j]["x"]))
+            # xy_.append(float(pl_[j]["y"]))
+            x_ = float(pl_[j]["x"])
+            y_ = float(pl_[j]["y"])
+
+            point = list(map(float, [x_, y_]))
+            point = list(map(round, point))
+            point_list.append(point)
+
+    return point_list, (w, h)
+
+
+def draw_line(img, point_list, color=(255, 0, 255), line_width=5):
+    mask = np.zeros(shape=img.shape[:2], dtype=np.uint8)
+    for i in range(len(point_list) - 1):
+        cv2.line(mask, (int(point_list[i][0]), int(point_list[i][1])), (int(point_list[i+ 1][0]), int(point_list[i + 1][1])), color, line_width)
+
+    return mask
+
+
+def labelbee_line_to_png(data_path):
+    images_path = data_path + "/{}".format("images")
+    json_path = data_path + "/{}".format("jsons")
+
+    save_path = make_save_path(data_path, add_str="seg_images_labels")
+    seg_images_path = save_path + "/{}".format("images")
+    # png_vis_path = save_path + "/{}".format("masks_vis")
+    png_path = save_path + "/{}".format("masks")
+    os.makedirs(seg_images_path, exist_ok=True)
+    # os.makedirs(png_vis_path, exist_ok=True)
+    os.makedirs(png_path, exist_ok=True)
+
+    file_list = get_file_list(json_path)
+
+    for f in file_list:
+        try:
+            fname = os.path.splitext(f)[0]
+            json_abs_path = json_path + "/{}".format(f)
+            if not os.path.exists(json_abs_path): continue
+            point_list, img_size = labelbee_line_to_png_parse_json(json_abs_path)
+
+            if len(point_list) <= 0: continue
+
+            img_abs_path = images_path + "/{}".format(fname)
+            img = cv2.imread(img_abs_path)
+
+            mask = draw_line(img, point_list, color=255, line_width=7)
+            # png_vis_save_path = png_vis_path + "/{}.png".format(fname)
+            # img_vis.save(png_vis_save_path)
+            png_save_path = png_path + "/{}.png".format(fname)
+            cv2.imwrite(png_save_path, mask)
+
+            # img_src_path = images_path + "/{}".format(f)
+            img_dst_path = seg_images_path + "/{}".format(f)
+            shutil.copy(img_abs_path, img_dst_path)
+            print("{} copy to --> {}".format(img_abs_path, img_dst_path))
 
         except Exception as Error:
             print(Error, Error.__traceback__.tb_lineno)
@@ -7655,7 +7728,7 @@ def create_cls_negatives_via_random_crop(data_path, random_size=(96, 100, 128, 1
 
     total_num = 0
 
-    for img in tqdm(img_list[6000:]):
+    for img in tqdm(img_list):
 
         if total_num >= dst_num:
             break
@@ -10800,8 +10873,8 @@ def opencv_imwrite_filename_contain_chinese(img_path, img):
     cv2.imencode('.jpg', img)[1].tofile(img_path)
 
 
-def z_score(x, mean, std):
-    return (x - mean) / std
+def z_score(x, mean, std, eps=1e-9):
+    return (x - mean) / (std + eps)
 
 
 def expand_bbox(bi, imgsz, expand_pixels):
@@ -13502,7 +13575,183 @@ def image_filter_test():
     cv2.destroyAllWindows()
 
 
+def cal_ssim_mse(image1, image2, p_mseThresh=0.5,  p_ssimThresh=0.98):
+    same = False
 
+    # image1 = cv2.cvtColor(image1, cv2.COLOR_RGB2BGR).copy()
+    # image2 = cv2.cvtColor(image2, cv2.COLOR_RGB2BGR).copy()
+    # 转换为灰度图像
+    gray_image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+    gray_image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+    # 计算结构相似性指数（SSIM）
+    ssim_score = ssim(gray_image1, gray_image2)
+    # 计算均方误差（MSE）
+    mse = ((gray_image1 - gray_image2) ** 2).mean()
+
+    if (mse < p_mseThresh) and (ssim_score > p_ssimThresh):
+        same = True
+
+    return same
+
+
+def main_test_20251105():
+    # 1. 读取图像（请替换为你的图像路径）
+    img = cv2.imread(r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\zhonganjitai\20251105_frames\Video_2025_11_05_151131_1\Video_2025_11_05_151131_1_output_000000001.jpg")  
+    if img is None:
+        print("图像读取失败，请检查路径")
+        exit()
+        
+    # 2. 灰度化与二值化
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # 阈值可根据激光线亮度调整，确保激光线为白色（255）、背景为黑色（0）
+    _, thresh = cv2.threshold(gray, 45, 255, cv2.THRESH_BINARY)  
+
+    height, width = thresh.shape
+    boundary_col = -1  # 初始化界限列号
+
+    # 3. 逐列分析连通线段数量，寻找界限列
+    for col in range(width):
+        # 提取当前列的所有像素
+        column = thresh[:, col]  
+        segments = []  # 存储当前列的白色连通线段（格式：(起始行, 结束行)）
+        start_row = -1
+        for row in range(height):
+            if column[row] == 255 and start_row == -1:
+                start_row = row  # 标记连通段起始行
+            elif column[row] == 0 and start_row != -1:
+                segments.append((start_row, row - 1))  # 记录连通段（起始行, 结束行）
+                start_row = -1
+        # 处理列末尾的连通段
+        if start_row != -1:
+            segments.append((start_row, height - 1))
+        
+        # 当线段数从2变为1时，记录该列
+        if len(segments) == 1 and boundary_col == -1:
+            boundary_col = col
+            break
+
+    print(f"两条激光线与一条激光线的界限位于第 {boundary_col} 列")
+
+    # 4. 可视化界限（绘制红色竖线）
+    result = img.copy()
+    cv2.line(result, (boundary_col, 0), (boundary_col, height), (0, 0, 255), 2)
+    cv2.imshow("Boundary Detection (Column)", result)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+
+def main_test_20251106():
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\DataFromDifferentLocations\NinemeiDaba\CollectedDataByProgram\20251030_merged"
+    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\DataFromDifferentLocations\NinemeiDaba\CollectedDataByProgram\20251030_merged_classify"
+    save_path0 = os.path.join(save_path, "0")
+    save_path1 = os.path.join(save_path, "1")
+    os.makedirs(save_path0, exist_ok=True)
+    os.makedirs(save_path1, exist_ok=True)
+
+    file_list = os.listdir(data_path)
+    for f in file_list:
+        f_abs_path = os.path.join(data_path, f)
+        img = cv2.imread(f_abs_path)
+        brightness = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).mean()
+        if brightness > 5:
+            cv2.imwrite(os.path.join(save_path1, f), img)
+        else:
+            cv2.imwrite(os.path.join(save_path0, f), img)
+
+
+def main_test_20251125():
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_2yi\data_merged_output\1_classify"
+    save_path = data_path + "_classify"
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = os.listdir(data_path)
+    for f in file_list:
+        f_abs_path = os.path.join(data_path, f)
+        f_dst_path = os.path.join(save_path, f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        brightness = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).mean()
+        # print(f, brightness)
+        if brightness > 5 and brightness < 20 and imgsz[1] < 512 and imgsz[1] > 100:
+            shutil.move(f_abs_path, f_dst_path)
+
+
+def flip_images_vertically(input_dir: str, output_dir: str, overwrite: bool = False) -> None:
+    """
+    遍历指定文件夹下的所有图片，执行上下翻转并保存结果
+    :param input_dir: 原始图片文件夹路径
+    :param output_dir: 翻转后图片的保存路径（不存在则自动创建）
+    :param overwrite: 若输出文件夹存在同名文件，是否覆盖（False则跳过）
+    """
+    # 1. 校验输入文件夹是否存在
+    if not os.path.exists(input_dir):
+        raise FileNotFoundError(f"输入文件夹不存在：{input_dir}")
+    
+    # 2. 创建输出文件夹（不存在则创建）
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 3. 遍历输入文件夹中的文件
+    image_files = os.listdir(input_dir)
+    if not image_files:
+        print(f"警告：输入文件夹 {input_dir} 中未找到支持的图片文件")
+        return
+    
+    # 4. 逐个处理图片
+    success_count = 0
+    fail_count = 0
+    skipped_count = 0
+    
+    print(f"开始处理，共找到 {len(image_files)} 张图片...")
+    for filename in image_files:
+        # 拼接完整路径
+        input_path = os.path.join(input_dir, filename)
+        output_path = os.path.join(output_dir, filename)
+        
+        # 检查是否需要跳过（避免覆盖）
+        if not overwrite and os.path.exists(output_path):
+            print(f"跳过：{filename}（输出路径已存在，且未开启覆盖）")
+            skipped_count += 1
+            continue
+        
+        try:
+            # 读取图片（cv2默认读取为BGR格式）
+            img = cv2.imread(input_path)
+            if img is None:
+                raise ValueError("图片读取失败（可能是损坏或格式不支持）")
+            
+            # 执行上下翻转（cv2.flip参数说明：0=上下翻转，1=左右翻转，-1=上下+左右翻转）
+            flipped_img = cv2.flip(img, 0)
+            
+            # 保存翻转后的图片
+            cv2.imwrite(output_path, flipped_img)
+            success_count += 1
+            print(f"成功处理：{filename}")
+        
+        except Exception as e:
+            print(f"处理失败：{filename} - 错误信息：{str(e)}")
+            fail_count += 1
+    
+    # 5. 输出处理统计
+    print("=" * 50)
+    print(f"处理完成！")
+    print(f"成功：{success_count} 张")
+    print(f"失败：{fail_count} 张")
+    print(f"跳过：{skipped_count} 张")
+    print(f"翻转后的图片已保存至：{os.path.abspath(output_dir)}")
+
+
+def main_test_20251203():
+    INPUT_FOLDER = r"G:\Gosion\data\006.Belt_Torn_Det\data\cls3\v1\val\1\00"   # 原始图片文件夹
+    OUTPUT_FOLDER = r"G:\Gosion\data\006.Belt_Torn_Det\data\cls3\v1\val\1\00_flipped_images"   # 翻转后图片保存文件夹
+    OVERWRITE_EXISTING = False           # 是否覆盖已存在的文件
+
+    # -------------------------- 执行处理 --------------------------
+    try:
+        flip_images_vertically(INPUT_FOLDER, OUTPUT_FOLDER, OVERWRITE_EXISTING)
+    except Exception as e:
+        print(f"程序执行失败：{str(e)}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
@@ -13641,13 +13890,24 @@ if __name__ == '__main__':
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ningmeigongguan")
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ZhongAnJiTai\all")
 
+    labelbee_line_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v3\Random_Selected")
+
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
     # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected_yolo_format".replace("\\", "/"), select_num=29, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\lainjiangsilie\videos\videos_night", fps=25)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20251203", fps=15)
+
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua"
+    # dirs = sorted(os.listdir(data_path))
+    # for d in dirs:
+    #     sdirs = sorted(os.listdir(os.path.join(data_path, d)))
+    #     for sd in sdirs:
+    #         sd_path = os.path.join(data_path, d, sd)
+    #         ffmpeg_extract_video_frames(sd_path, fps=37.44)
+
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
@@ -13723,7 +13983,7 @@ if __name__ == '__main__':
 
     # classify_image_by_brightness(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\1\000", show_brightness=False)
 
-    # create_cls_negatives_via_random_crop(data_path=r"E:\wujiahu\coco\train2017", random_size=(64, 96, 100, 128, 160, 180, 200, 256), randint_low=2, randint_high=6, hw_dis=100, dst_num=5000)
+    # create_cls_negatives_via_random_crop(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_5yi\20251120_frames\Video_2025_11_20_154706_1", random_size=(64, 96, 100, 128, 160, 180, 200, 256), randint_low=2, randint_high=6, hw_dis=100, dst_num=500)
 
     # seamless_clone(fg_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\cls\v5\train\Random_Selected\2_random_selected_100", bg_path=r"E:\wujiahu\coco\Random_Selected\train2017_random_cropped_random_selected_500", dst_num=5000)
 
@@ -14031,15 +14291,62 @@ if __name__ == '__main__':
 
     # zScoreTest()
 
-    image_filter_test()
+    # image_filter_test()
+
+
+    # serial_data = b'\xcf\xc1T\x00\x1b\x00\x00\x00\x00\x00\x00\x00\x81\x00\x00\x00\xff\x006?\x18\x00\xdd\xd6\x01\x00\x00\x01\x00\x00\xb4\x013f'
+    # # serial_data = None
+    # # serial_data = ""
+    # p_serialDataHeadCmd = bytes.fromhex("CF C1 54 00 1B".replace(' ', ''))
+    # # print(p_serialDataHeadCmd)
+
+    # # response = serial_data[:6]
+    # # res = response.startswith(p_serialDataHeadCmd)
+    # # print(res)
+
+    # res = serial_data.startswith(p_serialDataHeadCmd)
+    # print(res)
 
 
 
+    # # img_path1 = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\Qt_Program_test_video\Video_2025_09_16_142920_2_frames\Video_2025_09_16_142920_2\Video_2025_09_16_142920_2_output_000000010.jpg"
+    # # img_path2 = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\Qt_Program_test_video\Video_2025_09_16_142920_2_frames\Video_2025_09_16_142920_2\Video_2025_09_16_142920_2_output_000000013.jpg"
+
+    # img_path1 = r"G:\Gosion\data\006.Belt_Torn_Det\resources\Video_2025_10_23_152140_3\Video_2025_10_23_152140_3_output_000000008.jpg"
+    # img_path2 = r"G:\Gosion\data\006.Belt_Torn_Det\resources\Video_2025_10_23_152140_3\Video_2025_10_23_152140_3_output_000000010.jpg"
+
+    # img1 = cv2.imread(img_path1)
+    # img2 = cv2.imread(img_path2)
+
+    # is_same = cal_ssim_mse(img1, img2, p_mseThresh=2,  p_ssimThresh=0.98)
+    # print(is_same)
 
 
+    # from queue import Queue
+
+    # q = Queue(maxsize=10)
+    # for i in range(100):
+    #     q.put(i)
+    #     for j in range(q.qsize()): 
+    #         qj = q.get()
+    #         q.put(i)
+    #         print(qj)
+
+    #     print("======================================================")
 
 
+    # main_test_20251105()
+    # main_test_20251106()
 
 
-
+    # # # arr = np.array([5, 5, 5, 5, 5, 0, 0, 0, 0, 0])
+    # arr = np.array([5, 5, 5, 5, 10, 10, 5, 5, 5, 5])
+    # arr_mean = np.mean(arr)
+    # arr_std = np.std(arr)
+    # z = z_score(arr, arr_mean, arr_std)
+    # print(arr_mean)
+    # print(arr_std)
+    # print(z)
     
+    # # main_test_20251125()
+    # main_test_20251203()

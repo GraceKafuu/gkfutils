@@ -3360,11 +3360,13 @@ def labelbee_line_to_png(data_path):
             mask = draw_line(img, point_list, color=255, line_width=7)
             # png_vis_save_path = png_vis_path + "/{}.png".format(fname)
             # img_vis.save(png_vis_save_path)
-            png_save_path = png_path + "/{}.png".format(fname)
+            ffname = os.path.splitext(fname)[0]
+            png_save_path = png_path + "/{}.png".format(ffname)
             cv2.imwrite(png_save_path, mask)
 
             # img_src_path = images_path + "/{}".format(f)
-            img_dst_path = seg_images_path + "/{}".format(f)
+            
+            img_dst_path = seg_images_path + "/{}".format(fname)
             shutil.copy(img_abs_path, img_dst_path)
             print("{} copy to --> {}".format(img_abs_path, img_dst_path))
 

@@ -3335,7 +3335,7 @@ def labelbee_line_to_png(data_path):
     images_path = data_path + "/{}".format("images")
     json_path = data_path + "/{}".format("jsons")
 
-    save_path = make_save_path(data_path, add_str="seg_images_labels")
+    save_path = make_save_path(data_path, add_str="lined_images_labels")
     seg_images_path = save_path + "/{}".format("images")
     # png_vis_path = save_path + "/{}".format("masks_vis")
     png_path = save_path + "/{}".format("masks")
@@ -3357,7 +3357,7 @@ def labelbee_line_to_png(data_path):
             img_abs_path = images_path + "/{}".format(fname)
             img = cv2.imread(img_abs_path)
 
-            mask = draw_line(img, point_list, color=255, line_width=7)
+            mask = draw_line(img, point_list, color=255, line_width=8)
             # png_vis_save_path = png_vis_path + "/{}.png".format(fname)
             # img_vis.save(png_vis_save_path)
             ffname = os.path.splitext(fname)[0]
@@ -13892,7 +13892,7 @@ if __name__ == '__main__':
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ningmeigongguan")
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ZhongAnJiTai\all")
 
-    labelbee_line_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v3\Random_Selected")
+    labelbee_line_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v3\001")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})

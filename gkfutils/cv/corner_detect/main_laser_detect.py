@@ -6,6 +6,7 @@ import time
 import os
 import random
 import shutil
+from classify_equation import *
 
 
 class LaserDetect:
@@ -261,12 +262,12 @@ def fit_plot(img, model, deg=4, color=(255, 0, 255)):
 
 def main():
     # img_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\DataFromDifferentLocations\NinemeiDaba\CollectedDataByProgram\20251030_merged"
-    img_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Jingye\data\20251201"
+    img_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251205\data_20251205_3yi\20251130_mini"
     # img_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\DataFromDifferentLocations\NinemeiDaba\CollectedDataByProgram\compare_test"
     save_path = img_path + "_detect_results_20251206"
     os.makedirs(save_path, exist_ok=True)
 
-    model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251114_OK2\best.onnx"
+    model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251207_with_BW\laser_det_resnet18_64_256_v1.1.0.onnx"
     laserDetect = LaserDetect(model_path)
 
     file_list = os.listdir(img_path)
@@ -274,12 +275,20 @@ def main():
         img_name = os.path.splitext(f)[0]
         f_abs_path = os.path.join(img_path, f)
         img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
         # img_cp = img.copy()
 
         points = laserDetect.detect(img, vis=False)
 
         fit_model = np.polyfit(points[:, 0], points[:, 1], deg=4)
         print("img_name: {} fit_model: {}".format(img_name, fit_model))
+
+        extrema, ext_x, ext_y = get_extrema_points(fit_model, 0, imgsz[1])
+        equation_class, equation_class_info = classify_equation(ext_y, 100)
+        print("equation_class: {} ".format(equation_class))
+
+
+
         plot_out = fit_plot(img, fit_model, deg=4)
         # cv2.imshow("plot_out", plot_out)
         f_dst_path = os.path.join(save_path, f)

@@ -566,5 +566,139 @@ def main():
 
 
 
+def main2():
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_1jia\data_merged"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_1jia\20201120_frames\Video_2025_11_20_145650_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_1yi\20251120_frames\Video_2025_11_20_152927_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_2jia\20251120_frames\Video_2025_11_20_145920_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_3jia\20251120_frames\Video_2025_11_20_095245_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_4jia\20251120_frames\Video_2025_11_20_150622_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_5jia\20251120_frames\Video_2025_11_20_152517_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua\videos_5yi\20251120_frames\Video_2025_11_20_154706_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\Anhui\test_frames\Video_2025_12_11_140929_1"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215\data_20251215_3yi\data_merged"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251205\data_20251205_5yi\20251129"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Zouxian_Data\20251218\data_49_20251218\data\20251218"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251218\data_5yi_20251218_19\data\20251219"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215\line_labelbee\images"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215-bk\data\20251213"
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Jingye\data(1)\20251128"
+    save_path = data_path + "_results_20251225-1.1.5"
+    os.makedirs(save_path, exist_ok=True)   
+
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251209_OK\best.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251212_tmp\best.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251212_tmp2\best.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251213_tmp3\best.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251217\best.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251222\best.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251213_tmp3\laser_det_resnet18_64_256_v1.1.3.onnx"
+    model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251222\laser_det_resnet18_64_256_v1.1.5.onnx"
+    # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251214\best.onnx"
+    laserDetect = LaserDetect(model_path)
+
+    file_list = os.listdir(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(data_path, f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        # img_cp = img.copy()
+
+        points = laserDetect.detect(img, vis=False)
+
+        fit_model = np.polyfit(points[:, 0], points[:, 1], deg=4)
+        print("fname: {} fit_model: {}".format(fname, fit_model))
+
+        mask = createMaskByModel_v2(img, fit_model, fit_deg=4, expand_pixels=100)
+
+        masked_img = cv2.bitwise_and(img, img, mask=mask)
+
+        # green_mask = extract_green_mask(img, top_extend=0, bottom_extend=0)
+
+        # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        # _, thresh = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+        # thresh, comp_info = process_largest_component(
+        #     thresh, 
+        #     connectivity=8
+        # )
+
+        # mask_test = cv2.bitwise_and(green_mask, thresh)
+
+        # cv2.imshow("img", img)
+        # cv2.imshow("mask", mask)
+        # cv2.imshow("green_mask", green_mask)
+        # cv2.imshow("thresh", thresh)
+        # # cv2.imshow("mask_test", mask_test)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+        # res = np.vstack((a, b))
+
+        # masked_img_gray = cv2.cvtColor(masked_img, cv2.COLOR_BGR2GRAY)
+        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        # equalized = clahe.apply(masked_img_gray)
+
+        # splitLocations = (0.25, 0.75)
+        # left_split = int(imgsz[1] * splitLocations[0])
+        # right_split = int(imgsz[1] * splitLocations[1])
+        
+        # mask1 = np.zeros(shape=imgsz, dtype=np.uint8)
+        # mask1[:, 0:left_split] = 255          # 左侧区域
+        # mask1[:, right_split:imgsz[1]] = 255     # 右侧区域
+        # # 中间区域保持0（已初始化为0）
+        
+        # # 创建第二个mask：两侧为0，中间为255
+        # mask2 = np.zeros(shape=imgsz, dtype=np.uint8)
+        # mask2[:, left_split:right_split] = 255  # 中间区域
+
+
+        # _, masked_img_thresh = cv2.threshold(equalized, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+        # masked_img_thresh_dst_path = save_path + "/{}_thresh.jpg".format(fname)
+        # cv2.imwrite(masked_img_thresh_dst_path, masked_img_thresh)
+
+        # # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        # kernel = cv2.getStructuringElement(cv2.MORPH_OPEN, (3, 3))
+        # masked_img_thresh = cv2.erode(masked_img_thresh, kernel, iterations=1)
+        # masked_img_thresh = cv2.dilate(masked_img_thresh, kernel, iterations=1)
+
+
+        # # _, masked_img_thresh1 = cv2.threshold(equalized, 50, 255, cv2.THRESH_BINARY)
+        # # _, masked_img_thresh2 = cv2.threshold(equalized, 127, 255, cv2.THRESH_BINARY)
+
+        # # thr1 = cv2.bitwise_and(masked_img_thresh1, masked_img_thresh1, mask=mask1)
+        # # thr2 = cv2.bitwise_and(masked_img_thresh2, masked_img_thresh2, mask=mask2)
+        # # masked_img_thresh = cv2.bitwise_or(thr1, thr2)
+
+
+        # masked_img_thresh_dst_path = save_path + "/{}_thresh_open.jpg".format(fname)
+        # cv2.imwrite(masked_img_thresh_dst_path, masked_img_thresh)
+
+        # pointsNew = np.where(masked_img_thresh == 255)
+        # if len(pointsNew[0]) < 5:  # 拟合点数过少则不处理
+        #     continue
+
+        # fit_model2 = np.polyfit(pointsNew[1], pointsNew[0], deg=4)
+        # print("fname: {} fit_model: {}".format(fname, fit_model2))
+
+
+
+        plot_out = fit_plot(masked_img, fit_model, r=4)
+        # f_dst_path = os.path.join(save_path, f)
+        # cv2.imwrite(f_dst_path, plot_out)
+
+        # plot_out2 = fit_plot(masked_img, fit_model2, r=4, color=(255, 255, 0))
+        # plot_out2 = fit_plot(masked_img, fit_model2, r=4, color=(255, 0, 255))
+
+
+        f_dst_path = save_path + "/{}.jpg".format(fname)
+        cv2.imwrite(f_dst_path, plot_out)
+        # cv2.imwrite(f_dst_path, plot_out2)
+
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    main2()

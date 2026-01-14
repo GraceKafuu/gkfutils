@@ -1271,9 +1271,10 @@ if __name__ == '__main__':
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
     # merge_txt_content(path1=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels", path2=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels_T-shirt")
-    # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Jingye\data(1)\20251205", new_name_prefix="Jingye_20251205", start_num=0)
-    # strAdd = "5yi"
-    # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_{}\data_merged".format(strAdd), new_name_prefix="Daba_v2_20251129_rename_{}".format(strAdd), start_num=0)
+    # rename_files(data_path=r"G:\Gosion\projects\000.AlgorithmValDatasets\T-ShirtDetection\P", new_name_prefix="T-ShirtDetection_Val_P", start_num=0)
+    # strAdd = "51"
+    # strAdd2 = "20251218"
+    # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Zouxian_Data\20251218\data_{}_20251218\data\20251218".format(strAdd), new_name_prefix="Zhouxian_{}_rename_{}".format(strAdd, strAdd2), start_num=0)
 
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\DataFromDifferentLocations\NinemeiDaba\CollectedDataByProgram\20251030"
     # dlist = os.listdir(data_path)
@@ -1312,10 +1313,10 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    # merge_dirs(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251129\data_20251129_5yi\data")
+    merge_dirs(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train")
 
 
-    random_select_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\cls3\v3\train\1", mvcp="copy", select_num=500)
+    # random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\videos\frames\20251220_merged", mvcp="copy", select_num=60)
 
     # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images0", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images", save_path="", with_suffix=False, flag="same", mvcp="cp")
     

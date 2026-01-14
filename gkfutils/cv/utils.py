@@ -9699,8 +9699,12 @@ def yolo_label_expand_bbox(data_path, classes, r=1.5):
                     fw.write(line)
 
 
-def ffmpeg_extract_video_frames(video_path, fps=25):
-    save_path = make_save_path(video_path, relative=".", add_str="frames")
+def ffmpeg_extract_video_frames(video_path, fps=25, save_path=None):
+    if save_path is None:
+        save_path = make_save_path(video_path, relative=".", add_str="frames")
+    else:
+        os.makedirs(save_path, exist_ok=True)
+
     file_list = get_file_list(video_path)
     for f in file_list:
         fname = os.path.splitext(f)[0]
@@ -13756,6 +13760,121 @@ def main_test_20251203():
         sys.exit(1)
 
 
+def main_test_20251209():
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\v4_no_laser"
+    img_path = data_path + "/images"
+    mask_path = data_path + "/masks"
+    os.makedirs(mask_path, exist_ok=True)
+
+    file_list = sorted(os.listdir(img_path))
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(img_path, f)
+        mask_abs_path = os.path.join(mask_path, fname + ".png")
+
+        img = cv2.imread(f_abs_path)
+        mask = np.zeros(img.shape[:2], dtype=np.uint8)
+        cv2.imwrite(mask_abs_path, mask)
+
+
+def calculate_green_ratio(img, green_hsv_range=None):
+    """
+    计算图像中绿色像素的面积占比
+    :param image_path: 图像文件路径
+    :param green_hsv_range: 绿色的HSV阈值范围，格式为[(low_h, low_s, low_v), (high_h, high_s, high_v)]
+                            默认为通用绿色范围：[(35, 40, 40), (77, 255, 255)]
+    :return: 绿色像素占比（百分比），绿色像素数量，总像素数量
+    """
+    # 默认绿色HSV范围（可根据实际场景调整）
+    if green_hsv_range is None:
+        green_hsv_range = [(35, 40, 40), (77, 255, 255)]
+    
+    # 转换为HSV色彩空间（OpenCV中H范围0-179，S/V范围0-255）
+    hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    
+    # 提取绿色阈值范围
+    lower_green = np.array(green_hsv_range[0])
+    upper_green = np.array(green_hsv_range[1])
+    
+    # 生成绿色掩码（mask）：1表示绿色像素，0表示非绿色
+    green_mask = cv2.inRange(hsv_img, lower_green, upper_green)
+    
+    # 计算像素数量
+    total_pixels = img.shape[0] * img.shape[1]  # 高×宽
+    green_pixels = np.sum(green_mask > 0)       # 统计掩码中值>0的像素数（绿色像素）
+    
+    # 计算占比（百分比，保留两位小数）
+    green_ratio = (green_pixels / total_pixels) * 100 if total_pixels > 0 else 0.0
+    
+    return round(green_ratio, 2)
+
+
+def main_test_20251210():
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\v4_no_laser\images"
+    file_list = os.listdir(data_path)
+    ratios = []
+
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(data_path, f)
+        img = cv2.imread(f_abs_path)
+        green_ratio = calculate_green_ratio(img)
+        print(f"{fname} - green_ratio: {green_ratio}")
+        ratios.append(green_ratio)
+
+    min_r = np.min(ratios)
+    max_r = np.max(ratios)
+    mean_r =  np.mean(ratios)
+    print(f"min_r: {min_r}, max_r: {max_r}, mean_r: {mean_r}")
+
+
+def main_test_20251215():
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215\data_20251215_4yi\data_merged"
+    save_path = data_path + "_cropped"
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = os.listdir(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(data_path, f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+        if imgsz[1] < 1500:
+            f_dst_path = os.path.join(save_path, f)
+            shutil.move(f_abs_path, f_dst_path)
+
+
+def main_test_202512152():
+    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215\data_20251215_4yi\data_merged"
+    save_path = data_path + "_random_cropped"
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = os.listdir(data_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(data_path, f)
+        img = cv2.imread(f_abs_path)
+        imgsz = img.shape[:2]
+
+        random_h1 = random.randint(10, imgsz[0] - 50)
+        random_h2 = random.randint(10, imgsz[0] - 50)
+        while random_h2 == random_h1:
+            random_h2 = random.randint(10, imgsz[0] - 50)
+        
+        c1 = img[random_h1:, :]
+        c2 = img[random_h2:, :]
+
+        c1_save_path = os.path.join(save_path, fname + "_c1.jpg")
+        c2_save_path = os.path.join(save_path, fname + "_c2.jpg")
+        cv2.imwrite(c1_save_path, c1)
+        cv2.imwrite(c2_save_path, c2)
+
+
+
+
+
+
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
@@ -13881,8 +14000,8 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\New\zhanting_v2\train", copy_images=False)  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v1\val", copy_images=True)  # yolo_format 路径下是 images 和 labels
+    labelbee_to_yolo(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\val_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -13892,15 +14011,15 @@ if __name__ == '__main__':
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ningmeigongguan")
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ZhongAnJiTai\all")
 
-    labelbee_line_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v3\001")
+    # labelbee_line_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v5\20251218")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected_yolo_format".replace("\\", "/"), select_num=29, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train_yolo_format".replace("\\", "/"), select_num=12, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20251203", fps=15)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\009.TuoGun_Det\videos\20251222\RTSP_OUTPUT10.58.136.138_550\20251222", fps=0.01, save_path=r"G:\Gosion\projects\009.TuoGun_Det\videos\frames\20251222\10.58.136.138_550")
 
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua"
     # dirs = sorted(os.listdir(data_path))
@@ -13913,7 +14032,7 @@ if __name__ == '__main__':
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
-    # vis_yolo_labels(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\val")
+    # vis_yolo_labels(data_path=r"G:\Gosion\data\009.TuoGun_Det\data\v1\train")
 
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
 
@@ -14352,3 +14471,7 @@ if __name__ == '__main__':
     
     # # main_test_20251125()
     # main_test_20251203()
+    # main_test_20251209()
+    # main_test_20251210()
+    # main_test_20251215()
+    # main_test_202512152()

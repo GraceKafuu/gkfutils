@@ -1261,6 +1261,35 @@ def move_file_by_filename_keywords(data_path, k=""):
             print("{} --> {}".format(f_abs_path, f_dst_path))
 
 
+def main_test_20260114():
+    data_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\Zouxian_Data\20260105\20260101-20260104"
+    save_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\Zouxian_Data\20260105\20260101-20260104_selected"
+    os.makedirs(save_path, exist_ok=True)
+
+    dir_list = os.listdir(data_path)
+    for i, d in enumerate(dir_list):
+        dir_path = data_path + "/{}".format(d)
+        if os.path.isfile(dir_path):
+            continue
+
+        sdir_list = os.listdir(dir_path)
+        for j, sd in enumerate(sdir_list):
+            sdir_path = dir_path + "/{}".format(sd)
+            file_list = os.listdir(sdir_path)
+
+            file_list_new = []
+            for f in file_list:
+                if "Alarm" in f or "cropped" in f: continue
+                file_list_new.append(f)
+            random_selected = random.sample(file_list_new, 10)
+            for f in random_selected:
+                fname = os.path.splitext(f)[0]
+                f_abs_path = sdir_path + "/{}".format(f)
+                f_new_path = save_path + "/{}_{}.jpg".format(fname, str(np.random.random()).replace(".", "").replace("-", ""))
+                shutil.copy(f_abs_path, f_new_path)
+
+
+
 if __name__ == '__main__':
     pass
 
@@ -1313,10 +1342,9 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    merge_dirs(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train")
+    # merge_dirs(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train")
 
-
-    # random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\videos\frames\20251220_merged", mvcp="copy", select_num=60)
+    random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\output\no_result", mvcp="copy", select_num=500)
 
     # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images0", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
@@ -1334,6 +1362,8 @@ if __name__ == '__main__':
 
     # remove_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000\labels", k="masked_cleaned")
     # move_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\train_labelbee_format\jsons", k="aug")
+
+    # main_test_20260114()
 
     
 

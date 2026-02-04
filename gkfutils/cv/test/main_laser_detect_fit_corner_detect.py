@@ -283,8 +283,198 @@ def ransac_fit(points, deg=4, select_num=100, num_iterations=500, threshold=15.0
     return best_model
 
 
+def keep_largest_region(binary_image):
+    """
+    在二值图中找出最大的连通区域，并将其他区域置为0
+    
+    参数:
+        binary_image: 二值图像 (0和255或0和1)
+    
+    返回:
+        result: 只包含最大区域的二值图像
+    """
+    # 确保图像是二值的（0和255）
+    if binary_image.dtype != np.uint8:
+        binary_image = binary_image.astype(np.uint8)
+    
+    # 如果图像是0和1格式，转换为0和255格式
+    if np.max(binary_image) == 1:
+        binary_image = binary_image * 255
+    
+    # 寻找所有连通区域
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_image, connectivity=8)
+    
+    # 如果没有找到任何区域（除了背景），返回原图
+    if num_labels <= 1:
+        return binary_image
+    
+    # 找到面积最大的区域（跳过背景，背景索引为0）
+    # stats格式：[x, y, width, height, area]
+    areas = stats[1:, cv2.CC_STAT_AREA]  # 跳过背景
+    max_area_idx = np.argmax(areas) + 1  # 加1因为跳过了背景
+    
+    # 创建一个新图像，只保留最大区域
+    result = np.zeros_like(binary_image)
+    result[labels == max_area_idx] = 255
+    
+    return result
+
+
+def remove_small_regions_skimage(binary_image, width_threshold, height_threshold):
+    from skimage.measure import label, regionprops
+
+    """
+    使用scikit-image移除长和宽小于阈值的区域
+    
+    参数:
+        binary_image: 二值图像
+        width_threshold: 宽度阈值
+        height_threshold: 高度阈值
+    
+    返回:
+        result: 处理后的二值图像
+    """
+    # 标记连通区域
+    labeled_image = label(binary_image, connectivity=2)
+    
+    # 获取区域属性
+    regions = regionprops(labeled_image)
+    
+    # 创建一个与原始图像相同大小的掩码
+    mask = np.zeros_like(binary_image, dtype=bool)
+    
+    for region in regions:
+        # 获取区域的最小外接矩形（边界框）
+        min_row, min_col, max_row, max_col = region.bbox
+        width = max_col - min_col
+        height = max_row - min_row
+        
+        # 如果区域尺寸大于等于阈值，则保留
+        if width >= width_threshold and height >= height_threshold:
+            mask[region.coords[:, 0], region.coords[:, 1]] = True
+    
+    # 将掩码转换为与原图相同的格式
+    if np.max(binary_image) == 255:
+        result = np.zeros_like(binary_image, dtype=np.uint8)
+        result[mask] = 255
+    else:
+        result = mask.astype(binary_image.dtype)
+    
+    return result
+
+
+def remove_regions_by_shape(binary_image, shape_condition_func):
+    """
+    根据自定义形状条件移除区域
+    
+    参数:
+        binary_image: 二值图像
+        shape_condition_func: 函数，接受width和height参数，返回True/False表示是否保留
+    
+    返回:
+        result: 处理后的二值图像
+    """
+    if binary_image.dtype != np.uint8:
+        binary_image = binary_image.astype(np.uint8)
+    
+    if np.max(binary_image) == 1:
+        binary_image = binary_image * 255
+    
+    # 寻找所有连通区域
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary_image, connectivity=8)
+    
+    mask = np.zeros_like(binary_image, dtype=np.uint8)
+    
+    for i in range(1, num_labels):
+        width = stats[i, cv2.CC_STAT_WIDTH]
+        height = stats[i, cv2.CC_STAT_HEIGHT]
+        
+        # 使用自定义条件判断
+        if shape_condition_func(width, height):
+            mask[labels == i] = 255
+    
+    return mask
+
+
+def remove_small_regions_by_area_and_size(binary_image, area_threshold, width_threshold, height_threshold):
+    """
+    同时根据面积和尺寸移除小区域
+    
+    参数:
+        binary_image: 二值图像
+        area_threshold: 面积阈值
+        width_threshold: 宽度阈值
+        height_threshold: 高度阈值
+    
+    返回:
+        result: 处理后的二值图像
+        removed_count: 被移除的区域数量
+    """
+    if binary_image.dtype != np.uint8:
+        binary_image = binary_image.astype(np.uint8)
+    
+    if np.max(binary_image) == 1:
+        binary_image = binary_image * 255
+    
+    # 寻找所有连通区域
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary_image, connectivity=8)
+    
+    mask = np.zeros_like(binary_image, dtype=np.uint8)
+    removed_count = 0
+    
+    for i in range(1, num_labels):
+        width = stats[i, cv2.CC_STAT_WIDTH]
+        height = stats[i, cv2.CC_STAT_HEIGHT]
+        area = stats[i, cv2.CC_STAT_AREA]
+        
+        # 满足任意条件之一就移除
+        if area >= area_threshold and width >= width_threshold and height >= height_threshold:
+            mask[labels == i] = 255
+        else:
+            removed_count += 1
+    
+    return mask, removed_count
+
+
+def connected_components_analysis(img, connectivity=8, area_thr=100, h_thr=8, w_thr=8):
+    """
+    stats: [x, y, w, h, area]
+    """
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=connectivity)
+    
+    areas = stats[:, -1]  # stats[:, cv2.CC_STAT_AREA]
+    for i in range(1, num_labels):
+        if areas[i] < area_thr:
+            labels[labels == i] = 0
+        else:
+            if stats[i, 2] < w_thr or stats[i, 3] < h_thr:
+                labels[labels == i] = 0
+
+    # 不同的连通域赋予不同的颜色
+    output = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for i in range(1, num_labels):
+        mask = labels == i
+        output[:, :, 0][mask] = np.random.randint(0, 256)
+        output[:, :, 1][mask] = np.random.randint(0, 256)
+        output[:, :, 2][mask] = np.random.randint(0, 256)
+
+    return output, num_labels, labels, stats, centroids
+
+
 def fit_curve(img, deg=4, lower=None, upper=None, laser_color="green", FLAG_RANSAC_FIT=True, select_num=1000, num_iterations=1000, threshold=50):
-    mask, result, binary, binary_otsu = extract_specific_color(img, lower=lower, upper=upper, color=laser_color)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, binary1 = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    mask2, result2, binary2, binary_otsu2 = extract_specific_color(img, lower=None, upper=None, color="green")
+    # binary = cv2.bitwise_and(binary1, binary2)
+    binary = cv2.bitwise_or(binary1, binary2)
+    
+    # mask, result, binary, binary_otsu = extract_specific_color(img, lower=lower, upper=upper, color=laser_color)
+    # binary = keep_largest_region(binary)
+    # binary, _ = remove_small_regions_by_area_and_size(binary, 100, 50, 50)
+
+    output, num_labels, labels, stats, centroids = connected_components_analysis(binary, connectivity=8, area_thr=16, h_thr=4, w_thr=4)
+    gray2 = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray2, 127, 255, cv2.THRESH_BINARY)
 
     # cv2.imshow("binary", binary)
     # cv2.imshow("binary_otsu", binary_otsu)
@@ -416,12 +606,36 @@ def main():
 
 
 
+def main_000():
+    img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\Video_2025_03_01_165140_1_output_000009359.jpg"
+
+    fname = os.path.basename(img_path)
+    img_name = os.path.splitext(fname)[0]
+
+    img = cv2.imread(img_path)
+    img_cp = img.copy()
+
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # _, binary1 = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    # mask2, result2, binary2, binary_otsu2 = extract_specific_color(img, lower=None, upper=None, color="green")
+    # binary3 = cv2.bitwise_and(binary1, binary2)
+    # binary4 = cv2.bitwise_or(binary1, binary2)
+
+    # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\binary11.jpg", binary1)
+    # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\binary21.jpg", binary2)
+    # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\binary31.jpg", binary3)
+    # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\binary41.jpg", binary4)
+
+    fit_model = fit_curve(img, deg=4, lower=None, upper=None, laser_color="green", FLAG_RANSAC_FIT=True, select_num=1000, num_iterations=1000, threshold=50)
+    img_vis = fit_plot(img, fit_model, deg=4, color=(255, 0, 255))
+    cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\img_vis14.jpg", img_vis)
 
 
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    main_000()
 
 
 

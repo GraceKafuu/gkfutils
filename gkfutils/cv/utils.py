@@ -791,6 +791,7 @@ def clahe(img, random=False, p=1, m=0, clipLimit=2.0, tileGridSize=(8, 8)):
             tgs = np.random.randint(tileGridSize[0], tileGridSize[1] + 1)
             # tgs = np.random.choice([4, 8, 16, 32])
             tileGridSize = (tgs, tgs)
+            m = np.random.randint(0, 2)
             if m == 0:
                 img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
                 clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
@@ -13870,9 +13871,122 @@ def main_test_202512152():
         cv2.imwrite(c2_save_path, c2)
 
 
+def main_aug_laser_line_detect_dataset():
+    data_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v6\train"
+    save_path = data_path + "_aug"
+    img_save_path = save_path + "/images"
+    mask_save_path = save_path + "/masks"
+    os.makedirs(img_save_path, exist_ok=True)
+    os.makedirs(mask_save_path, exist_ok=True)
+
+    img_path = data_path + "/images"
+    mask_path = data_path + "/masks"
+
+    file_list = os.listdir(img_path)
+    for f in file_list:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(img_path, f)
+        mask_abs_path = os.path.join(mask_path, fname + ".png")
+        img = cv2.imread(f_abs_path)
+
+        for i in range(1):
+            # img_new = change_brightness(img, random=True, p=1, value=(-50, 50))
+            
+            # img_new = sp_noise(img, random=True, p=1, salt_p=(0.0001, 0.01), pepper_p=(0.0001, 0.01))
+            img_new = make_sunlight_effect(img, random=True, p=1, center=None, effect_r=(50, 200), light_strength=(50, 150))  # slow
+            # img_new = color_distortion(img, random=True, p=1, value=(-150, 150))
+            
+            # img_new = clahe(img, random=True, p=1, m=1, clipLimit=(2.0, 2.0), tileGridSize=(8, 8))
+
+            # img_new = gaussian_blur(img, random=True, p=1, k=5)
+            # img_new = transperent_overlay(img, random=True, p=1, rect=None, max_h_r=1, max_w_r=0.25, alpha=(0.1, 0.25))
+
+            aug_type = "make_sunlight_effect"
+            rdm_str = str(np.random.random()).replace(".", "").replace("-", "")
+            img_dst_path = img_save_path + "/{}_{}_{}_{}.jpg".format(fname, aug_type, i, rdm_str)
+            cv2.imwrite(img_dst_path, img_new)
+
+            mask_dst_path = mask_save_path + "/{}_{}_{}_{}.png".format(fname, aug_type, i, rdm_str)
+            shutil.copy(mask_abs_path, mask_dst_path)
 
 
 
+def main_aug_test():
+    img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v6\train\images"
+    save_path = img_path + "_aug_test"
+    os.makedirs(save_path, exist_ok=True)
+
+    file_list = os.listdir(img_path)
+    for f in file_list[:100]:
+        fname = os.path.splitext(f)[0]
+        f_abs_path = os.path.join(img_path, f)
+        img = cv2.imread(f_abs_path)
+
+        for i in range(10):
+            # img_new = change_brightness(img, random=True, p=1, value=(-50, 50))
+            
+            # img_new = sp_noise(img, random=True, p=1, salt_p=(0.0001, 0.01), pepper_p=(0.0001, 0.01))
+            # img_new = make_sunlight_effect(img, random=True, p=1, center=None, effect_r=(50, 200), light_strength=(50, 150))  # slow
+            # img_new = color_distortion(img, random=True, p=1, value=(-150, 150))
+            
+            img_new = clahe(img, random=True, p=1, m=1, clipLimit=(2.0, 2.0), tileGridSize=(8, 8))
+
+            # img_new = gaussian_blur(img, random=True, p=1, k=5)
+            # img_new = transperent_overlay(img, random=True, p=1, rect=None, max_h_r=1, max_w_r=0.25, alpha=(0.1, 0.25))
+
+
+            img_dst_path = save_path + "/{}_{}_{}.jpg".format(fname, i, str(np.random.random()).replace(".", "").replace("-", ""))
+            cv2.imwrite(img_dst_path, img_new)
+
+
+def main_test_20260127():
+    # img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_DL56380CAK00025_frames\Video_2026_01_09_170147_1\Video_2026_01_09_170147_1_output_000000012.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EH36727AAK00042_frames\1\1_output_000000011.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EH36727AAK00042_frames\Video_2026_01_27_151029_1\Video_2026_01_27_151029_1_output_000000019.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EH36727AAK00042_frames\Video_2026_01_27_160116_1\Video_2026_01_27_160116_1_output_000000019.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EH36727AAK00042_frames\Video_2026_01_27_161124_3\Video_2026_01_27_161124_3_output_000000011.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_151303_1\Video_2026_01_27_151303_1_output_000000018.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_151712_2\Video_2026_01_27_151712_2_output_000000012.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_151947_3\Video_2026_01_27_151947_3_output_000000019.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_152326_4\Video_2026_01_27_152326_4_output_000000018.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_152526_5\Video_2026_01_27_152526_5_output_000000019.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_153055_6\Video_2026_01_27_153055_6_output_000000020.jpg"
+    # img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_153301_7\Video_2026_01_27_153301_7_output_000000025.jpg"
+    img_path = r"g:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006_frames\Video_2026_01_27_153521_8\Video_2026_01_27_153521_8_output_000000020.jpg"
+    save_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\binary_images"
+    os.makedirs(save_path, exist_ok=True)
+
+    img_name = os.path.splitext(os.path.basename(img_path))[0]
+    img = cv2.imread(img_path)  
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    # binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)[1]
+    img_save_path = os.path.join(save_path, img_name + "_binary.jpg")
+    cv2.imwrite(img_save_path, binary)
+
+
+def main_test_20260204():
+    data_path = r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\data_v1.0.13_20260202\data\data_collection"
+    dir_list = os.listdir(data_path)
+
+    save_path = r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\random_selected"
+    os.makedirs(save_path, exist_ok=True)
+
+    for d in dir_list:
+        d_path = os.path.join(data_path, d)
+
+        dd_list = os.listdir(d_path)
+        for dd in dd_list:
+            dd_path = os.path.join(d_path, dd)
+            file_list = sorted(os.listdir(dd_path))
+
+            rdm_list = random.sample(file_list, 10)
+            for f in rdm_list:
+                fname = os.path.splitext(f)[0]
+                img_path = dd_path + "/{}".format(f)
+
+                img_dst_path = save_path + "/{}_{}.jpg".format(f, time.time())
+                shutil.copy(img_path, img_dst_path)
 
 
 if __name__ == '__main__':
@@ -14000,8 +14114,8 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v1\val", copy_images=True)  # yolo_format 路径下是 images 和 labels
-    labelbee_to_yolo(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\val_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\random_selected", copy_images=True)  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\val_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -14011,7 +14125,7 @@ if __name__ == '__main__':
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ningmeigongguan")
     # labelbee_seg_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\ZhongAnJiTai\all")
 
-    # labelbee_line_to_png(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\v5\20251218")
+    # labelbee_line_to_png(data_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\labelbee\20260114")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
@@ -14019,7 +14133,7 @@ if __name__ == '__main__':
     # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train_yolo_format".replace("\\", "/"), select_num=12, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\009.TuoGun_Det\videos\20251222\RTSP_OUTPUT10.58.136.138_550\20251222", fps=0.01, save_path=r"G:\Gosion\projects\009.TuoGun_Det\videos\frames\20251222\10.58.136.138_550")
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006", fps=10, save_path=None)
 
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua"
     # dirs = sorted(os.listdir(data_path))
@@ -14461,7 +14575,7 @@ if __name__ == '__main__':
 
 
     # # # arr = np.array([5, 5, 5, 5, 5, 0, 0, 0, 0, 0])
-    # arr = np.array([5, 5, 5, 5, 10, 10, 5, 5, 5, 5])
+    # arr = np.array([5, 5, 5, 5, 70, 70, 5, 5, 5, 5])
     # arr_mean = np.mean(arr)
     # arr_std = np.std(arr)
     # z = z_score(arr, arr_mean, arr_std)
@@ -14475,3 +14589,9 @@ if __name__ == '__main__':
     # main_test_20251210()
     # main_test_20251215()
     # main_test_202512152()
+
+    # main_aug_test()
+    # main_aug_laser_line_detect_dataset()
+
+    # main_test_20260127()
+    # main_test_20260204()

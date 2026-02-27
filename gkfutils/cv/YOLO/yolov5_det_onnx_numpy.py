@@ -19,7 +19,7 @@ def timeit(func):
     return wrapper
 
 
-class YOLOv5_ORT(object):
+class YOLOv5(object):
     def __init__(self, model_path, imgsz=(640, 640), conf=0.60, iou=0.45, device='cpu'):
         self.model_path = model_path
         self.imgsz = imgsz
@@ -297,7 +297,7 @@ class YOLOv5_ORT(object):
     
     def detect(self, img0, show=False):
         img = self.preprocess(img0)
-        pred = self.inference(img)   
+        pred = self.inference(img)
         results = self.postprocess(pred)
         out = self.vis_results(img0, results)
 
@@ -325,14 +325,14 @@ class YOLOv5_ORT(object):
 
  
 if __name__=="__main__":
-    onnx_path = r"D:\Gosion\code\others\Python\yolov5-master\yolov5s.onnx"
-    img_pth = r"G:\Gosion\data\004.Out_GuardArea_Det\resources\20250725\plan_light_1933425297818984450.jpg"
+    model_path = r"G:\Gosion\code\Python\yolov5-master\yolov5s.onnx"
+    img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
     
-    yolov5 = YOLOv5_ORT(onnx_path, conf=0.25)
-    img = cv2.imread(img_pth)
+    yolov5 = YOLOv5(model_path, conf=0.60)
+    img = cv2.imread(img_path)
 
-    # out = yolov5.detect(img, show=True)
+    out = yolov5.detect(img, show=True)
 
-    imgs_path = r"G:\Gosion\data\000.Test_Data\images\detect_test"
-    save_path = r"G:\Gosion\data\000.Test_Data\images\detect_test_results"
-    yolov5.detect_folder(imgs_path, save_path)
+    # imgs_path = r"G:\Gosion\data\000.Test_Data\images\detect_test"
+    # save_path = r"G:\Gosion\data\000.Test_Data\images\detect_test_results"
+    # yolov5.detect_folder(imgs_path, save_path)

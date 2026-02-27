@@ -1,3 +1,5 @@
+# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+
 import os
 import cv2
 import numpy as np
@@ -7,9 +9,6 @@ from tqdm import tqdm
 import shutil
 
 
-# ======================================== v3 start =======================================
-# =========================================================================================
-# Pose Start ==============================================================================
 class Colors:
     """
     Ultralytics default color palette https://ultralytics.com/.
@@ -348,13 +347,76 @@ def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None, normalize=False
     return coords
 
 
+def bbox_voc_to_yolo(imgsz, box):
+    """
+    VOC --> YOLO
+    :param imgsz: [H, W]
+    :param box:
+    orig: [xmin, xmax, ymin, ymax], deprecated;
+    new:  [xmin, ymin, xmax, ymax], 2024.03.29, WJH.
+    :return: [x, y, w, h]
+    """
+    dh = 1. / (imgsz[0])
+    dw = 1. / (imgsz[1])
+    # x = (box[0] + box[1]) / 2.0
+    # y = (box[2] + box[3]) / 2.0
+    # w = box[1] - box[0]
+    # h = box[3] - box[2]
+    x = (box[0] + box[2]) / 2.0
+    y = (box[1] + box[3]) / 2.0
+    w = box[2] - box[0]
+    h = box[3] - box[1]
+    x = int(round(x)) * dw
+    w = int(round(w)) * dw
+    y = int(round(y)) * dh
+    h = int(round(h)) * dh
+
+    if x < 0: x = 0
+    if y < 0: y = 0
+    if w > 1: w = 1
+    if h > 1: h = 1
+    assert x <= 1, "x: {}".format(x)
+    assert y <= 1, "y: {}".format(y)
+    assert w >= 0, "w: {}".format(w)
+    assert h >= 0, "h: {}".format(h)
+
+    return [x, y, w, h]
+
+
+def bbox_yolo_to_voc(imgsz, bbx):
+    """
+    YOLO --> VOC
+    !!!!!! orig: (bbx, imgsz) 20230329 changed to (imgsz, bbx)
+    :param bbx: yolo format bbx
+    :param imgsz: [H, W]
+    :return: [x_min, y_min, x_max, y_max]
+    """
+    bbx_ = (bbx[0] * imgsz[1], bbx[1] * imgsz[0], bbx[2] * imgsz[1], bbx[3] * imgsz[0])
+    x_min = int(round(bbx_[0] - (bbx_[2] / 2)))
+    y_min = int(round(bbx_[1] - (bbx_[3] / 2)))
+    x_max = int(round(bbx_[0] + (bbx_[2] / 2)))
+    y_max = int(round(bbx_[1] + (bbx_[3] / 2)))
+
+    if x_min < 0: x_min = 0
+    if y_min < 0: y_min = 0
+    if x_max > imgsz[1]: x_max = imgsz[1]
+    if y_max > imgsz[0]: y_max = imgsz[0]
+
+    assert x_min >= 0 and x_min <= imgsz[1], "x_min: {}".format(x_min)
+    assert y_min >= 0 and y_min <= imgsz[0], "y_min: {}".format(y_min)
+    assert x_max >= 0 and x_max <= imgsz[1], "x_max: {}".format(x_max)
+    assert y_max >= 0 and y_max <= imgsz[0], "y_max: {}".format(y_max)
+
+    return [x_min, y_min, x_max, y_max]
+
+
 class YOLO11_ORT:
     """
     YOLO11 model for handling inference and visualization. Also support YOLOv8.
     Currently support detection and pose, other tasks will be added later.
     """
     
-    def __init__(self, model_path, num_kpt=17, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
+    def __init__(self, onnx_model, num_kpt=17, confidence_thres=0.60, iou_thres=0.45, num_classes=80):
         """
         Initializes an instance of the YOLOv8 class.
 
@@ -365,12 +427,12 @@ class YOLO11_ORT:
             iou_thres: IoU (Intersection over Union) threshold for non-maximum suppression.
         """
         self.num_kpt = num_kpt
-        self.model_path = model_path
+        self.onnx_model = onnx_model
         self.confidence_thres = confidence_thres
         self.iou_thres = iou_thres
 
         # Create an inference session using the ONNX model and specify execution providers
-        self.session = ort.InferenceSession(self.model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        self.session = ort.InferenceSession(self.onnx_model, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 
         # Get the model inputs
         self.model_inputs = self.session.get_inputs()
@@ -390,26 +452,26 @@ class YOLO11_ORT:
         self.limb_color = self.colors.pose_palette[[9, 9, 9, 9, 7, 7, 7, 0, 0, 0, 0, 0, 16, 16, 16, 16, 16, 16, 16]]
         self.kpt_color = self.colors.pose_palette[[16, 16, 16, 16, 16, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9]]
         self.skeleton = [
-            [16, 14],
-            [14, 12],
-            [17, 15],
-            [15, 13],
-            [12, 13],
-            [6, 12],
-            [7, 13],
-            [6, 7],
-            [6, 8],
-            [7, 9],
-            [8, 10],
-            [9, 11],
-            [2, 3],
-            [1, 2],
-            [1, 3],
-            [2, 4],
-            [3, 5],
-            [4, 6],
-            [5, 7]
-        ]
+                    [16, 14],
+                    [14, 12],
+                    [17, 15],
+                    [15, 13],
+                    [12, 13],
+                    [6, 12],
+                    [7, 13],
+                    [6, 7],
+                    [6, 8],
+                    [7, 9],
+                    [8, 10],
+                    [9, 11],
+                    [2, 3],
+                    [1, 2],
+                    [1, 3],
+                    [2, 4],
+                    [3, 5],
+                    [4, 6],
+                    [5, 7],
+                ]
 
     def draw_detections(self, img, box, score, class_id):
         """
@@ -653,6 +715,7 @@ class YOLO11_ORT:
 
         return boxes[picked, :], scores[picked], keypoints[picked, :]
 
+
     def iou_of(self, boxes0, boxes1, eps=1e-5):
         """Return intersection-over-union (Jaccard index) of boxes.
         Args:
@@ -782,7 +845,34 @@ class YOLO11_ORT:
 
         return angle
     
-    def pose_detect(self, img):
+    def sitting_or_standing(self, k, angle_thr=165):
+        """
+        -1: 判断不了 0: 坐着 1: 站着
+        假如身体与双腿的夹角大于45°则认为是坐着
+        """
+        if k.shape[0] != 17: return -1
+        k = k[:, :-1]
+        angle_11_5_13 = self.cal_angle_via_vector_cross(k[11], k[5], k[13])
+        angle_13_11_15 = self.cal_angle_via_vector_cross(k[13], k[11], k[15])
+        angle_12_6_14 = self.cal_angle_via_vector_cross(k[12], k[6], k[14])
+        angle_14_12_16 = self.cal_angle_via_vector_cross(k[14], k[12], k[16])
+
+        sum = 0
+        if angle_11_5_13 > angle_thr:
+            sum += 1
+        if angle_13_11_15 > angle_thr:
+            sum += 1
+        if angle_12_6_14 > angle_thr:
+            sum += 1
+        if angle_14_12_16 > angle_thr:
+            sum += 1
+
+        if sum >= 3:
+            return "Standing"
+        else:
+            return "Sitting"
+
+    def sitting_or_standing_detect(self, img_path):
         """
         Performs inference using an ONNX model and returns the output image with drawn detections.
 
@@ -791,10 +881,40 @@ class YOLO11_ORT:
         """
         
         # Preprocess the image data
-        img = self.preprocess(img)
+        img_data = self.preprocess(img_path)
 
         # Run inference using the preprocessed image data
-        outputs = self.session.run(None, {self.model_inputs[0].name: img})
+        outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+
+        boxes, scores, keypoints = self.pose_postprocess(
+            outputs[0][0],
+            width_radio=self.img_width / self.input_width,
+            height_radio=self.img_height / self.input_height,
+        )
+
+        for b, s, k in zip(boxes, scores, keypoints):
+            b = list(map(round, b))
+            self.img = self.draw_kpts(self.img, k, self.img.shape[:2], radius=5, kpt_line=True)
+
+            print("img_path: {}".format(img_path))
+            res = self.sitting_or_standing(k, angle_thr=145)
+            print("Res: {}\n".format(res))
+            cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
+            cv2.putText(self.img, "Person: {:.2f} {}".format(s, res), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+
+    def pose_detect(self, img_path):
+        """
+        Performs inference using an ONNX model and returns the output image with drawn detections.
+
+        Returns:
+            output_img: The output image with drawn detections.
+        """
+        
+        # Preprocess the image data
+        img_data = self.preprocess(img_path)
+
+        # Run inference using the preprocessed image data
+        outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
 
         boxes, scores, keypoints = self.pose_postprocess(
             outputs[0][0],
@@ -807,34 +927,149 @@ class YOLO11_ORT:
         for b, s, k in zip(boxes, scores, keypoints):
             b = list(map(round, b))
             self.img = self.draw_kpts(self.img, k, self.img.shape[:2], radius=5, kpt_line=True)
+
             cv2.rectangle(self.img, (b[0], b[1]), (b[2], b[3]), (255, 0, 255), 2)
-            cv2.putText(self.img, "{:.2f}".format(s), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
+            cv2.putText(self.img, "0: {:.2f}".format(s), (b[0], b[1] - 5), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
 
-        return self.img, boxes, scores, keypoints
-# Pose End ================================================================================
-# =========================================================================================
+        return self.img
+    
+    def pose_detect_generate_yolo_labels(self, data_path):
+        dirname = os.path.basename(data_path)
+        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_converted_yolo_labels".format(dirname)
+        img_save_path = save_path + "/images"
+        lbl_save_path = save_path + "/labels"
+        os.makedirs(img_save_path, exist_ok=True)
+        os.makedirs(lbl_save_path, exist_ok=True)
 
+        file_list = sorted(os.listdir(data_path))
+        for f in file_list:
+            fname = os.path.splitext(f)[0]
+            f_abs_path = data_path + "/{}".format(f)
+            img = cv2.imread(f_abs_path)
+            imgsz = img.shape[:2]
+
+            img_data = self.preprocess(img)
+
+            # Run inference using the preprocessed image data
+            outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+
+            boxes, scores, keypoints = self.pose_postprocess(
+                outputs[0][0],
+                width_radio=self.img_width / self.input_width,
+                height_radio=self.img_height / self.input_height,
+                filter_threshold=self.confidence_thres,
+                iou_threshold=self.iou_thres
+            )
+
+            img_dst_path = img_save_path + "/{}".format(f)
+            if len(boxes) != 0:
+                shutil.copy(f_abs_path, img_dst_path)
+
+                lbl_dst_path = lbl_save_path + "/{}.txt".format(fname)
+
+                with open(lbl_dst_path, "w", encoding="utf-8") as f_wirte:
+                    for b, s, k in zip(boxes, scores, keypoints):
+                        yolo_box = bbox_voc_to_yolo(imgsz, b)
+
+                        pts_yolo = ""
+                        for i, k in enumerate(k):
+                            x_coord, y_coord = k[0], k[1]
+                            x_coord_yolo, y_coord_yolo = k[0] / imgsz[1], k[1] / imgsz[0]
+                            pts_k = [x_coord_yolo, y_coord_yolo, 2]
+                            
+                            if i == 0:
+                                pts_yolo += " ".join([str(ki) for ki in pts_k]) + " "
+                            else:
+                                pts_yolo += " ".join([str(ki) for ki in pts_k])
+
+                    
+                        line = "0 " + " ".join([str(bi) for bi in yolo_box]) + " " + pts_yolo + "\n"
+                        f_wirte.write(line)
+
+    def pose_detect_up_down_flip_image(self, data_path):
+        """
+        通过人来检测上下翻转的图片，头在下面，腿在上面的认为是上下翻转了
+        """
+        dirname = os.path.basename(data_path)
+        save_path = os.path.abspath(os.path.join(data_path, "..")) + "/{}_up_down_flip".format(dirname)
+        img_path = data_path + "/images"
+        jsn_path = data_path + "/jsons"
+        img_save_path = save_path + "/images"
+        jsn_save_path = save_path + "/jsons"
+        os.makedirs(img_save_path, exist_ok=True)
+        os.makedirs(jsn_save_path, exist_ok=True)
+
+
+
+        file_list = sorted(os.listdir(img_path))
+        for f in tqdm(file_list):
+            fname = os.path.splitext(f)[0]
+            f_abs_path = img_path + "/{}".format(f)
+            img = cv2.imread(f_abs_path)
+            imgsz = img.shape[:2]
+
+            j_abs_path = jsn_path + "/{}.json".format(f)
+
+            img_data = self.preprocess(img)
+
+            # Run inference using the preprocessed image data
+            outputs = self.session.run(None, {self.model_inputs[0].name: img_data})
+
+            boxes, scores, keypoints = self.pose_postprocess(
+                outputs[0][0],
+                width_radio=self.img_width / self.input_width,
+                height_radio=self.img_height / self.input_height,
+                filter_threshold=0.60,
+                iou_threshold=0.45
+            )
+
+            try:
+                front7_kpts = keypoints[:, :7, :]
+                back4_kpts = keypoints[:, -4:, :]
+
+                front7_meany = np.mean(front7_kpts[:, :, 1])
+                back4_meany = np.mean(back4_kpts[:, :, 1])
+
+                if back4_meany < front7_meany:
+                    f_dst_path = img_save_path + "/{}".format(f)
+                    j_dst_path = jsn_save_path + "/{}.json".format(f)
+                    shutil.move(f_abs_path, f_dst_path)
+                    shutil.move(j_abs_path, j_dst_path)
+            except Exception as e:
+                print(e)
 
 
 if __name__ == '__main__':
-    model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v12_yolo11s\weights\belt_torn_kpt_yolo11s_256_256_v1.1.0.onnx"
-    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\images"
-    save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\images_20250829_results"
-    os.makedirs(save_path, exist_ok=True)
+    # model_path = r"D:\Gosion\code\others\Python\ultralytics-8.3.72\runs\train-pose\006.belt_torn_pose_v12_yolo11s\weights\belt_torn_kpt_yolo11s_256_256_v1.1.0.onnx"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\images"
+    # save_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\images_20250829_results"
+    # os.makedirs(save_path, exist_ok=True)
 
-    model = YOLO11_ORT(model_path, 2, 0.60)
+    # model = YOLO11_KPT(model_path, 2, 0.60)
 
-    file_list = sorted(os.listdir(data_path))
+    # file_list = sorted(os.listdir(data_path))
 
-    for f in file_list:
-        f_abs_path = data_path + "/{}".format(f)
-        f_dst_path = save_path + "/{}".format(f)
-        img = cv2.imread(f_abs_path)
-        out, boxes, scores, keypoints = model.pose_detect(img)
-        if len(boxes) > 0:
-            print("{}: {} {}".format(f, boxes, scores))
-            cv2.imwrite(f_dst_path, out)
+    # for f in file_list:
+    #     f_abs_path = data_path + "/{}".format(f)
+    #     f_dst_path = save_path + "/{}".format(f)
+    #     img = cv2.imread(f_abs_path)
+    #     out, boxes, scores, keypoints = model.pose_detect(img)
+    #     if len(boxes) > 0:
+    #         print("{}: {} {}".format(f, boxes, scores))
+    #         cv2.imwrite(f_dst_path, out)
 
+
+    model_path = r"G:\Gosion\code\Python\ultralytics-8.3.72\weights\yolo11s-pose.onnx"
+    img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
+    # img_path = r"G:\Gosion\projects\000.Test_Data\images\zidane.jpg"
+
+    model = YOLO11_ORT(model_path, 17, 0.60)
+
+    # img = cv2.imread(img_path)
+    output = model.pose_detect(img_path)
+    cv2.namedWindow("output", cv2.WINDOW_NORMAL)
+    cv2.imshow("output", output)
+    cv2.waitKey(0)
 
 
 

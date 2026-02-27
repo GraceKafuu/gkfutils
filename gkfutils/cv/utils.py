@@ -13989,6 +13989,83 @@ def main_test_20260204():
                 shutil.copy(img_path, img_dst_path)
 
 
+def nothing(x):
+    pass
+
+
+def hsvTrackbar(image_path):
+    # 读取图像
+    # image_path = 'input.jpg'  # 请替换为你的图像路径
+    img = cv2.imread(image_path)
+    if img is None:
+        print("无法读取图像，请检查路径")
+        return
+    # 转换为HSV
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    # 创建窗口
+    cv2.namedWindow('Trackbars')
+    cv2.namedWindow('Mask')
+    cv2.namedWindow('Result')
+
+    # 创建滑动条，初始值设置为绿色范围
+    cv2.createTrackbar('H_min', 'Trackbars', 35, 179, nothing)
+    cv2.createTrackbar('H_max', 'Trackbars', 85, 179, nothing)
+    cv2.createTrackbar('S_min', 'Trackbars', 40, 255, nothing)
+    cv2.createTrackbar('S_max', 'Trackbars', 255, 255, nothing)
+    cv2.createTrackbar('V_min', 'Trackbars', 40, 255, nothing)
+    cv2.createTrackbar('V_max', 'Trackbars', 255, 255, nothing)
+
+    while True:
+        # 获取当前滑动条的值
+        h_min = cv2.getTrackbarPos('H_min', 'Trackbars')
+        h_max = cv2.getTrackbarPos('H_max', 'Trackbars')
+        s_min = cv2.getTrackbarPos('S_min', 'Trackbars')
+        s_max = cv2.getTrackbarPos('S_max', 'Trackbars')
+        v_min = cv2.getTrackbarPos('V_min', 'Trackbars')
+        v_max = cv2.getTrackbarPos('V_max', 'Trackbars')
+
+        # 确保下限小于上限（可选：自动调整）
+        if h_min > h_max:
+            h_min, h_max = h_max, h_min
+            cv2.setTrackbarPos('H_min', 'Trackbars', h_min)
+            cv2.setTrackbarPos('H_max', 'Trackbars', h_max)
+        if s_min > s_max:
+            s_min, s_max = s_max, s_min
+            cv2.setTrackbarPos('S_min', 'Trackbars', s_min)
+            cv2.setTrackbarPos('S_max', 'Trackbars', s_max)
+        if v_min > v_max:
+            v_min, v_max = v_max, v_min
+            cv2.setTrackbarPos('V_min', 'Trackbars', v_min)
+            cv2.setTrackbarPos('V_max', 'Trackbars', v_max)
+
+        # 定义阈值范围
+        lower = np.array([h_min, s_min, v_min])
+        upper = np.array([h_max, s_max, v_max])
+
+        # 生成掩码
+        mask = cv2.inRange(hsv, lower, upper)
+
+        # 可选：形态学操作，去除噪声
+        kernel = np.ones((5,5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        # 显示掩码
+        cv2.imshow('Mask', mask)
+
+        # 也可以将掩码应用到原图，显示绿色区域
+        result = cv2.bitwise_and(img, img, mask=mask)
+        cv2.imshow('Result', result)
+
+        # 按键退出
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q') or key == 27:  # 27是ESC
+            break
+
+    cv2.destroyAllWindows()
+
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
@@ -14114,8 +14191,8 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\random_selected", copy_images=True)  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\val_labelbee_format", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\random_selected", copy_images=True)  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v3\New\005", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -14133,7 +14210,7 @@ if __name__ == '__main__':
     # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train_yolo_format".replace("\\", "/"), select_num=12, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\20260127_Test_Videos\MV-A7300CG30_EK28501AAK00006", fps=10, save_path=None)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\videos_20260207\videos\MV-A7300CG30_EK28501AAK00006", fps=5, save_path=None)
 
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua"
     # dirs = sorted(os.listdir(data_path))
@@ -14595,3 +14672,5 @@ if __name__ == '__main__':
 
     # main_test_20260127()
     # main_test_20260204()
+
+    hsvTrackbar(image_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Projects\NingmeiDaba\alarm_images\20260224\alarm_images_2yi\Alarm_No_Bbox_1771762349.5830162.jpg")

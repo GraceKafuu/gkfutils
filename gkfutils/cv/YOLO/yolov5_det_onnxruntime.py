@@ -333,6 +333,9 @@ if __name__=="__main__":
 
     out = yolov5.detect(img, show=True)
 
+    # for i in range(30):
+    #     out = yolov5.detect(img, show=False)
+
     # imgs_path = r"G:\Gosion\data\000.Test_Data\images\detect_test"
     # save_path = r"G:\Gosion\data\000.Test_Data\images\detect_test_results"
     # yolov5.detect_folder(imgs_path, save_path)

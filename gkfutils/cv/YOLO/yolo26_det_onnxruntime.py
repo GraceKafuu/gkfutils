@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 import torch
+import time
 from ultralytics.utils.checks import check_requirements
 
 
@@ -163,7 +164,10 @@ class YOLO26:
         img_data, pad, r = self.preprocess()
  
         # Run inference using the preprocessed image data
+        t1=time.time()
         outputs = self.session.run(None, {model_inputs[0].name: img_data})
+        t2=time.time()
+        print("inference time: ", t2-t1)
  
         # Perform post-processing on the outputs to obtain output image
         return self.postprocess_yolo26(self.img, outputs, pad,r)
@@ -184,15 +188,15 @@ if __name__ == "__main__":
     detection = YOLO26(args.model, args.img, args.conf_thres)
  
     # Perform object detection and obtain the output image
-    import time
-    for _ in range(10):
-        t1=time.time()
-        output_image = detection.main()
-        print((time.time()-t1))
+    output_image = detection.main()
+    
+    # for _ in range(30):
+    #     output_image = detection.main()
+
     # Display the output image in a window
     cv2.namedWindow("Output", cv2.WINDOW_NORMAL)
     cv2.imshow("Output", output_image)
-    cv2.imwrite("output.jpg", output_image)
+    # cv2.imwrite("output.jpg", output_image)
  
     # Wait for a key press to exit
     cv2.waitKey(0)

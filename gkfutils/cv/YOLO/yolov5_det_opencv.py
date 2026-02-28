@@ -112,7 +112,6 @@ class YOLOv5_CV2:
         start = time.perf_counter()
         # inference
         outs = model.forward()
-
         end = time.perf_counter()
 
         print("inference time: ", end - start)
@@ -269,6 +268,9 @@ if __name__=="__main__":
     img = cv2.imread(img_path)
 
     out = yolov5.detect(img, show=True)
+
+    # for i in range(30):
+    #     out = yolov5.detect(img, show=False)
 
     # imgs_path = r"G:\Gosion\data\000.Test_Data\images\detect_test"
     # save_path = r"G:\Gosion\data\000.Test_Data\images\detect_test_results2"

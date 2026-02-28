@@ -62,6 +62,7 @@ from sklearn.model_selection import train_test_split
 from labelme import utils
 import subprocess
 from skimage.metrics import structural_similarity as ssim
+from typing import List, Tuple, Optional
 
 
 # Base utils ===================================================
@@ -14066,6 +14067,185 @@ def hsvTrackbar(image_path):
     cv2.destroyAllWindows()
 
 
+def order_points(points: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    """
+    将点按照逆时针方向排序
+    """
+    if len(points) < 3:
+        return points
+    
+    # 转换为numpy数组
+    pts = np.array(points)
+    
+    # 计算几何中心
+    center = pts.mean(axis=0)
+    
+    # 计算每个点相对于中心的角度
+    angles = np.arctan2(pts[:, 1] - center[1], pts[:, 0] - center[0])
+    
+    # 按照角度排序（逆时针方向）
+    sorted_indices = np.argsort(-angles)  # 负号表示逆时针
+    sorted_points = pts[sorted_indices]
+    
+    return [tuple(p) for p in sorted_points]
+
+
+def create_polygon_mask(
+        points: List[Tuple[float, float]],
+        image_size: Optional[Tuple[int, int]] = None,
+        order_ccw: bool = True
+    ) -> np.ndarray:
+    """
+    从多边形点集创建掩码(mask)
+    
+    参数:
+    - points: 多边形顶点坐标列表 [(x1, y1), (x2, y2), ...]
+    - image_size: 图像大小 (height, width)，如果为None则自动计算
+    - return_image: 是否返回OpenCV图像格式
+    - order_ccw: 是否按逆时针方向排序点
+    
+    返回:
+    - mask: 二值掩码图像，多边形区域为255，背景为0
+    """
+    if len(points) < 3:
+        raise ValueError("多边形至少需要3个点")
+    
+    # 如果需要，按逆时针方向排序点
+    if order_ccw:
+        points = order_points(points)
+    
+    # 将点转换为整数坐标
+    points_array = np.array(points, dtype=np.int32)
+    
+    # 自动计算图像大小
+    if image_size is None:
+        max_x = int(np.max(points_array[:, 0])) + 10  # 加一些边界
+        max_y = int(np.max(points_array[:, 1])) + 10
+        min_x = max(0, int(np.min(points_array[:, 0])) - 10)
+        min_y = max(0, int(np.min(points_array[:, 1])) - 10)
+        
+        width = max_x - min_x
+        height = max_y - min_y
+        
+        # 调整点坐标到新的坐标系
+        points_array[:, 0] -= min_x
+        points_array[:, 1] -= min_y
+        image_size = (height, width)
+    else:
+        height, width = image_size
+    
+    # 创建空白图像
+    mask = np.zeros((height, width), dtype=np.uint8)
+    
+    # 创建多边形填充
+    # 使用cv2.fillPoly填充多边形内部
+    # 注意：OpenCV坐标顺序是(x, y)，数组顺序是(height, width)
+    polygon = [points_array.reshape(-1, 1, 2)]
+    cv2.fillPoly(mask, polygon, color=255)
+    
+    return mask
+
+
+def visPolygon(img, polygon):
+    """
+    可视化划定的区域
+    """
+    for p in polygon:
+        cv2.circle(img, p, 5, (255, 0, 0), -1)
+
+    for pi in range(len(polygon)):
+        if pi == len(polygon) - 1:
+            cv2.line(img, polygon[pi], polygon[0], (255, 0, 0), 2)
+        else:
+            cv2.line(img, polygon[pi], polygon[pi + 1], (255, 0, 0), 2)
+
+    return img
+
+
+
+def is_point_in_polygon(point, polygon):
+    """
+    判断点是否在多边形内
+    :param point: (x, y) 坐标
+    :param polygon: 多边形顶点列表 [(x1, y1), (x2, y2), ...]
+    :return: True如果在多边形内，否则False
+    """
+    x, y = point
+    n = len(polygon)
+    inside = False
+    
+    p1x, p1y = polygon[0]
+    for i in range(n + 1):
+        p2x, p2y = polygon[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    
+    return inside
+
+
+def main_test_20260228():
+    data_path = r"G:\Gosion\projects\009.TuoGun_Det\data\cls\data\000"
+    file_list = os.listdir(data_path)
+
+    save_path = r"G:\Gosion\projects\009.TuoGun_Det\data\cls\data\000_mask_ouput"
+    os.makedirs(save_path, exist_ok=True)
+
+
+    # 四驱1号机下托辊高清:  1280x720
+    # [[83, 114], [326, 325], [637, 523], [981, 720], [1280, 720], [1280, 320]]
+
+    # 四驱2号机下托辊高清:  1280x720
+    # [[76, 141], [640, 720], [1280, 720], [1280, 300]]
+
+    # JE01号机:  1280x720
+    # [[40, 434], [153, 470], [523, 518], [1280, 546], [1280, 360], [504, 416]]
+
+    # JE03号机:  1280x720
+    # [[174, 491], [287, 515], [643, 529], [1280, 485], [1280, 360]]
+
+    # JE04号机:  1920x1080
+    # [[276, 871], [465, 909], [737, 945], [1291, 937], [1920, 830], [1920, 540], [843, 825]]
+
+    # JE06号机:  1920x1080
+    # [[356, 724], [459, 737], [850, 761], [1306, 732], [1920, 660], [1920, 480], [800, 675]]
+
+    # JE07号机:  1920x1080
+    # [[721, 691], [880, 745], [1297, 861], [1920, 941], [1920, 673], [1091, 703]]
+
+    # JE09号机:  1280x720
+    # [[500, 468], [620, 480], [1036, 470], [1280, 454], [1280, 210], [690, 415]]
+    area_points = [
+        [363, 741], [382, 768], [850, 761], [1306, 732], [1920, 660], [1920, 480], [800, 675]
+    ]
+
+    for f in file_list:
+        img_path = os.path.join(data_path, f)
+        img = cv2.imread(img_path)
+        imgsz = img.shape[:2]
+
+        mask = create_polygon_mask(area_points, imgsz, order_ccw=True)
+        masked_img = cv2.bitwise_and(img, img, mask=mask)
+        f_dst_path = os.path.join(save_path, f)
+        cv2.imwrite(f_dst_path, masked_img)
+
+
+
+        
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     pass
     # iou = cal_iou(bbx1=[0, 0, 10, 10], bbx2=[2, 2, 12, 12])
@@ -14192,7 +14372,7 @@ if __name__ == '__main__':
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
     # yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\random_selected", copy_images=True)  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v3\New\005", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\images\XianChang\output_train5", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -14673,4 +14853,5 @@ if __name__ == '__main__':
     # main_test_20260127()
     # main_test_20260204()
 
-    hsvTrackbar(image_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Projects\NingmeiDaba\alarm_images\20260224\alarm_images_2yi\Alarm_No_Bbox_1771762349.5830162.jpg")
+    # hsvTrackbar(image_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Projects\NingmeiDaba\alarm_images\20260224\alarm_images_2yi\Alarm_No_Bbox_1771762349.5830162.jpg")
+    main_test_20260228()

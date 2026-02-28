@@ -1289,6 +1289,36 @@ def main_test_20260114():
                 shutil.copy(f_abs_path, f_new_path)
 
 
+def main_random_select_files_test():
+    data_path = r"G:\Gosion\projects\009.TuoGun_Det\resources\images\XianChang\data_20260216"
+    dir_list = os.listdir(data_path)
+
+    save_path = r"G:\Gosion\projects\009.TuoGun_Det\resources\images\XianChang\data_20260216_random_select"
+    os.makedirs(save_path, exist_ok=True)
+
+    for d in dir_list:
+        d_path = os.path.join(data_path, d)
+
+        dd_list = os.listdir(d_path)
+        for dd in dd_list:
+            dd_path = os.path.join(d_path, dd)
+            file_list = sorted(os.listdir(dd_path))
+
+            select_num = 15
+            if select_num > len(file_list): select_num = len(file_list)
+            rdm_list = random.sample(file_list, select_num)
+
+            for f in rdm_list:
+                fname = os.path.splitext(f)[0]
+                img_path = dd_path + "/{}".format(f)
+                
+                rdm_num = str(np.random.random()).replace(".", "").replace("-", "")
+                f_dst_path = save_path + "/{}_{}.jpg".format(fname, rdm_num)
+                shutil.copy(img_path, f_dst_path)
+
+
+
+
 
 if __name__ == '__main__':
     pass
@@ -1342,9 +1372,14 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    # merge_dirs(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train")
+    # merge_dirs(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\cls\v1\train\0")
 
-    random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\output\no_result", mvcp="copy", select_num=500)
+    random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\cls\v1\train\0", mvcp="move", select_num=496)
+
+    # for i in range(1, 7):
+    #     random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\videos\frames\20251219_merged\{}".format(i), mvcp="copy", select_num=15)
+
+    # main_random_select_files_test()
 
     # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images0", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images", save_path="", with_suffix=False, flag="same", mvcp="cp")
     

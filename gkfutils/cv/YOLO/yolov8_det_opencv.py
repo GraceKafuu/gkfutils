@@ -7,7 +7,7 @@ from typing import Any
 
 import cv2.dnn
 import numpy as np
-
+import time
 from ultralytics.utils import ASSETS, YAML
 from ultralytics.utils.checks import check_yaml
 
@@ -66,7 +66,10 @@ def main(onnx_model: str, input_image: str) -> list[dict[str, Any]]:
     model.setInput(blob)
 
     # Perform inference
+    t1 = time.time()
     outputs = model.forward()
+    t2 = time.time()
+    print("inference time: ", t2 - t1)
 
     # Prepare output array
     outputs = np.array([cv2.transpose(outputs[0])])
@@ -132,3 +135,6 @@ if __name__ == "__main__":
     parser.add_argument("--img", default=r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg", help="Path to input image.")
     args = parser.parse_args()
     main(args.model, args.img)
+
+    # for i in range(30):
+    #     main(args.model, args.img)

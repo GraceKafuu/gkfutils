@@ -410,7 +410,7 @@ def bbox_yolo_to_voc(imgsz, bbx):
     return [x_min, y_min, x_max, y_max]
 
 
-class YOLO11_ORT:
+class YOLO11_KPT:
     """
     YOLO11 model for handling inference and visualization. Also support YOLOv8.
     Currently support detection and pose, other tasks will be added later.
@@ -1063,7 +1063,7 @@ if __name__ == '__main__':
     img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
     # img_path = r"G:\Gosion\projects\000.Test_Data\images\zidane.jpg"
 
-    model = YOLO11_ORT(model_path, 17, 0.60)
+    model = YOLO11_KPT(model_path, 17, 0.60)
 
     # img = cv2.imread(img_path)
     output = model.pose_detect(img_path)

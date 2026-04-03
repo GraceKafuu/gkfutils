@@ -1,0 +1,8 @@
+model:
+  name: yolov8n
+  conf_thres: 0.75
+  iou_thres: 0.45
+
+server:
+  port: 8001
+  debug: true

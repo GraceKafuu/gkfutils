@@ -1317,7 +1317,28 @@ def main_random_select_files_test():
                 shutil.copy(img_path, f_dst_path)
 
 
+def main_random_select_files_test_20260305():
+    data_path = r"G:\Gosion\projects\009.TuoGun_Det\resources\images\XianChang\20260304"
+    dir_list = os.listdir(data_path)
 
+    save_path = r"G:\Gosion\projects\009.TuoGun_Det\resources\images\XianChang\20260304_random_select"
+    os.makedirs(save_path, exist_ok=True)
+
+    for dd in dir_list:
+        dd_path = os.path.join(data_path, dd)
+        file_list = sorted(os.listdir(dd_path))
+
+        select_num = 10
+        if select_num > len(file_list): select_num = len(file_list)
+        rdm_list = random.sample(file_list, select_num)
+
+        for f in rdm_list:
+            fname = os.path.splitext(f)[0]
+            img_path = dd_path + "/{}".format(f)
+            
+            rdm_num = str(np.random.random()).replace(".", "").replace("-", "")
+            f_dst_path = save_path + "/{}_{}.jpg".format(fname, rdm_num)
+            shutil.copy(img_path, f_dst_path)
 
 
 if __name__ == '__main__':
@@ -1329,8 +1350,8 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    # merge_txt_content(path1=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels", path2=r"G:\Gosion\data\000.ShowRoom_Algrithom\Person_Helmet_T-shirt\v2\500\labels_T-shirt")
-    # rename_files(data_path=r"G:\Gosion\projects\000.AlgorithmValDatasets\T-ShirtDetection\P", new_name_prefix="T-ShirtDetection_Val_P", start_num=0)
+    merge_txt_content(path1=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000\labels", path2=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000\labels_new")
+    # rename_files(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\002_yolo_format\labels", new_name_prefix="person_mobilephone_20260402", start_num=0)
     # strAdd = "51"
     # strAdd2 = "20251218"
     # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Zouxian_Data\20251218\data_{}_20251218\data\20251218".format(strAdd), new_name_prefix="Zhouxian_{}_rename_{}".format(strAdd, strAdd2), start_num=0)
@@ -1372,14 +1393,15 @@ if __name__ == '__main__':
     # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
-    # merge_dirs(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\cls\v1\train\0")
+    # merge_dirs(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos_frames")
 
-    random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\cls\v1\train\0", mvcp="move", select_num=496)
+    # random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\videos\BrowserRecording\20260304\Small_frames\1772591549173", mvcp="copy", select_num=10)
 
     # for i in range(1, 7):
     #     random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\videos\frames\20251219_merged\{}".format(i), mvcp="copy", select_num=15)
 
     # main_random_select_files_test()
+    # main_random_select_files_test_20260305()
 
     # process_via_filename(path1=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images0", path2=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\20250811\20250808_frames_labelbee\images", save_path="", with_suffix=False, flag="same", mvcp="cp")
     
@@ -1399,6 +1421,7 @@ if __name__ == '__main__':
     # move_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\train_labelbee_format\jsons", k="aug")
 
     # main_test_20260114()
+    
 
     
 

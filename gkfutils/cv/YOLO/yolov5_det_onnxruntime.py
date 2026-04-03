@@ -19,7 +19,7 @@ def timeit(func):
     return wrapper
 
 
-class YOLOv5(object):
+class YOLOv5:
     def __init__(self, model_path, imgsz=(640, 640), conf=0.60, iou=0.45, device='cpu'):
         self.model_path = model_path
         self.imgsz = imgsz

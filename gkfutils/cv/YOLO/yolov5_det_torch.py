@@ -20,7 +20,7 @@ def timeit(func):
     return wrapper
 
 
-class YOLOv5(object):
+class YOLOv5:
     """
     yolov5-6.2 yolov5-7.0
     onnx-opset 10

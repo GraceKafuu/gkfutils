@@ -2925,6 +2925,47 @@ def tobase64(file_path):
     with open(file_path, "rb") as image_file:
         data = base64.b64encode(image_file.read())
         return data.decode()
+    
+
+def image_to_base64(file_path):
+    with open(file_path, "rb") as image_file:
+        data = base64.b64encode(image_file.read())
+        return data.decode()
+
+
+def base64_to_image(base64_str, output_path):
+    """
+    将Base64字符串解码为图片并保存到指定路径。
+
+    参数：
+        base64_str (str): Base64编码的字符串，可能包含Data URL前缀（如 "data:image/png;base64,iVBOR..."）。
+        output_path (str): 输出图片的文件路径（例如 "output.png"）。
+
+    返回：
+        bool: 成功返回True，失败返回False。
+    """
+    try:
+        # 去除可能存在的Data URL前缀（形如 data:image/xxx;base64,）
+        # 使用正则匹配逗号之前的部分，只保留逗号之后的Base64数据
+        if ',' in base64_str:
+            # 假设格式为 data:[<mediatype>][;base64],<data>
+            base64_str = base64_str.split(',', 1)[1]
+        
+        # 去除字符串中的空白字符（如换行符、空格），确保解码不出错
+        base64_str = re.sub(r'\s+', '', base64_str)
+        
+        # 解码Base64字符串为字节数据
+        image_data = base64.b64decode(base64_str)
+        
+        # 将字节数据写入文件
+        with open(output_path, 'wb') as f:
+            f.write(image_data)
+        
+        print(f"图片已成功保存至：{output_path}")
+        return True
+    except Exception as e:
+        print(f"转换失败：{e}")
+        return False
 
 
 def img_filename_to_ext(img_filename, ext='txt'):
@@ -4020,19 +4061,19 @@ def change_yolo_labels(txt_base_path):
             l = l_.strip().split(" ")
             cls = int(l[0])
 
-            # if cls == 0:
-            #     cls_new = 1
-            #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
+            if cls == 0:
+                cls_new = 1
+                l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
             # elif cls == 1:
             #     cls_new = 1
             #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
 
-            if cls == 80 or cls == 81:
-                cls_new = cls - 80
-                l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
+            # if cls == 80 or cls == 81:
+            #     cls_new = cls - 80
+            #     l_new = str(cls_new) + " " + " ".join([i for i in l[1:]]) + "\n"
 
-                # if cls == 0:
-                #     l_new = str(cls) + " " + " ".join([i for i in l[1:]]) + "\n"
+            #     # if cls == 0:
+            #     #     l_new = str(cls) + " " + " ".join([i for i in l[1:]]) + "\n"
 
                 txt_data_new.write(l_new)
 
@@ -14235,7 +14276,29 @@ def main_test_20260228():
         cv2.imwrite(f_dst_path, masked_img)
 
 
+def checkIfInBlockTimePeriods(p_blockTimePeriods):
+        """ 判断当前时间是否处于某个时间段内 """
+        p_blockTimePeriodsFlag = True
+        if p_blockTimePeriodsFlag:
+            now = time.localtime()
+            now_minutes = now.tm_hour * 60 + now.tm_min
 
+            for start_str, end_str in p_blockTimePeriods:
+                # 解析起始和结束时间
+                start_h, start_m = map(int, start_str.split(':'))
+                end_h, end_m = map(int, end_str.split(':'))
+
+                start_minutes = start_h * 60 + start_m
+                end_minutes = end_h * 60 + end_m
+
+                # 检查当前时间是否在区间内（包含边界）
+                if start_minutes <= now_minutes <= end_minutes:
+                    return True
+
+            return False
+        
+        else:
+            return False
         
 
 
@@ -14371,8 +14434,8 @@ if __name__ == '__main__':
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\009.TuoGun_Det\images\XianChang\random_selected", copy_images=True)  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\images\XianChang\output_train5", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000", copy_images=False)  # yolo_format 路径下是 images 和 labels
+    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos_frames_merged", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -14387,10 +14450,12 @@ if __name__ == '__main__':
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
 
-    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\009.TuoGun_Det\data\det\v3\train_yolo_format".replace("\\", "/"), select_num=12, move_or_copy="move", select_mode=0)
+    # coco_to_yolo(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\v1\data\valid", json_name="_annotations.coco.json", save_path="", copy_images=False, small_bbx_thresh=3, cls_plus=0)
+
+    random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\v1\train".replace("\\", "/"), select_num=30, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\videos\MoNiHuanJing\videos_20260207\videos\MV-A7300CG30_EK28501AAK00006", fps=5, save_path=None)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos", fps=5, save_path=None)
 
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua"
     # dirs = sorted(os.listdir(data_path))
@@ -14854,4 +14919,15 @@ if __name__ == '__main__':
     # main_test_20260204()
 
     # hsvTrackbar(image_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Projects\NingmeiDaba\alarm_images\20260224\alarm_images_2yi\Alarm_No_Bbox_1771762349.5830162.jpg")
-    main_test_20260228()
+    # main_test_20260228()
+
+    
+    # baser64_content = ''
+    # img_outpath = "test_image_out.png"
+    # base64_to_image(baser64_content, img_outpath)
+
+    # p_blockTimePeriods = [["6:00", "7:00"], ["16:40", "16:50"]]
+    # res = checkIfInBlockTimePeriods(p_blockTimePeriods)
+    # print(res)
+
+    # change_yolo_labels(txt_base_path=r"G:\Gosion\code\Python\yolov5-6.2\runs\detect\exp4")

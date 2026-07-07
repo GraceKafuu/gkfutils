@@ -1350,8 +1350,8 @@ if __name__ == '__main__':
     #     print(n)
     #     crack_passward(file_path="D:/GraceKafuu/Music/zcx/zcx.zip", words=words, repeat=n)
 
-    merge_txt_content(path1=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000\labels", path2=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000\labels_new")
-    # rename_files(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\002_yolo_format\labels", new_name_prefix="person_mobilephone_20260402", start_num=0)
+    # merge_txt_content(path1=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000\labels", path2=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000\labels_new")
+    # rename_files(data_path=r"G:\Gosion\projects\010.BeltTornDetectionR3\data\det\v1\simulated_laser_data2\2_lines\defect", new_name_prefix="2_lines_defect_002", start_num=0)
     # strAdd = "51"
     # strAdd2 = "20251218"
     # rename_files(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\Zouxian_Data\20251218\data_{}_20251218\data\20251218".format(strAdd), new_name_prefix="Zhouxian_{}_rename_{}".format(strAdd, strAdd2), start_num=0)
@@ -1390,12 +1390,12 @@ if __name__ == '__main__':
 
     # remove_corrupt_img(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\New_All\Add\Det\v1_add\v2\train\images")
 
-    # move_same_file(data_path=r"G:\Gosion\data\007.PPE_Det\data\v1\all_yolo_format\images")
+    # move_same_file(data_path=r"G:\Gosion\projects\000.AlgorithmDatasets\验证集\仪表识别\数显表\v1")
 
     # # TODO: 增加各文件夹的文件名是否相同, 防止覆盖
     # merge_dirs(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos_frames")
 
-    # random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\videos\BrowserRecording\20260304\Small_frames\1772591549173", mvcp="copy", select_num=10)
+    # random_select_files(data_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Train\cls3\v8\train\2", mvcp="copy", select_num=1000)
 
     # for i in range(1, 7):
     #     random_select_files(data_path=r"G:\Gosion\projects\009.TuoGun_Det\resources\videos\frames\20251219_merged\{}".format(i), mvcp="copy", select_num=15)
@@ -1408,7 +1408,7 @@ if __name__ == '__main__':
 
     # process_db(db_path=r"D:\Gosion\Projects\Algorithm_Deploy_GUI\env_manage\AppData\env_manage.db", m="w")
 
-    # save_file_path_to_txt(data_path=r"G:\Gosion\code\07-3d-line\data\1200w\1200w_frames\Video_2025_04_17_113309_2", abspath=True)
+    # save_file_path_to_txt(data_path=r"G:\Gosion\projects\000.Test_Data\videos\1_frames\3209298-hd_1920_1080_25fps", abspath=False)
     # save_all_files_path_to_txt(data_path=r"D:\Gosion\code\others\Python\arcface-pytorch-master\data\Datasets\lfw\lfw-align-128", abspath=True)
 
     # logger = Logger(filename="Test-Logger", level='info', when='D', interval=1, backCount=30)
@@ -1418,7 +1418,7 @@ if __name__ == '__main__':
     # get_system_platform()
 
     # remove_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v4_yitiji\000\labels", k="masked_cleaned")
-    # move_file_by_filename_keywords(data_path=r"D:\Gosion\data\006.Belt_Torn_Det\data\pose\v4\v3\train_labelbee_format\jsons", k="aug")
+    move_file_by_filename_keywords(data_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Train\laser_detect\v5_20260630\train\images", k="sharpen")
 
     # main_test_20260114()
     

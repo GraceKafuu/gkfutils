@@ -582,8 +582,10 @@ def main2():
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251218\data_5yi_20251218_19\data\20251219"
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215\line_labelbee\images"
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Daba_Data\data_20251215-bk\data\20251213"
-    data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Jingye\data(1)\20251128"
-    save_path = data_path + "_results_20251225-1.1.5"
+    # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\Jingye\data(1)\20251128"
+    # data_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\images"
+    data_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\YanjiuBaogao\images2"
+    save_path = data_path + "_results_20260528-1.1.5"
     os.makedirs(save_path, exist_ok=True)   
 
     # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251209_OK\best.onnx"
@@ -593,7 +595,7 @@ def main2():
     # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251217\best.onnx"
     # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251222\best.onnx"
     # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251213_tmp3\laser_det_resnet18_64_256_v1.1.3.onnx"
-    model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251222\laser_det_resnet18_64_256_v1.1.5.onnx"
+    model_path = r"G:\Gosion\code\Python\Ultra-Fast-Lane-Detection-v2-master\weights\20251222\laser_det_resnet18_64_256_v1.1.5.onnx"
     # model_path = r"G:\Gosion\code\Ultra-Fast-Lane-Detection-v2-master\weights\20251214\best.onnx"
     laserDetect = LaserDetect(model_path)
 
@@ -696,6 +698,10 @@ def main2():
         f_dst_path = save_path + "/{}.jpg".format(fname)
         cv2.imwrite(f_dst_path, plot_out)
         # cv2.imwrite(f_dst_path, plot_out2)
+
+        plot_out2 = fit_plot(img, fit_model, r=4)
+        f_dst_path = save_path + "/{}2.jpg".format(fname)
+        cv2.imwrite(f_dst_path, plot_out2)
 
 
 

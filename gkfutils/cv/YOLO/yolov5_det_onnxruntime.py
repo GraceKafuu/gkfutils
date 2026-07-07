@@ -306,7 +306,7 @@ class YOLOv5:
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-        return out
+        return out, results
     
     def detect_folder(self, imgs_path, out_path):
         file_list = sorted(os.listdir(imgs_path))
@@ -325,13 +325,16 @@ class YOLOv5:
 
  
 if __name__=="__main__":
-    model_path = r"G:\Gosion\code\Python\yolov5-master\yolov5s.onnx"
-    img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
+    # model_path = r"G:\Gosion\code\Python\yolov5-master\yolov5s.onnx"
+    # img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
+    model_path = r"G:\Gosion\resources\algorithm_v2\helmet\best.onnx"
+    img_path = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\helmet_test.jpg"
     
     yolov5 = YOLOv5(model_path, conf=0.60)
     img = cv2.imread(img_path)
 
-    out = yolov5.detect(img, show=True)
+    out, results = yolov5.detect(img, show=True)
+    print(results)
 
     # for i in range(30):
     #     out = yolov5.detect(img, show=False)

@@ -297,12 +297,14 @@ def calculate_speed(track_history, track_id, dt, pixel_per_meter):
 
     return round(speed_kmh, 1)
 
-
+    
 def detect_forklift_speed():
     # 初始化你自己的 YOLO11
     # ====================== 配置 ======================
-    MODEL_PATH = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\Forklift_Det_2\weights\best.onnx"          # 你的ONNX模型
-    VIDEO_PATH = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos\17751080339262039575089774800897.mp4"   # 输入视频
+    # MODEL_PATH = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\forklift_v2\weights\best.onnx"          # 你的ONNX模型
+    # VIDEO_PATH = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos\17751080339262039575089774800897.mp4"   # 输入视频
+    # VIDEO_PATH = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\1号测点视频\17761605493372043990498942857218.mp4"   # 输入视频
+    VIDEO_PATH = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos\17751080350572039574937311850498.mp4"   # 输入视频
     # VIDEO_PATH = r"G:\Gosion\projects\006.Belt_Torn_Det\data\resources\videos\Video_2025_08_27_171729_1_2.avi"   # 输入视频
     CLASS_NAMES = ["forklift", "person"] # 0:叉车 1:人
     # PIXEL_PER_METER = 65                # 像素对应实际1米（根据场景调整）
@@ -310,7 +312,8 @@ def detect_forklift_speed():
     IOU_THRESH = 0.5
     # ==================================================
 
-    model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\Forklift_Det_2\weights\best.onnx"
+    # model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\Forklift_Det_2\weights\best.onnx"
+    model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\forklift_v2\weights\best.onnx"
     yolo11 = YOLO11(model_path, 0.60, 0.45)
 
     # 打开视频
@@ -356,7 +359,7 @@ def detect_forklift_speed():
                     track_history[0].pop(0)
 
                 # 计算速度
-                PIXEL_PER_METER = w / 2.2
+                PIXEL_PER_METER = w / 1.5
                 current_speed = calculate_speed(track_history, 0, frame_interval, PIXEL_PER_METER)
 
         # ====================== 绘制 ======================

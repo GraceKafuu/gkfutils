@@ -2409,8 +2409,8 @@ def voc_to_yolo(data_path, save_path="", classes={}, copy_images=True, small_bbx
                         print("{} is not in {}!".format(cls, classes))
                         continue
                     if int(difficult) == 1:
-                        print("int(difficult) == 1!")
-                        continue
+                        print("{}.xml: int(difficult) == 1!".format(file_name))
+                        # continue
 
                 cls_id = list(classes.values()).index(cls)
                 xmlbox = obj.find('bndbox')
@@ -2933,7 +2933,7 @@ def image_to_base64(file_path):
         return data.decode()
 
 
-def base64_to_image(base64_str, output_path):
+def base64_to_image(base64_str):
     """
     将Base64字符串解码为图片并保存到指定路径。
 
@@ -2957,11 +2957,26 @@ def base64_to_image(base64_str, output_path):
         # 解码Base64字符串为字节数据
         image_data = base64.b64decode(base64_str)
         
-        # 将字节数据写入文件
-        with open(output_path, 'wb') as f:
-            f.write(image_data)
+        # # 将字节数据写入文件
+        # with open(output_path, 'wb') as f:
+        #     f.write(image_data)
+        # print(f"图片已成功保存至：{output_path}")
+
+        # =========================
+        # ✅ 关键：image_data 转 cv2 图片
+        # =========================
+        np_arr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        if img is None:
+            print("图片解码失败")
+            return False
+
+        # 4. 直接显示
+        cv2.imshow("Base64 Image", img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         
-        print(f"图片已成功保存至：{output_path}")
         return True
     except Exception as e:
         print(f"转换失败：{e}")
@@ -9604,13 +9619,20 @@ def change_txt_content(txt_path):
             #     l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
             #     fw.write(l_new)
 
+            # for line in txt_content:
+            #     l = line.strip().split(" ")
+            #     cls = int(l[0])
+            #     if cls == 1:
+            #         cls_new = 0
+            #     else:
+            #         cls_new = 1
+            #     l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
+            #     fw.write(l_new)
+
             for line in txt_content:
                 l = line.strip().split(" ")
                 cls = int(l[0])
-                if cls == 1:
-                    cls_new = 0
-                else:
-                    cls_new = 1
+                cls_new = cls - 1
                 l_new= str(cls_new) + " " + " ".join([str(a) for a in l[1:]]) + '\n'
                 fw.write(l_new)
 
@@ -14301,11 +14323,2289 @@ def checkIfInBlockTimePeriods(p_blockTimePeriods):
             return False
         
 
+def move_images(src_folder, dst_folder="", m=0):
+    """
+    将 高度 > 宽度 的图片移动到目标文件夹
+    :param src_folder: 原始图片文件夹
+    :param dest_folder: 移动后的文件夹
+    """
+    # 如果目标文件夹不存在，创建
+    if dst_folder == "" or dst_folder is None:
+        dst_folder = src_folder + "_selected"
+    os.makedirs(dst_folder, exist_ok=True)
+
+    # 支持的图片格式
+    img_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp')
+
+    # 遍历所有文件
+    for filename in os.listdir(src_folder):
+        # 只处理图片
+        if filename.lower().endswith(img_exts):
+            img_path = os.path.join(src_folder, filename)
+
+            try:
+                # 打开图片获取尺寸
+                with Image.open(img_path) as img:
+                    width, height = img.size  # (宽, 高)
+
+                # 判断：高 > 宽 → 移动
+                if m == 0:
+                    if height > width:
+                        dest_path = os.path.join(dst_folder, filename)
+                        shutil.move(img_path, dest_path)
+                        print(f"已移动: {filename}")
+                elif m == 1:
+                    if width > height:
+                        dest_path = os.path.join(dst_folder, filename)
+                        shutil.move(img_path, dest_path)
+                        print(f"已移动: {filename}")
+                elif m == 2:
+                    if width == 1080 and height == 1920:
+                    # if width == 576 and height == 704:
+                        dest_path = os.path.join(dst_folder, filename)
+                        shutil.move(img_path, dest_path)
+                        print(f"已移动: {filename}")
+
+            except Exception as e:
+                print(f"出错跳过: {filename} | 错误: {e}")
+
+    print("=== 全部完成 ===")
 
 
 
+def laserDetectByThreshStatistics(img: np.ndarray) -> list:
+    dstPts = []
+    rows, cols = img.shape[:2]
+
+    # 只处理 y: 4 ~ rows-4
+    y_valid = np.arange(4, rows - 4, dtype=np.int32)
+    x_valid = np.arange(cols, dtype=np.int32)
+
+    # 取出 4 行切片（向量化！）
+    row_m2 = img[y_valid - 2][:, x_valid]
+    row_m1 = img[y_valid - 1][:, x_valid]
+    row_0  = img[y_valid][:, x_valid]
+    row_p1 = img[y_valid + 1][:, x_valid]
+
+    # 
+    cond1 = (row_m2 == 255) & (row_m1 == 255) & (row_0 == 0) & (row_p1 == 0)
+    cond2 = (row_m2 == 0) & (row_m1 == 0) & (row_0 == 255) & (row_p1 == 255)
+    mask = cond1 | cond2
+
+    # 广播 y 坐标
+    y_grid = np.broadcast_to(y_valid[:, None], mask.shape)
+
+    # 按列求和 & 计数
+    sumY = np.sum(np.where(mask, y_grid, 0), axis=0)
+    count = np.sum(mask, axis=0)
+
+    # keep = count >= 4
+    keep = count >= 2
+    x_keep = x_valid[keep]
+    y_keep = sumY[keep] // count[keep]
+
+    # 输出点
+    dstPts.extend([(x, y) for x, y in zip(x_keep, y_keep)])
+    return dstPts
 
 
+def main_test_20260526():
+    # img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\resources\videos\zhonganjitai\20251105_frames\Video_2025_11_05_151131_1\Video_2025_11_05_151131_1_output_000000001.jpg"
+    # img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\resources\videos\zhonganjitai\20251105_frames\Video_2025_11_05_151131_1\Video_2025_11_05_151131_1_output_000000125.jpg"
+    # img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\data\Train\laser_seg\ZhongAnJiTai\all\images\Pic_2025_09_29_132036_1.jpg"
+    img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\Video_2025_03_01_165140_1_output_000009359.jpg"
+    img = cv2.imread(img_path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    # thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)[1]
+
+    dstPts = laserDetectByThreshStatistics(thresh)
+    for i in range(len(dstPts)):
+        cv2.circle(img, dstPts[i], 2, (0, 0, 255), -1)
+    cv2.imshow("img", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    print(dstPts)
+
+
+def main_test_20260617():
+    a1 = [23, 23, 24, 25, 24, 25, 24, 26, 23, 22, 23, 23, 25, 25]
+    a2 = [23, 23, 24, 25, 24, 25, 24, 26, 25, 27, 29, 30, 32, 32]
+
+    d1 = np.mean(np.diff(a1))
+    d2 = np.mean(np.diff(a2))
+    print(d1)
+    print(d2)
+
+
+def get_normalized_curve_points(label_img_path, num_cols=256, vis=False):
+    """
+    从分割标签图中提取横向曲线的归一化坐标点
+    
+    参数：
+        label_img_path: 分割标签图路径（单通道/三通道都支持，曲线为非零像素）
+        num_cols: 均分列数，默认256
+    
+    返回：
+        points: np.ndarray，形状为 (256, 2)，每一行是 [x归一化, y归一化]
+    """
+    # 1. 读取图像（自动转为灰度图，只保留亮度通道）
+    img = cv2.imread(label_img_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        raise ValueError(f"无法读取图像：{label_img_path}")
+    
+    height, width = img.shape
+    points = []
+    
+    # 2. 遍历每一列
+    for col_idx in range(num_cols):
+        # 计算当前列在原图上的左右像素范围
+        start_x = int(col_idx * width / num_cols)
+        end_x = int((col_idx + 1) * width / num_cols)
+        # 当前列的中点（归一化到 0~1）
+        col_mid_x = (col_idx + 0.5) / num_cols
+        
+        # 截取当前列区域
+        col_region = img[:, start_x:end_x]
+        
+        # 3. 提取非零像素（曲线上的点）的 Y 坐标
+        y_indices = np.nonzero(col_region)[0]  # 取行坐标（Y）
+        
+        if len(y_indices) == 0:
+            # 该列无曲线点，用 NaN 标记
+            # avg_y = np.nan
+            avg_y = -1
+        else:
+            # 求 Y 均值并归一化（除以图像高度）
+            avg_y = np.mean(y_indices) / height
+        
+        points.append([col_mid_x, avg_y])
+
+    if vis:
+        # 可视化
+        img_vis = cv2.merge([img, img, img])
+        for point in points:
+            cv2.circle(img_vis, (int(point[0] * width), int(point[1] * height)), 2, (0, 0, 255), -1)
+        cv2.imshow("img_vis", img_vis)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    return np.array(points)
+
+
+def main_test_20260622():
+    # 替换成你的标签图路径
+    LABEL_IMAGE_PATH = r"G:\Gosion\projects\006.Belt_Torn_Det\data\Train\laser_seg\20260622\20250915142244_19_28.png"
+    
+    # 获取 256 个归一化点
+    curve_points = get_normalized_curve_points(LABEL_IMAGE_PATH, num_cols=256, vis=True)
+    
+    # 输出结果
+    print("生成的 256 个归一化点（x, y）：")
+    print(curve_points)
+
+
+def discrete_curve_curvature(points, smoothing=True, sigma=2):
+    """
+    计算离散有序点集的曲率
+    参数：
+        points: np.array, 形状 (N,2)，有序曲线点 [x,y]
+        smoothing: 是否对坐标做高斯平滑（减少噪声影响）
+        sigma: 平滑窗口大小
+    返回：
+        curvature: 长度为 N 的曲率数组，首尾点曲率 = 相邻点（补全长度）
+    """
+    points = np.asarray(points, dtype=np.float64)
+    x = points[:, 0]
+    y = points[:, 1]
+    
+    # 可选：高斯平滑（强烈推荐，离散点噪声会严重影响曲率）
+    if smoothing:
+        x = gaussian_smooth(x, sigma=sigma)
+        y = gaussian_smooth(y, sigma=sigma)
+
+    n = len(x)
+    curvature = np.zeros(n)
+
+    # 三点法计算中间点曲率
+    for i in range(1, n-1):
+        x0, y0 = x[i-1], y[i-1]
+        x1, y1 = x[i], y[i]
+        x2, y2 = x[i+1], y[i+1]
+
+        # 1. 计算三角形面积（带符号，决定曲率方向）
+        area = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0)
+        
+        # 2. 计算三边长度
+        l1 = np.hypot(x1 - x0, y1 - y0)
+        l2 = np.hypot(x2 - x1, y2 - y1)
+        l3 = np.hypot(x2 - x0, y2 - y0)
+
+        # 3. 曲率公式
+        k = (2 * area) / (l1 * l2 * l3)
+        curvature[i] = k
+
+    # 首尾点曲率赋值为相邻点（保持长度一致）
+    curvature[0] = curvature[1]
+    curvature[-1] = curvature[-2]
+
+    return curvature
+
+def gaussian_smooth(data, sigma=2):
+    """高斯平滑：去除离散点噪声"""
+    r = int(2 * sigma)
+    x = np.arange(-r, r+1)
+    gaussian = np.exp(-(x**2) / (2 * sigma**2))
+    gaussian /= np.sum(gaussian)
+    return np.convolve(data, gaussian, mode='same')
+
+# ------------------- 测试示例 -------------------
+def curvature_test_20260622():
+    # 1. 生成测试曲线点（你可以替换成自己的 256 个点）
+    t = np.linspace(0, 2*np.pi, 256)
+    x = t
+    y = np.sin(t) + 0.05 * np.random.randn(256)  # 带噪声正弦曲线
+    test_points = np.column_stack([x, y])
+
+    # 2. 计算曲率
+    curv = discrete_curve_curvature(test_points, smoothing=True)
+
+    # 3. 绘图对比
+    plt.figure(figsize=(12,5))
+    
+    plt.subplot(1,2,1)
+    plt.plot(test_points[:,0], test_points[:,1], 'b-', lw=2)
+    plt.title("原始曲线")
+    plt.axis('equal')
+    
+    plt.subplot(1,2,2)
+    plt.plot(test_points[:,0], curv, 'r-', lw=2)
+    plt.axhline(0, color='k', linestyle='--')
+    plt.title("曲率（正=凸，负=凹）")
+    
+    plt.tight_layout()
+    plt.show()
+
+    print("曲率形状:", curv.shape)  # (256,)
+
+
+def detect_laser_discontinuity(image_path, thresh_val=127, y_jump_thresh=15, min_crack_width=2):
+    """
+    通过双平行激光线检测表面裂缝/断裂
+    
+    参数:
+        image_path: 输入图像路径
+        thresh_val: 提取激光线的二值化阈值（根据激光亮度调整）
+        y_jump_thresh: 相邻列Y坐标跳变阈值（像素单位），超过此值视为错位断裂
+        min_crack_width: 触发报警的最小连续异常列数（防止噪点误报）
+    """
+    # 1. 图像预处理
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError("无法读取图像")
+    
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # 高斯滤波滤除高频噪点
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    # 二值化提取极亮的激光区域
+    _, thresh = cv2.threshold(blurred, thresh_val, 255, cv2.THRESH_BINARY)
+    
+    height, width = thresh.shape
+    
+    # 记录每一列提取到的双激光线 Y 坐标
+    # line1_y 记录上方激光线，line2_y 记录下方激光线。无法提取时留空(None)
+    line1_y = [None] * width
+    line2_y = [None] * width
+    
+    # 2. 逐列提取激光中心点
+    for col in range(width):
+        col_data = thresh[:, col]
+        # 寻找当前列非零像素的连通段（提取激光线纵向变宽的中心）
+        contours, _ = cv2.findContours(col_data, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        centers = []
+        for c in contours:
+            # 计算每个激光片段的 Y 轴中心
+            y_center = np.mean(c[:, :, 1])
+            centers.append(y_center)
+            
+        # 排序，确保 centers[0] 是上方激光，centers[1] 是下方激光
+        centers = sorted(centers)
+        
+        if len(centers) >= 2:
+            # 正常提取到至少两条线（如果大于2条，取最外侧或主要的2条，这里取前两条）
+            line1_y[col] = centers[0]
+            line2_y[col] = centers[1]
+        elif len(centers) == 1:
+            # 只有一条线，通过距离判断它更接近哪一条，或者暂时归为 line1
+            line1_y[col] = centers[0]
+            
+    # 3. 裂缝与断裂逻辑判定
+    crack_columns = [] # 记录判定为异常的列索引
+    
+    for col in range(1, width):
+        # 情况 A: 数量型断裂（某条线直接丢点断开了）
+        if (line1_y[col] is None and line1_y[col-1] is not None) or \
+           (line2_y[col] is None and line2_y[col-1] is not None):
+            crack_columns.append(col)
+            continue
+            
+        # 情况 B: 位置型断裂（Y坐标发生突变错位）
+        if line1_y[col] is not None and line1_y[col-1] is not None:
+            if abs(line1_y[col] - line1_y[col-1]) > y_jump_thresh:
+                crack_columns.append(col)
+                continue
+                
+        if line2_y[col] is not None and line2_y[col-1] is not None:
+            if abs(line2_y[col] - line2_y[col-1]) > y_jump_thresh:
+                crack_columns.append(col)
+                continue
+
+    # 4. 异常过滤与联动报警（去除孤立噪点引起的误报）
+    has_crack = False
+    crack_zones = [] # 存储裂缝的左右边界 [(start_x, end_x), ...]
+    
+    if len(crack_columns) > 0:
+        # 将离散的异常列聚类成连续的“裂缝区域”
+        img_vis = img.copy()
+        consecutive_run = []
+        
+        for i in range(len(crack_columns)):
+            if i == 0 or crack_columns[i] == crack_columns[i-1] + 1:
+                consecutive_run.append(crack_columns[i])
+            else:
+                if len(consecutive_run) >= min_crack_width:
+                    crack_zones.append((consecutive_run[0], consecutive_run[-1]))
+                consecutive_run = [crack_columns[i]]
+        if len(consecutive_run) >= min_crack_width:
+            crack_zones.append((consecutive_run[0], consecutive_run[-1]))
+            
+        if len(crack_zones) > 0:
+            has_crack = True
+
+    # 5. 可视化输出
+    img_vis = img.copy()
+    
+    # 画出检测到的激光线中心点（绿色）
+    for col in range(width):
+        if line1_y[col] is not None:
+            cv2.circle(img_vis, (col, int(line1_y[col])), 1, (0, 255, 0), -1)
+        if line2_y[col] is not None:
+            cv2.circle(img_vis, (col, int(line2_y[col])), 1, (0, 255, 0), -1)
+            
+    # 如果有裂缝，用红色矩形框标记出断裂的 X 轴范围
+    if has_crack:
+        print(f"【⚠️ 警告】检测到表面裂缝或激光线断裂！共 {len(crack_zones)} 处。")
+        for start_x, end_x in crack_zones:
+            # 绘制覆盖整列的红色警示框
+            cv2.rectangle(img_vis, (start_x - 5, 0), (end_x + 5, height), (0, 0, 255), 2)
+            cv2.putText(img_vis, "CRACK", (start_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+    else:
+        print("【✅ 正常】表面光滑，激光线连续。")
+        cv2.putText(img_vis, "SMOOTH", (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    # 结果展示
+    cv2.imshow("Detection Result", img_vis)
+    cv2.imshow("Laser Mask", thresh)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    return has_crack, crack_zones
+
+
+def generate_laser_images(num_images, save_dir="./simulated_laser_data"):
+    """
+    动态模拟生成平行双激光线图像（包含正常和带裂口的图像）
+    
+    参数:
+        num_images: 拟生成的图像总张数
+        save_dir: 图像保存路径
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    # 固定画布尺寸（宽、高）
+    width, height = 1200, 300
+    
+    print(f"开始生成图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 创建带微弱噪声的暗背景
+        img = np.random.randint(5, 15, (height, width), dtype=np.uint8)
+        
+        # 2. 随机初始化每张图的基础结构光参数（让每张图的曲线弧度都不同）
+        laser_gap = random.randint(25, 35)         # 两条激光线的间距
+        center_y = random.randint(130, 170)        # 激光线的垂直中心位置
+        amplitude = random.uniform(15, 30)         # 曲线整体弯曲的幅度
+        wave_length = random.uniform(1.0, 1.8)     # 弯曲周期
+        phase = random.uniform(0, np.pi)           # 初相位
+        
+        # 生成基础平滑曲线的 Y 坐标数组
+        x_indices = np.arange(width)
+        y1_profile = center_y + amplitude * np.sin(2 * np.pi * wave_length * x_indices / width + phase) - laser_gap // 2
+        y2_profile = y1_profile + laser_gap
+        
+        # 3. 随机决定这张图是否包含裂口（50% 概率包含）
+        has_crack = random.choice([True, False])
+        crack_info = [] # 记录裂口的物理范围，方便后续画裂口感官
+        
+        if has_crack:
+            # 随机生成 1 到 5 个裂口
+            num_cracks = random.randint(1, 5)
+            
+            for _ in range(num_cracks):
+                crack_width = random.randint(12, 28)    # 裂口宽度
+                crack_start = random.randint(50, width - 100) # 裂口X起始坐标
+                crack_end = crack_start + crack_width
+                # 深度带来的Y轴错位（可正可负，模拟凹槽或凸起）
+                y_offset = random.choice([1, -1]) * random.randint(15, 35) 
+                
+                # 在当前裂口X范围内，强制改变激光线的Y轴轨迹
+                y1_profile[crack_start:crack_end] += y_offset
+                y2_profile[crack_start:crack_end] += y_offset
+                
+                crack_info.append((crack_start, crack_end, y_offset))
+                
+        # 4. 渲染裂口背景的微弱纵向散射光（模拟图2中槽内的反光）
+        for (start, end, offset) in crack_info:
+            # 裂口纵向延伸的范围
+            y_min = int(min(np.min(y1_profile[start:end]), np.min(y1_profile[start-1:start]))) - 20
+            y_max = int(max(np.max(y2_profile[start:end]), np.max(y2_profile[start-1:start]))) + 20
+            y_min = max(0, y_min)
+            y_max = min(height, y_max)
+            
+            # 填充一个稍微亮一点的垂直弱光矩形
+            cv2.rectangle(img, (start, y_min), (end, y_max), random.randint(25, 45), -1)
+            
+        # 5. 逐列绘制高斯能量分布的激光线（核心：完美处理断裂处的垂直切面）
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        
+        for x in range(width):
+            y1 = y1_profile[x]
+            y2 = y2_profile[x]
+            
+            # 对激光线中心点上下 3 个像素进行高斯亮度的能量扩散
+            for dy in range(-3, 4):
+                ny1, ny2 = int(y1) + dy, int(y2) + dy
+                weight = np.exp(-(dy**2) / 1.5) # 高斯分布权重
+                
+                if 0 <= ny1 < height:
+                    laser_canvas[ny1, x] += 200 * weight
+                if 0 <= ny2 < height:
+                    laser_canvas[ny2, x] += 200 * weight
+                    
+        # 将激光能量叠加到带有裂口的背景图上
+        img = cv2.addWeighted(img, 1.0, np.clip(laser_canvas, 0, 255).astype(np.uint8), 1.0, 0)
+        
+        # 6. 后处理：加入相机噪点与全局高斯模糊，使其更接近真实镜头质感
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        noise = np.random.normal(0, 2, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+        
+        # 7. 保存文件
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"sim_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 成功生成并保存了 {num_images} 张图像至 {save_dir} 文件夹中！")
+
+
+def generate_laser_images_v2(num_images, save_dir="./simulated_laser_data_v2"):
+    """
+    动态模拟生成平行双激光线图像（基准曲线为近似抛物线的二次/四次曲线）
+    
+    参数:
+        num_images: 拟生成的图像总张数
+        save_dir: 图像保存路径
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    print(f"开始生成符合二次/四次抛物线形态的图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 创建带微弱噪声的暗背景
+        img = np.random.randint(5, 15, (height, width), dtype=np.uint8)
+        
+        # 2. 随机初始化结构光基础几何参数
+        laser_gap = random.randint(25, 35)         # 两条激光线的间距
+        center_y = random.randint(140, 180)        # 曲线顶点的纵坐标基准
+        amplitude = random.uniform(25, 45)         # 抛物线弯曲的最大幅度
+        
+        # 为了让每张图略有不同，随机让抛物线的对称轴在图像中心附近轻微偏移
+        peak_x = random.randint(width // 2 - 100, width // 2 + 100)
+        
+        # 3. 构建多项式曲线（将 X 轴归一化到 -1 到 1 之间进行计算）
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        # 随机决定使用 2次 还是 4次 曲线
+        curve_type = random.choice(['quadratic', 'quartic'])
+        # 原图呈现开口向下的拱形（direction=-1），少部分允许开口向上（direction=1）
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            # 标准二次抛物线公式：y = 顶点Y + 方向 * 幅度 * x^2
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            # 近似抛物线的四次曲线公式：y = 顶点Y + 方向 * (a*x^4 + b*x^2)
+            # 通过分配权重，让其整体形态依然逼近抛物线，但两端下坠或上升得更陡峭/平缓
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        # 4. 随机决定是否包含裂口（50% 概率）
+        has_crack = random.choice([True, False])
+        crack_info = []
+        
+        if has_crack:
+            num_cracks = random.randint(1, 5) # 1到5个裂口
+            for _ in range(num_cracks):
+                crack_width = random.randint(12, 28)
+                crack_start = random.randint(100, width - 150)
+                crack_end = crack_start + crack_width
+                # 裂口带来的阶跃错位
+                y_offset = random.choice([1, -1]) * random.randint(15, 35)
+                
+                y1_profile[crack_start:crack_end] += y_offset
+                y2_profile[crack_start:crack_end] += y_offset
+                
+                crack_info.append((crack_start, crack_end, y_offset))
+                
+        # 5. 渲染裂口内部的弱光带
+        for (start, end, offset) in crack_info:
+            y_min = int(min(np.min(y1_profile[start:end]), np.min(y1_profile[start-1:start]))) - 20
+            y_max = int(max(np.max(y2_profile[start:end]), np.max(y2_profile[start-1:start]))) + 20
+            y_min = max(0, y_min)
+            y_max = min(height, y_max)
+            cv2.rectangle(img, (start, y_min), (end, y_max), random.randint(25, 45), -1)
+            
+        # 6. 逐列绘制具备高斯能量分布的激光线
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        for x in range(width):
+            y1, y2 = y1_profile[x], y2_profile[x]
+            for dy in range(-3, 4):
+                ny1, ny2 = int(y1) + dy, int(y2) + dy
+                weight = np.exp(-(dy**2) / 1.5)
+                if 0 <= ny1 < height:
+                    laser_canvas[ny1, x] += 200 * weight
+                if 0 <= ny2 < height:
+                    laser_canvas[ny2, x] += 200 * weight
+                    
+        img = cv2.addWeighted(img, 1.0, np.clip(laser_canvas, 0, 255).astype(np.uint8), 1.0, 0)
+        
+        # 7. 全局高斯模糊与噪点注入，完美还原图1、图2的真实镜头质感
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        noise = np.random.normal(0, 2, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+        
+        # 8. 保存图像
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"poly_{idx:03d}_{curve_type}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 成功生成 {num_images} 张抛物线结构光图片，已保存在: {save_dir}")
+
+
+def generate_laser_images_v3(num_images, save_dir="./simulated_laser_data_v3"):
+    """
+    动态模拟生成平行双激光线图像（V3 高级物理拟真版）
+    引入特征：端点光学偏折、深槽视线遮挡（纯断裂无连线）
+    
+    参数:
+        num_images: 拟生成的图像总张数
+        save_dir: 图像保存路径
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    print(f"开始生成 V3 高级拟真图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 创建带微弱噪点的暗背景
+        img = np.random.randint(5, 15, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化结构光基础几何参数（二次/四次抛物线）
+        laser_gap = random.randint(25, 35)         
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 100, width // 2 + 100)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        # 创建激光线可见性掩膜（用于模拟某些裂口内激光被遮挡无法成像）
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 随机决定是否包含裂口（50% 概率）
+        has_crack = random.choice([True, False])
+        crack_info = []
+        
+        if has_crack:
+            num_cracks = random.randint(1, 4) 
+            for _ in range(num_cracks):
+                crack_width = random.randint(14, 32)
+                crack_start = random.randint(120, width - 150)
+                crack_end = crack_start + crack_width
+                
+                # 随机决定裂口类型：
+                # 'offset': 浅槽，能看到底部的偏移线
+                # 'gap': 深槽，因光线遮挡，内部看不到任何激光线（纯断裂）
+                crack_type = random.choice(['offset', 'gap'])
+                
+                # 边缘偏折/翘曲的长度（像素级）
+                t_len = random.randint(4, 9) 
+                
+                if crack_type == 'offset':
+                    y_offset = random.choice([1, -1]) * random.randint(20, 40)
+                    
+                    # A. 模拟【有偏移线】处的端点过渡与微小光学偏折(Overshoot)
+                    # 左端点过渡区
+                    for i in range(t_len * 2):
+                        x_pos = crack_start - t_len + i
+                        if 0 <= x_pos < width:
+                            w = i / (t_len * 2) # 渐变权重
+                            # 边缘衍射引起的微小过冲弯折
+                            edge_flare = 4 * w * (1 - w) * (direction * random.randint(3, 6))
+                            y1_profile[x_pos] += y_offset * w + edge_flare
+                            y2_profile[x_pos] += y_offset * w + edge_flare
+                            
+                    # 槽底内部完全偏移
+                    y1_profile[crack_start + t_len : crack_end - t_len] += y_offset
+                    y2_profile[crack_start + t_len : crack_end - t_len] += y_offset
+                    
+                    # 右端点回归区
+                    for i in range(t_len * 2):
+                        x_pos = crack_end - t_len + i
+                        if 0 <= x_pos < width:
+                            w = i / (t_len * 2)
+                            edge_flare = 4 * w * (1 - w) * (direction * random.randint(3, 6))
+                            y1_profile[x_pos] += y_offset * (1 - w) + edge_flare
+                            y2_profile[x_pos] += y_offset * (1 - w) + edge_flare
+                            
+                else:
+                    # B. 模拟【看不到偏移线】的深槽（纯断裂），但端点产生向槽内或向外的“勾笔画”偏折
+                    bend_amt = random.choice([1, -1]) * random.randint(8, 16)
+                    
+                    # 左边缘产生突变偏折
+                    for i in range(t_len):
+                        x_pos = crack_start - t_len + i
+                        if 0 <= x_pos < width:
+                            w = i / t_len
+                            y1_profile[x_pos] += bend_amt * (w ** 2)
+                            y2_profile[x_pos] += bend_amt * (w ** 2)
+                            
+                    # 右边缘产生突变偏折
+                    for i in range(t_len):
+                        x_pos = crack_end + i
+                        if 0 <= x_pos < width:
+                            w = 1.0 - (i / t_len)
+                            y1_profile[x_pos] += bend_amt * (w ** 2)
+                            y2_profile[x_pos] += bend_amt * (w ** 2)
+                    
+                    # 核心：将该裂口内部的激光可见性设为 False（光线被遮挡）
+                    laser_visible[crack_start:crack_end] = False
+                
+                crack_info.append((crack_start, crack_end, crack_type))
+                
+        # 4. 渲染裂口内部的反光带（深槽的弱光带更暗，更贴近图2质感）
+        for (start, end, c_type) in crack_info:
+            y_min = int(min(np.min(y1_profile[start:end]), np.min(y1_profile[start-1:start]))) - 25
+            y_max = int(max(np.max(y2_profile[start:end]), np.max(y2_profile[start-1:start]))) + 25
+            y_min = max(0, y_min)
+            y_max = min(height, y_max)
+            
+            # 如果是看不见线的深槽(gap)，内部反射灰度非常低；浅槽(offset)稍微亮一点
+            bg_brightness = random.randint(18, 28) if c_type == 'gap' else random.randint(28, 45)
+            cv2.rectangle(img, (start, y_min), (end, y_max), bg_brightness, -1)
+            
+        # 5. 逐列绘制具备高斯能量分布的激光线（引入可见性掩膜控制）
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        for x in range(width):
+            # 如果该列处于深槽遮挡区，直接跳过不绘制激光线
+            if not laser_visible[x]:
+                continue
+                
+            y1, y2 = y1_profile[x], y2_profile[x]
+            for dy in range(-3, 4):
+                ny1, ny2 = int(y1) + dy, int(y2) + dy
+                weight = np.exp(-(dy**2) / 1.5)
+                if 0 <= ny1 < height:
+                    laser_canvas[ny1, x] += 200 * weight
+                if 0 <= ny2 < height:
+                    laser_canvas[ny2, x] += 200 * weight
+                    
+        img = cv2.addWeighted(img, 1.0, np.clip(laser_canvas, 0, 255).astype(np.uint8), 1.0, 0)
+        
+        # 6. 后处理：高斯模糊与微弱散粒噪声
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        noise = np.random.normal(0, 1.5, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+        
+        # 7. 保存图像
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"laser_v3_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V3 数据集生成完毕！完美的偏折与断裂效果已保存至: {save_dir}")
+
+
+def generate_laser_images_v4(num_images, save_dir="./simulated_laser_data_v4"):
+    """
+    动态模拟生成平行双激光线图像（V4 终极拟真版：以假乱真）
+    升级特征：端点全随机角度/长度偏折、主线与偏移线彻底断开、背景100%无缝一致
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    print(f"🚀 开始生成 V4 终极拟真图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 创建全图完全一致、带有微弱颗粒感的工业相机暗背景
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化结构光基础几何参数（抛物线基准）
+        laser_gap = random.randint(26, 34)         
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        # 创建控制激光线是否发射的可见性掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态植入裂口特征
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            num_cracks = random.randint(1, 4)
+            # 确保多个裂口之间有足够的间距，不重叠
+            crack_positions = sorted(random.sample(range(150, width - 200), num_cracks))
+            
+            for start_pos in crack_positions:
+                crack_width = random.randint(16, 35)
+                c_start = start_pos
+                c_end = c_start + crack_width
+                
+                # 随机设定外界/内部断开的物理盲区宽度（确保线段绝不相连）
+                gap_left = random.randint(3, 7)
+                gap_right = random.randint(3, 7)
+                
+                # 强行掐断这几个像素的激光，使其形成绝对自然的断裂口
+                laser_visible[max(0, c_start - gap_left) : c_start] = False
+                laser_visible[c_end : min(width, c_end + gap_right)] = False
+                
+                # 随机决定当前裂口是深是浅
+                crack_type = random.choice(['offset', 'gap'])
+                
+                # --- 核心：主线左端点全随机偏折（角度与长度） ---
+                bend_len_l = random.randint(6, 18)     # 偏折线段的长度
+                # 偏折的角度（用斜率模拟，可正可负，可大可小）
+                bend_angle_l = random.uniform(-2.5, 2.5) 
+                for x in range(max(0, c_start - gap_left - bend_len_l), c_start - gap_left):
+                    dist = x - (c_start - gap_left - bend_len_l)
+                    # 线性结合微幅二次方，让偏折曲线末梢更自然
+                    dy = bend_angle_l * dist + (random.uniform(-0.1, 0.1) * (dist**2))
+                    y1_profile[x] += dy
+                    y2_profile[x] += dy
+
+                # --- 核心：主线右端点全随机偏折（角度与长度） ---
+                bend_len_r = random.randint(6, 18)
+                bend_angle_r = random.uniform(-2.5, 2.5)
+                for x in range(c_end + gap_right, min(width, c_end + gap_right + bend_len_r)):
+                    dist = (c_end + gap_right + bend_len_r) - x
+                    dy = bend_angle_r * dist + (random.uniform(-0.1, 0.1) * (dist**2))
+                    y1_profile[x] += dy
+                    y2_profile[x] += dy
+                
+                # 4. 如果是看得见底部的浅裂口
+                if crack_type == 'offset':
+                    y_offset = random.choice([1, -1]) * random.randint(18, 45)
+                    
+                    # 槽底内部线段也注入微小的随机倾斜角，模拟槽底不平整
+                    inside_slope = random.uniform(-0.4, 0.4)
+                    for x in range(c_start, c_end):
+                        y1_profile[x] += y_offset + inside_slope * (x - c_start)
+                        y2_profile[x] += y_offset + inside_slope * (x - c_start)
+                        
+                    # 槽底内部线段与边缘同样保持微小微断开，拒绝机械式拼接
+                    inner_gap_l = random.randint(1, 3)
+                    inner_gap_r = random.randint(1, 3)
+                    laser_visible[c_start : c_start + inner_gap_l] = False
+                    laser_visible[c_end - inner_gap_r : c_end] = False
+                else:
+                    # 深不可测的裂口，内部直接全黑（无光线返回）
+                    laser_visible[c_start : c_end] = False
+
+        # 5. 渲染具备工业级“高斯+散粒噪点”能量分布的激光线
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        for x in range(width):
+            if not laser_visible[x]:
+                continue
+                
+            y1, y2 = y1_profile[x], y2_profile[x]
+            
+            # 引入激光横向能量微弱抖动（Speckle），防止线段过于平滑显得死板
+            col_intensity = random.randint(180, 240)
+            line_thickness_factor = random.uniform(1.2, 1.8)
+            
+            for dy in range(-4, 5):
+                ny1, ny2 = int(y1) + dy, int(y2) + dy
+                weight = np.exp(-(dy**2) / line_thickness_factor)
+                
+                if 0 <= ny1 < height:
+                    laser_canvas[ny1, x] += col_intensity * weight
+                if 0 <= ny2 < height:
+                    laser_canvas[ny2, x] += col_intensity * weight
+                    
+        # 叠加背景与结构光
+        img = cv2.addWeighted(img, 1.0, np.clip(laser_canvas, 0, 255).astype(np.uint8), 1.0, 0)
+        
+        # 6. 最终复合微弱高斯模糊与传感器过载噪声，打破数字感
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        sensor_noise = np.random.normal(0, 1.2, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        # 7. 保存
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"laser_v4_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V4 终极拟真数据集生成完毕！请查看目录: {save_dir}")
+
+
+def generate_laser_images_v5(num_images, save_dir="./simulated_laser_data_v5"):
+    """
+    动态模拟生成平行双激光线图像（V5 物理光学级终极拟真版）
+    全面修复：大角度偏折断续、斜坡能量衰减、散斑效应、超广域裂口尺寸随机
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    print(f"🚀 开始使用物理光学模型生成 V5 终极数据集，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生 100% 均匀一致的传感器暗基底（包含微弱底噪）
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 随机初始化结构光基础几何参数（抛物线基准）
+        laser_gap = random.randint(26, 34)         
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        # 创建控制激光可见性的布尔掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态植入裂口（大幅扩宽尺寸域：从超窄到超宽）
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            num_cracks = random.randint(1, 4)
+            crack_positions = sorted(random.sample(range(120, width - 200), num_cracks))
+            
+            for start_pos in crack_positions:
+                # 【升级点】裂口宽度支持更极端随机：从5像素（微丝裂纹）到100像素（大破损）
+                crack_width = random.choice([
+                    random.randint(5, 15),   # 窄裂纹
+                    random.randint(16, 50),  # 中等槽
+                    random.randint(51, 100)  # 巨型豁口
+                ])
+                c_start = start_pos
+                c_end = c_start + crack_width
+                
+                # 光学阴影盲区（主线与内部线之间的真空断开区）
+                gap_left = random.randint(3, 8)
+                gap_right = random.randint(3, 8)
+                
+                laser_visible[max(0, c_start - gap_left) : c_start] = False
+                laser_visible[c_end : min(width, c_end + gap_right)] = False
+                
+                # 随机决定当前裂口是深是浅
+                crack_type = random.choice(['offset', 'gap'])
+                
+                # --- 【物理升级】主线左端点全随机偏折（导数连续控制） ---
+                bend_len_l = random.randint(10, 28)     # 【升级】偏折线段长度域扩大，更明显
+                bend_angle_l = random.uniform(-4.5, 4.5) # 【升级】偏折角度（斜率）能力大幅加强
+                
+                for x in range(max(0, c_start - gap_left - bend_len_l), c_start - gap_left):
+                    dist = x - (c_start - gap_left - bend_len_l)
+                    # 使用平滑的三次多项式插值，确保偏折在起始处是平滑的，在末梢产生极明显的勾形变化
+                    t = dist / bend_len_l
+                    dy = bend_angle_l * bend_len_l * (t ** 3) 
+                    y1_profile[x] += dy
+                    y2_profile[x] += dy
+
+                # --- 【物理升级】主线右端点全随机偏折 ---
+                bend_len_r = random.randint(10, 28)
+                bend_angle_r = random.uniform(-4.5, 4.5)
+                for x in range(c_end + gap_right, min(width, c_end + gap_right + bend_len_r)):
+                    dist = (c_end + gap_right + bend_len_r) - x
+                    t = dist / bend_len_r
+                    dy = bend_angle_r * bend_len_r * (t ** 3)
+                    y1_profile[x] += dy
+                    y2_profile[x] += dy
+                
+                # 4. 如果是内部可见的浅裂口
+                if crack_type == 'offset':
+                    y_offset = random.choice([1, -1]) * random.randint(20, 50)
+                    inside_slope = random.uniform(-0.5, 0.5)
+                    
+                    for x in range(c_start, c_end):
+                        y1_profile[x] += y_offset + inside_slope * (x - c_start)
+                        y2_profile[x] += y_offset + inside_slope * (x - c_start)
+                        
+                    # 槽底内部与边缘同样保持微小微断开
+                    inner_gap_l = random.randint(2, 4)
+                    inner_gap_r = random.randint(2, 4)
+                    if c_end - c_start > (inner_gap_l + inner_gap_r):
+                        laser_visible[c_start : c_start + inner_gap_l] = False
+                        laser_visible[c_end - inner_gap_r : c_end] = False
+                else:
+                    laser_visible[c_start : c_end] = False
+
+        # 5. 【核心物理重构】基于连续空间向量场渲染激光线（彻底根治大角度断续）
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        
+        for x in range(1, width):
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            # 提取前后两列构成的连续线段端点
+            pt1_line1 = (x-1, y1_profile[x-1])
+            pt2_line1 = (x, y1_profile[x])
+            pt1_line2 = (x-1, y2_profile[x-1])
+            pt2_line2 = (x, y2_profile[x])
+            
+            # 计算当前列的局部斜率（用于进行朗伯能量衰减计算）
+            slope = abs(y1_profile[x] - y1_profile[x-1])
+            
+            # 物理衰减公式：斜率越大，线宽越宽（光面展开），中心能量密度（衰减系数）越低
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.15)
+            thickness_factor = 1.4 * np.sqrt(1.0 + (slope ** 2) * 0.08)
+            col_intensity = random.randint(190, 245) * energy_attenuation
+            
+            # 在垂直跨度内进行无盲区包络扫描，确保光束绝对连续
+            y_min_scan = int(min(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) - 6
+            y_max_scan = int(max(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) + 6
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                # 计算像素点 (x, y) 到线段的垂直距离
+                # 针对第一条线
+                d1 = abs((pt2_line1[1]-pt1_line1[1])*x - (pt2_line1[0]-pt1_line1[0])*y + pt2_line1[0]*pt1_line1[1] - pt2_line1[1]*pt1_line1[0]) / (np.sqrt((pt2_line1[1]-pt1_line1[1])**2 + (pt2_line1[0]-pt1_line1[0])**2) + 1e-5)
+                # 针对第二条线
+                d2 = abs((pt2_line2[1]-pt1_line2[1])*x - (pt2_line2[0]-pt1_line2[0])*y + pt2_line2[0]*pt1_line2[1] - pt2_line2[1]*pt1_line2[0]) / (np.sqrt((pt2_line2[1]-pt1_line2[1])**2 + (pt2_line2[0]-pt1_line2[0])**2) + 1e-5)
+                
+                # 渲染高斯能量
+                w1 = np.exp(-(d1**2) / thickness_factor)
+                w2 = np.exp(-(d2**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * (w1 + w2)
+
+        # 6. 【物理升级】注入高频激光相干散斑噪声 (Speckle Noise)
+        speckle_noise = np.random.uniform(0.75, 1.25, laser_canvas.shape)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        # 7. 最终全图大一统融合（环境底噪与传感器模糊，完全抹除人工切口痕迹）
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        # 模拟工业相机传感器读出噪声
+        sensor_noise = np.random.normal(0, 1.0, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        # 8. 保存
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"laser_v5_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V5 物理级全拟真数据集生成完毕！请查看目录: {save_dir}")
+
+
+def generate_laser_images_v6(num_images, save_dir="./simulated_laser_data_v6"):
+    """
+    动态模拟生成平行双激光线图像（V6 线性棱角拟真版）
+    核心优化：笔直的梯形侧面偏折、超大跨度裂口（最大1000px）、主线与偏折线彻底不连接、100%无缝一致背景
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    print(f"🚀 开始使用 V6 梯形棱角模型生成图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生 100% 均匀一致的相机芯片暗基底
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化结构光基准曲线（抛物线）
+        laser_gap = random.randint(26, 34)         
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态植入裂口（升级：支持 5px 到 1000px 的超广域随机）
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            # 50% 概率产生单个巨型豁口（100-1000px），50% 概率产生多个常规裂口（5-100px）
+            is_giant_crack = random.choice([True, False])
+            
+            if is_giant_crack:
+                num_cracks = 1
+                crack_widths = [random.randint(100, 1000)]
+                # 动态限制巨型裂口的起点，防止右边界溢出画布
+                crack_positions = [random.randint(40, max(50, width - crack_widths[0] - 60))]
+            else:
+                num_cracks = random.randint(1, 4)
+                crack_widths = [random.choice([random.randint(5, 15), random.randint(16, 100)]) for _ in range(num_cracks)]
+                # 随机撒点，确保多裂口间距合理
+                crack_positions = sorted(random.sample(range(100, width - 150), num_cracks))
+            
+            for c_idx, start_pos in enumerate(crack_positions):
+                crack_width = crack_widths[c_idx]
+                c_start = start_pos
+                c_end = min(width - 5, c_start + crack_width)
+                
+                # 物理光学盲区（让主线、偏折线、内部残线之间产生绝对的物理断开）
+                gap_left = random.randint(4, 9)
+                gap_right = random.randint(4, 9)
+                
+                # 强行掐断断口前后的可见性
+                laser_visible[max(0, c_start - gap_left) : c_start] = False
+                laser_visible[c_end : min(width, c_end + gap_right)] = False
+                
+                # 随机决定是可见底部的浅槽还是全黑深槽
+                crack_type = random.choice(['offset', 'gap'])
+                
+                # --- 【核心重构：左端点平直线性偏折】 ---
+                bend_len_l = random.randint(12, 40)      # 偏折线段在X轴上的投影长度
+                bend_slope_l = random.uniform(-3.0, 3.0) # 固定的线性斜率（产生笔直效果）
+                x_start_bend_l = c_start - gap_left - bend_len_l
+                x_end_bend_l = c_start - gap_left
+                
+                for x in range(max(0, x_start_bend_l), x_end_bend_l):
+                    # y = k * x + b 线性递增，在连接原本曲线处(x_start_bend_l)偏折量为0，形成尖锐棱角
+                    dx = bend_slope_l * (x - x_start_bend_l)
+                    y1_profile[x] += dx
+                    y2_profile[x] += dx
+
+                # --- 【核心重构：右端点平直线性偏折】 ---
+                bend_len_r = random.randint(12, 40)
+                bend_slope_r = random.uniform(-3.0, 3.0)
+                x_start_bend_r = c_end + gap_right
+                x_end_bend_r = c_end + gap_right + bend_len_r
+                
+                for x in range(x_start_bend_r, min(width, x_end_bend_r)):
+                    # 右侧镜像线性递减，在右侧原曲线连接处(x_end_bend_r)偏折量回归0
+                    dx = bend_slope_r * (x_end_bend_r - x)
+                    y1_profile[x] += dx
+                    y2_profile[x] += dx
+                
+                # 4. 处理槽底内部线段
+                if crack_type == 'offset':
+                    y_offset = random.choice([1, -1]) * random.randint(25, 55)
+                    inside_slope = random.uniform(-0.3, 0.3)
+                    
+                    for x in range(c_start, c_end):
+                        y1_profile[x] += y_offset + inside_slope * (x - c_start)
+                        y2_profile[x] += y_offset + inside_slope * (x - c_start)
+                        
+                    # 槽底内部线段与左右边缘同样保持强制不连接
+                    inner_gap_l = random.randint(2, 5)
+                    inner_gap_r = random.randint(2, 5)
+                    if (c_end - c_start) > (inner_gap_l + inner_gap_r):
+                        laser_visible[c_start : c_start + inner_gap_l] = False
+                        laser_visible[c_end - inner_gap_r : c_end] = False
+                else:
+                    # 深槽则内部完全无光
+                    laser_visible[c_start : c_end] = False
+
+        # 5. 基于亚像素空间向量场渲染激光线（保证大角度平直斜坡绝对连续不失真）
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        
+        for x in range(1, width):
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            pt1_line1 = (x-1, y1_profile[x-1])
+            pt2_line1 = (x, y1_profile[x])
+            pt1_line2 = (x-1, y2_profile[x-1])
+            pt2_line2 = (x, y2_profile[x])
+            
+            slope = abs(y1_profile[x] - y1_profile[x-1])
+            
+            # 物理效应：斜率越大，线宽变宽，但中心能量密度降低（物理变暗）
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.2)
+            thickness_factor = 1.5 * np.sqrt(1.0 + (slope ** 2) * 0.1)
+            col_intensity = random.randint(190, 245) * energy_attenuation
+            
+            y_min_scan = int(min(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) - 6
+            y_max_scan = int(max(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) + 6
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                # 点到线段的亚像素垂直距离
+                d1 = abs((pt2_line1[1]-pt1_line1[1])*x - (pt2_line1[0]-pt1_line1[0])*y + pt2_line1[0]*pt1_line1[1] - pt2_line1[1]*pt1_line1[0]) / (np.sqrt((pt2_line1[1]-pt1_line1[1])**2 + (pt2_line1[0]-pt1_line1[0])**2) + 1e-5)
+                d2 = abs((pt2_line2[1]-pt1_line2[1])*x - (pt2_line2[0]-pt1_line2[0])*y + pt2_line2[0]*pt1_line2[1] - pt2_line2[1]*pt1_line2[0]) / (np.sqrt((pt2_line2[1]-pt1_line2[1])**2 + (pt2_line2[0]-pt1_line2[0])**2) + 1e-5)
+                
+                w1 = np.exp(-(d1**2) / thickness_factor)
+                w2 = np.exp(-(d2**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * (w1 + w2)
+
+        # 6. 注入高频物理相干散斑噪声
+        speckle_noise = np.random.uniform(0.75, 1.25, laser_canvas.shape)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        # 7. 全图无缝融合（通过全局模糊和传感器读出噪声，消除任何拼接痕迹）
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        sensor_noise = np.random.normal(0, 1.0, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        # 8. 保存图像
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"laser_v6_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V6 梯形棱角级终极拟真数据生成完毕！保存路径: {save_dir}")
+
+
+
+def generate_laser_images_v7(num_images, save_dir="./simulated_laser_data_v7"):
+    """
+    动态模拟生成平行双激光线图像（V7 多模态极真版）
+    核心优化：
+      1. 引入“橡皮擦”纯断裂模式（无偏折，两端线条位置绝对不变）
+      2. 偏折段长度大幅缩短且高度随机（拒绝发丝感，呈现紧凑硬质切角）
+      3. 严格的缺陷间距隔离，确保多缺陷之间原本的激光线原封不动
+      4. 超广域裂口尺寸随机（从几像素微瑕到几百像素巨豁）
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    print(f"🚀 开始使用 V7 多模态模型生成图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生 100% 均匀一致的相机芯片暗基底
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化纯净的结构光基准曲线（抛物线/四次曲线）
+        laser_gap = random.randint(26, 34)         
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        # 复制出两条纯净的基准线坐标，后续修改绝不污染非缺陷区
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        # 激光可见性控制掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态构建不重叠的多模态缺陷序列
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            cracks_config = []
+            num_cracks = random.randint(1, 3)
+            attempts = 0
+            
+            # 尝试在全图范围内“撒”出彼此隔离的缺陷区间
+            while len(cracks_config) < num_cracks and attempts < 100:
+                attempts += 1
+                # 尺寸超广域随机：大到巨型豁口（400px），小到微丝裂纹（6px）
+                c_width = random.choice([random.randint(6, 25), random.randint(26, 150), random.randint(151, 550)])
+                c_start = random.randint(60, width - c_width - 60)
+                c_end = c_start + c_width
+                
+                # 严格校验：确保新缺陷与已有缺陷之间至少留有 50px 的绝对安全基线隔离带
+                overlap = False
+                for (existing_start, existing_end, _) in cracks_config:
+                    if not (c_end < existing_start - 50 or c_start > existing_end + 50):
+                        overlap = True
+                        break
+                        
+                if not overlap:
+                    # 随机分配多模态缺陷类型：
+                    # 'eraser': 类似橡皮擦纯擦除，无任何形变
+                    # 'bend_offset': 带短平直偏折且槽底可见
+                    # 'bend_gap': 带短平直偏折且槽底深黑
+                    crack_type = random.choice(['eraser', 'bend_offset', 'bend_gap'])
+                    cracks_config.append((c_start, c_end, crack_type))
+            
+            # 按从左到右的顺序处理各个缺陷，避免逻辑交叉
+            cracks_config.sort(key=lambda x: x[0])
+            
+            for c_start, c_end, c_type in cracks_config:
+                
+                if c_type == 'eraser':
+                    # ==========================================
+                    # 范式 1：【橡皮擦模式】
+                    # ==========================================
+                    # 直接将该区间从可见掩膜中抹去，两端的 y_profile 坐标不做任何加减
+                    # 这样断口两侧的激光线会完美保持在原抛物线轨迹上，绝对不改变位置
+                    laser_visible[c_start : c_end] = False
+                    
+                else:
+                    # ==========================================
+                    # 范式 2 & 3：【短线性偏折模式】
+                    # ==========================================
+                    # 物理盲区（让主线、偏折线、内部残线之间产生绝对的物理断开）
+                    gap_left = random.randint(3, 6)
+                    gap_right = random.randint(3, 6)
+                    
+                    laser_visible[max(0, c_start - gap_left) : c_start] = False
+                    laser_visible[c_end : min(width, c_end + gap_right)] = False
+                    
+                    # 【核心优化】偏折长度显著缩短（3到10像素），拒绝长发丝感，实现紧凑切角
+                    bend_len_l = random.randint(3, 10)      
+                    bend_slope_l = random.uniform(-4.5, 4.5) 
+                    x_start_bend_l = c_start - gap_left - bend_len_l
+                    x_end_bend_l = c_start - gap_left
+                    
+                    # 笔直的线性一阶偏折
+                    for x in range(max(0, x_start_bend_l), x_end_bend_l):
+                        y1_profile[x] += bend_slope_l * (x - x_start_bend_l)
+                        y2_profile[x] += bend_slope_l * (x - x_start_bend_l)
+                        
+                    bend_len_r = random.randint(3, 10)
+                    bend_slope_r = random.uniform(-4.5, 4.5)
+                    x_start_bend_r = c_end + gap_right
+                    x_end_bend_r = c_end + gap_right + bend_len_r
+                    
+                    for x in range(x_start_bend_r, min(width, x_end_bend_r)):
+                        y1_profile[x] += bend_slope_r * (x_end_bend_r - x)
+                        y2_profile[x] += bend_slope_r * (x_end_bend_r - x)
+                    
+                    # 分支处理槽底内部线段
+                    if c_type == 'bend_offset':
+                        y_offset = random.choice([1, -1]) * random.randint(25, 55)
+                        inside_slope = random.uniform(-0.2, 0.2)
+                        
+                        for x in range(c_start, c_end):
+                            y1_profile[x] += y_offset + inside_slope * (x - c_start)
+                            y2_profile[x] += y_offset + inside_slope * (x - c_start)
+                            
+                        # 槽底内部与边缘同样保持断开
+                        inner_gap = random.randint(2, 4)
+                        if (c_end - c_start) > (inner_gap * 2):
+                            laser_visible[c_start : c_start + inner_gap] = False
+                            laser_visible[c_end - inner_gap : c_end] = False
+                    else:
+                        # bend_gap 模式下内部完全无光
+                        laser_visible[c_start : c_end] = False
+
+        # 4. 基于空间向量场的亚像素激光线渲染（继承自 V6，确保大斜率斜坡不断线）
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        
+        for x in range(1, width):
+            # 只有当前后两列均可见时，才绘制该空间连续段
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            pt1_line1 = (x-1, y1_profile[x-1])
+            pt2_line1 = (x, y1_profile[x])
+            pt1_line2 = (x-1, y2_profile[x-1])
+            pt2_line2 = (x, y2_profile[x])
+            
+            slope = abs(y1_profile[x] - y1_profile[x-1])
+            
+            # 斜率物理效应（朗伯漫反射衰减）
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.2)
+            thickness_factor = 1.5 * np.sqrt(1.0 + (slope ** 2) * 0.1)
+            col_intensity = random.randint(190, 245) * energy_attenuation
+            
+            y_min_scan = int(min(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) - 6
+            y_max_scan = int(max(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) + 6
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                d1 = abs((pt2_line1[1]-pt1_line1[1])*x - (pt2_line1[0]-pt1_line1[0])*y + pt2_line1[0]*pt1_line1[1] - pt2_line1[1]*pt1_line1[0]) / (np.sqrt((pt2_line1[1]-pt1_line1[1])**2 + (pt2_line1[0]-pt1_line1[0])**2) + 1e-5)
+                d2 = abs((pt2_line2[1]-pt1_line2[1])*x - (pt2_line2[0]-pt1_line2[0])*y + pt2_line2[0]*pt1_line2[1] - pt2_line2[1]*pt1_line2[0]) / (np.sqrt((pt2_line2[1]-pt1_line2[1])**2 + (pt2_line2[0]-pt1_line2[0])**2) + 1e-5)
+                
+                w1 = np.exp(-(d1**2) / thickness_factor)
+                w2 = np.exp(-(d2**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * (w1 + w2)
+
+        # 5. 注入高频散斑干涉噪声
+        speckle_noise = np.random.uniform(0.75, 1.25, laser_canvas.shape)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        # 6. 全图无痕无缝融合
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        sensor_noise = np.random.normal(0, 1.0, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        # 7. 保存图像
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"laser_v7_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V7 多模态极真数据集生成完毕！保存至: {save_dir}")
+
+
+def generate_laser_images_v8(num_images, save_dir="./simulated_laser_data_v8"):
+    """
+    动态模拟生成平行双激光线图像（V8 视差多模态级终极拟真版）
+    核心优化：
+      1. 严格限制同一裂口内的上下纵向位移（紧凑微位移，杜绝夸张悬崖感）
+      2. 视场空间位置决定偏折行为：
+         - 左 1/4 区域 (<300px)：仅左侧偏折 或 纯橡皮擦
+         - 右 1/4 区域 (>900px)：仅右侧偏折 或 纯橡皮擦
+         - 中间 2/4 区域 (300px~900px)：两侧同时偏折 或 纯橡皮擦
+      3. 完美的基线隔离，多裂口之间原本的两条激光线位置绝对不发生任何改变
+      4. 超广域裂口跨度自适应（支持几像素至数百像素）
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    
+    # 空间区域边界定义
+    left_boundary = width // 4       # 300px
+    right_boundary = (width * 3) // 4 # 900px
+    
+    print(f"🚀 开始使用 V8 视差空间模型生成图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生 100% 均匀一致的相机芯片暗基底（全图无缝融合）
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化纯净的结构光基准曲线（抛物线/四次曲线）
+        laser_gap = random.randint(26, 34)         
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        # 深度复制出基准线坐标，非缺陷区域绝不污染，确保基线稳固
+        y1_profile = base_curve - laser_gap // 2
+        y2_profile = base_curve + laser_gap // 2
+        
+        # 激光可见性控制掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态构建空间位置互斥的缺陷序列
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            cracks_config = []
+            num_cracks = random.randint(1, 3)
+            attempts = 0
+            
+            while len(cracks_config) < num_cracks and attempts < 100:
+                attempts += 1
+                # 裂口宽度随机（从 6px 微裂纹到 450px 巨豁口）
+                c_width = random.choice([random.randint(6, 25), random.randint(26, 120), random.randint(121, 450)])
+                c_start = random.randint(40, width - c_width - 40)
+                c_end = c_start + c_width
+                c_mid = c_start + c_width // 2
+                
+                # 严格校验：确保多个裂口之间留有至少 60px 的绝对安全隔离带，让中间的线雷打不动
+                overlap = False
+                for (existing_start, existing_end, _) in cracks_config:
+                    if not (c_end < existing_start - 60 or c_start > existing_end + 60):
+                        overlap = True
+                        break
+                        
+                if not overlap:
+                    # --- 【核心空间决策引擎】根据裂口所处的 X 坐标区域决定模态 ---
+                    if c_mid < left_boundary:
+                        # 图像左边 1/4：要么是纯橡皮擦，要么只有左边偏折
+                        crack_style = random.choice(['eraser', 'left_only_offset', 'left_only_gap'])
+                    elif c_mid > right_boundary:
+                        # 图像右边 1/4：要么是纯橡皮擦，要么只有右边偏折
+                        crack_style = random.choice(['eraser', 'right_only_offset', 'right_only_gap'])
+                    else:
+                        # 图像中间 2/4：要么是纯橡皮擦，要么两边都有偏折
+                        crack_style = random.choice(['eraser', 'both_offset', 'both_gap'])
+                        
+                    cracks_config.append((c_start, c_end, crack_style))
+            
+            # 从左到右依次进行几何形变注入
+            cracks_config.sort(key=lambda x: x[0])
+            
+            for c_start, c_end, c_style in cracks_config:
+                
+                if c_style == 'eraser':
+                    # 范式 1：【纯橡皮擦模式】—— 直接抹除，两端无任何偏折位移
+                    laser_visible[c_start : c_end] = False
+                else:
+                    # 确定当前缺陷是否需要生成左偏折、右偏折以及内部残线
+                    need_left_bend = 'left_only' in c_style or 'both' in c_style
+                    need_right_bend = 'right_only' in c_style or 'both' in c_style
+                    is_offset_mode = 'offset' in c_style
+                    
+                    # 物理光学盲区断开（让主线、偏折线段与内部之间产生明确的不连接）
+                    gap_left = random.randint(3, 6)
+                    gap_right = random.randint(3, 6)
+                    
+                    laser_visible[max(0, c_start - gap_left) : c_start] = False
+                    laser_visible[c_end : min(width, c_end + gap_right)] = False
+                    
+                    # --- 左端点平直线性偏折控制 ---
+                    if need_left_bend:
+                        bend_len_l = random.randint(4, 12)       # 短小紧凑的偏折投影长度
+                        bend_slope_l = random.uniform(-2.5, 2.5) # 控制在合理坡度内
+                        x_start_bend_l = c_start - gap_left - bend_len_l
+                        x_end_bend_l = c_start - gap_left
+                        
+                        for x in range(max(0, x_start_bend_l), x_end_bend_l):
+                            dx = bend_slope_l * (x - x_start_bend_l)
+                            y1_profile[x] += dx
+                            y2_profile[x] += dx
+                    
+                    # --- 右端点平直线性偏折控制 ---
+                    if need_right_bend:
+                        bend_len_r = random.randint(4, 12)
+                        bend_slope_r = random.uniform(-2.5, 2.5)
+                        x_start_bend_r = c_end + gap_right
+                        x_end_bend_r = c_end + gap_right + bend_len_r
+                        
+                        for x in range(x_start_bend_r, min(width, x_end_bend_r)):
+                            dx = bend_slope_r * (x_end_bend_r - x)
+                            y1_profile[x] += dx
+                            y2_profile[x] += dx
+                    
+                    # --- 处理裂口内部线段 ---
+                    if is_offset_mode:
+                        # 【优化点1】限制纵向跳变位移，使其紧凑逼真（10-22像素，拒绝夸张巨变）
+                        y_offset = random.choice([1, -1]) * random.randint(10, 22)
+                        inside_slope = random.uniform(-0.15, 0.15) # 槽底微弱倾斜
+                        
+                        for x in range(c_start, c_end):
+                            y1_profile[x] += y_offset + inside_slope * (x - c_start)
+                            y2_profile[x] += y_offset + inside_slope * (x - c_start)
+                            
+                        # 内部残线与两壁保持强制性微断开
+                        inner_gap = random.randint(2, 4)
+                        if (c_end - c_start) > (inner_gap * 2):
+                            laser_visible[c_start : c_start + inner_gap] = False
+                            laser_visible[c_end - inner_gap : c_end] = False
+                    else:
+                        # gap 模式下内部由于光线遮蔽完全无光返回
+                        laser_visible[c_start : c_end] = False
+
+        # 4. 基于空间向量场的亚像素连续激光线渲染（保证平直斜坡大斜率时不断线）
+        laser_canvas = np.zeros_like(img, dtype=np.float32)
+        
+        for x in range(1, width):
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            pt1_line1 = (x-1, y1_profile[x-1])
+            pt2_line1 = (x, y1_profile[x])
+            pt1_line2 = (x-1, y2_profile[x-1])
+            pt2_line2 = (x, y2_profile[x])
+            
+            slope = abs(y1_profile[x] - y1_profile[x-1])
+            
+            # 朗伯余弦光强衰减定理
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.25)
+            thickness_factor = 1.4 * np.sqrt(1.0 + (slope ** 2) * 0.12)
+            col_intensity = random.randint(190, 245) * energy_attenuation
+            
+            y_min_scan = int(min(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) - 6
+            y_max_scan = int(max(y1_profile[x], y1_profile[x-1], y2_profile[x], y2_profile[x-1])) + 6
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                d1 = abs((pt2_line1[1]-pt1_line1[1])*x - (pt2_line1[0]-pt1_line1[0])*y + pt2_line1[0]*pt1_line1[1] - pt2_line1[1]*pt1_line1[0]) / (np.sqrt((pt2_line1[1]-pt1_line1[1])**2 + (pt2_line1[0]-pt1_line1[0])**2) + 1e-5)
+                d2 = abs((pt2_line2[1]-pt1_line2[1])*x - (pt2_line2[0]-pt1_line2[0])*y + pt2_line2[0]*pt1_line2[1] - pt2_line2[1]*pt1_line2[0]) / (np.sqrt((pt2_line2[1]-pt1_line2[1])**2 + (pt2_line2[0]-pt1_line2[0])**2) + 1e-5)
+                
+                w1 = np.exp(-(d1**2) / thickness_factor)
+                w2 = np.exp(-(d2**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * (w1 + w2)
+
+        # 5. 注入高频物理相干散斑噪声 (Speckle Noise)
+        speckle_noise = np.random.uniform(0.75, 1.25, laser_canvas.shape)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        # 6. 全图无缝无痕融合（传感器模糊与读出底噪）
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        sensor_noise = np.random.normal(0, 1.0, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        # 7. 保存图像
+        state_str = "defect" if has_crack else "normal"
+        file_name = f"laser_v8_{idx:03d}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V8 视差空间全拟真数据集生成完毕！请查看目录: {save_dir}")
+
+
+
+def generate_laser_images_v8_optimized(num_images, save_dir="./simulated_laser_data_v8_opt"):
+    """
+    基于 V8 架构深度优化的工业级结构光数据集生成引擎
+    核心新增与优化：
+      1. 动态线数机制：每张图随机决定绘制【1条单激光线】或【2条平行双激光线】。
+      2. 随机多模态噪声：引入四种随机噪声配置（纯净、标准V8、高相干散斑、随机脉冲黑白点），
+         在维持 V8 清晰线条质感的前提下，提供多变的噪声环境。
+      3. 完美继承 V8 的一切优秀拓扑：同一裂口内上下微位移约束、1/4区域空间视差状态机、多裂口间基线绝对稳固。
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    left_boundary = width // 4       
+    right_boundary = (width * 3) // 4 
+    
+    print(f"🚀 开始使用 V8 优化版引擎（随机线数与多变噪声）生成图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生 100% 均匀一致的相机芯片暗基底
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化纯净的结构光基准主曲线
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        # 【新增功能 1】随机决定绘制 1 条线还是 2 条线
+        num_lines = random.choice([1, 2])
+        profiles = []
+        
+        if num_lines == 1:
+            # 单线模式：直接复制主曲线
+            profiles.append(base_curve.copy())
+        else:
+            # 双线模式：基于激光间距错开
+            laser_gap = random.randint(26, 34)
+            profiles.append(base_curve - laser_gap // 2)
+            profiles.append(base_curve + laser_gap // 2)
+        
+        # 激光可见性控制掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态构建空间位置互斥的缺陷序列（完全继承 V8 核心逻辑）
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            cracks_config = []
+            num_cracks = random.randint(1, 3)
+            attempts = 0
+            
+            while len(cracks_config) < num_cracks and attempts < 100:
+                attempts += 1
+                c_width = random.choice([random.randint(6, 25), random.randint(26, 120), random.randint(121, 450)])
+                c_start = random.randint(40, width - c_width - 40)
+                c_end = c_start + c_width
+                c_mid = c_start + c_width // 2
+                
+                # 严格校验：确保多个裂口之间留有至少 60px 的绝对安全隔离带
+                overlap = False
+                for (existing_start, existing_end, _) in cracks_config:
+                    if not (c_end < existing_start - 60 or c_start > existing_end + 60):
+                        overlap = True
+                        break
+                        
+                if not overlap:
+                    # 空间区域决策状态机
+                    if c_mid < left_boundary:
+                        crack_style = random.choice(['eraser', 'left_only_offset', 'left_only_gap'])
+                    elif c_mid > right_boundary:
+                        crack_style = random.choice(['eraser', 'right_only_offset', 'right_only_gap'])
+                    else:
+                        crack_style = random.choice(['eraser', 'both_offset', 'both_gap'])
+                        
+                    cracks_config.append((c_start, c_end, crack_style))
+            
+            cracks_config.sort(key=lambda x: x[0])
+            
+            for c_start, c_end, c_style in cracks_config:
+                if c_style == 'eraser':
+                    laser_visible[c_start : c_end] = False
+                else:
+                    need_left_bend = 'left_only' in c_style or 'both' in c_style
+                    need_right_bend = 'right_only' in c_style or 'both' in c_style
+                    is_offset_mode = 'offset' in c_style
+                    
+                    gap_left = random.randint(3, 6)
+                    gap_right = random.randint(3, 6)
+                    
+                    laser_visible[max(0, c_start - gap_left) : c_start] = False
+                    laser_visible[c_end : min(width, c_end + gap_right)] = False
+                    
+                    # --- 左端点平直线性偏折控制（同时应用到所有激活的线上） ---
+                    if need_left_bend:
+                        bend_len_l = random.randint(4, 12)       
+                        bend_slope_l = random.uniform(-2.5, 2.5) 
+                        x_start_bend_l = c_start - gap_left - bend_len_l
+                        x_end_bend_l = c_start - gap_left
+                        
+                        for x in range(max(0, x_start_bend_l), x_end_bend_l):
+                            dx = bend_slope_l * (x - x_start_bend_l)
+                            for profile in profiles:
+                                profile[x] += dx
+                    
+                    # --- 右端点平直线性偏折控制 ---
+                    if need_right_bend:
+                        bend_len_r = random.randint(4, 12)
+                        bend_slope_r = random.uniform(-2.5, 2.5)
+                        x_start_bend_r = c_end + gap_right
+                        x_end_bend_r = c_end + gap_right + bend_len_r
+                        
+                        for x in range(x_start_bend_r, min(width, x_end_bend_r)):
+                            dx = bend_slope_r * (x_end_bend_r - x)
+                            for profile in profiles:
+                                profile[x] += dx
+                    
+                    # --- 处理裂口内部线段（严格控制在 10-22 像素的微位移内） ---
+                    if is_offset_mode:
+                        y_offset = random.choice([1, -1]) * random.randint(10, 22)
+                        inside_slope = random.uniform(-0.15, 0.15) 
+                        
+                        for x in range(c_start, c_end):
+                            for profile in profiles:
+                                profile[x] += y_offset + inside_slope * (x - c_start)
+                            
+                        inner_gap = random.randint(2, 4)
+                        if (c_end - c_start) > (inner_gap * 2):
+                            laser_visible[c_start : c_start + inner_gap] = False
+                            laser_visible[c_end - inner_gap : c_end] = False
+                    else:
+                        laser_visible[c_start : c_end] = False
+
+        # 4. 基于空间向量场的亚像素连续激光线渲染（自动适配单线/双线架构）
+        laser_canvas = np.zeros((height, width), dtype=np.float32)
+        
+        for x in range(1, width):
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            # 以第一条曲线为基准计算坡度衰减因子
+            slope = abs(profiles[0][x] - profiles[0][x-1])
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.25)
+            thickness_factor = 1.4 * np.sqrt(1.0 + (slope ** 2) * 0.12)
+            col_intensity = random.randint(190, 245) * energy_attenuation
+            
+            # 动态扫描所有激活线条的上下边界，防止溢出
+            y_scan_points = [p[x] for p in profiles] + [p[x-1] for p in profiles]
+            y_min_scan = int(min(y_scan_points)) - 6
+            y_max_scan = int(max(y_scan_points)) + 6
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                total_w = 0.0
+                for profile in profiles:
+                    pt1 = (x-1, profile[x-1])
+                    pt2 = (x, profile[x])
+                    # 点到线段距离公式
+                    d = abs((pt2[1]-pt1[1])*x - (pt2[0]-pt1[0])*y + pt2[0]*pt1[1] - pt2[1]*pt1[0]) / (np.sqrt((pt2[1]-pt1[1])**2 + (pt2[0]-pt1[0])**2) + 1e-5)
+                    total_w += np.exp(-(d**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * total_w
+
+        # ==========================================
+        # 【新增功能 2】工业级随机噪声决策发生器
+        # ==========================================
+        noise_mode = random.choice(['clean', 'v8_standard', 'heavy_speckle', 'salt_pepper'])
+        
+        # 默认噪声控制参数
+        speckle_low, speckle_high = 0.95, 1.05
+        sensor_sigma = 0.4
+        inject_sp_noise = False
+        
+        if noise_mode == 'v8_standard':
+            speckle_low, speckle_high = 0.75, 1.25
+            sensor_sigma = 1.0
+        elif noise_mode == 'heavy_speckle':
+            # 强化相干光的空间离散粗糙度
+            speckle_low, speckle_high = 0.60, 1.40
+            sensor_sigma = 1.5
+        elif noise_mode == 'salt_pepper':
+            # 模拟工业现场镜片上有微小灰尘导致的随机点噪声
+            speckle_low, speckle_high = 0.85, 1.15
+            sensor_sigma = 0.8
+            inject_sp_noise = True
+            
+        # A. 应用乘性相干散斑噪声
+        speckle_noise = np.random.uniform(speckle_low, speckle_high, laser_canvas.shape).astype(np.float32)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        # B. 全图图像无痕融合
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        # C. 叠加热释电加性高斯底噪
+        sensor_noise = np.random.normal(0, sensor_sigma, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        # D. 如果抽中椒盐模式，随机在画面上撒几十个单像素黑白点
+        if inject_sp_noise:
+            num_sp = random.randint(15, 40)
+            for _ in range(num_sp):
+                sp_y = random.randint(0, height - 1)
+                sp_x = random.randint(0, width - 1)
+                img[sp_y, sp_x] = random.choice([0, 255]) # 随机极黑或极白点
+
+        # 5. 保存最终优化的 V8 图像
+        state_str = "defect" if has_crack else "normal"
+        line_str = f"{num_lines}lines"
+        file_name = f"laser_v8opt_{idx:03d}_{line_str}_{state_str}.jpg"
+        cv2.imwrite(os.path.join(save_dir, file_name), img)
+
+    print(f"🎉 V8 极致优化版数据集生成完毕！查看路径: {save_dir}")
+
+
+def generate_laser_images_v8_optimized_v2(num_images, save_dir="./simulated_laser_data_v8_v2"):
+    """
+    基于 V8_Optimized 架构深度定制的 V2 版本
+    核心升级：
+      - 引入【四象限动态目录分流引擎】：自动根据“线数（单线/双线）”与“状态（正常/断裂）”
+        创建 2x2 的子文件夹矩阵，实现图像的精准自动归类。
+      - 完美保留 V8 优化版的所有硬核特性：动态单双线、4 种多模态工业噪声、紧凑微位移及稳固基线。
+    """
+    # 基础目录检查
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    left_boundary = width // 4       
+    right_boundary = (width * 3) // 4 
+    
+    print(f"🚀 开始使用 V8_Optimized_V2 引擎生成图像，共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生相机芯片暗基底
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化纯净的结构光基准主曲线
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        # 动态线数决策
+        num_lines = random.choice([1, 2])
+        profiles = []
+        
+        if num_lines == 1:
+            profiles.append(base_curve.copy())
+        else:
+            laser_gap = random.randint(26, 34)
+            profiles.append(base_curve - laser_gap // 2)
+            profiles.append(base_curve + laser_gap // 2)
+        
+        # 激光可见性控制掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态构建空间位置互斥的缺陷序列
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            cracks_config = []
+            num_cracks = random.randint(1, 3)
+            attempts = 0
+            
+            while len(cracks_config) < num_cracks and attempts < 100:
+                attempts += 1
+                c_width = random.choice([random.randint(6, 25), random.randint(26, 120), random.randint(121, 450)])
+                c_start = random.randint(40, width - c_width - 40)
+                c_end = c_start + c_width
+                c_mid = c_start + c_width // 2
+                
+                overlap = False
+                for (existing_start, existing_end, _) in cracks_config:
+                    if not (c_end < existing_start - 60 or c_start > existing_end + 60):
+                        overlap = True
+                        break
+                        
+                if not overlap:
+                    if c_mid < left_boundary:
+                        crack_style = random.choice(['eraser', 'left_only_offset', 'left_only_gap'])
+                    elif c_mid > right_boundary:
+                        crack_style = random.choice(['eraser', 'right_only_offset', 'right_only_gap'])
+                    else:
+                        crack_style = random.choice(['eraser', 'both_offset', 'both_gap'])
+                        
+                    cracks_config.append((c_start, c_end, crack_style))
+            
+            cracks_config.sort(key=lambda x: x[0])
+            
+            for c_start, c_end, c_style in cracks_config:
+                if c_style == 'eraser':
+                    laser_visible[c_start : c_end] = False
+                else:
+                    need_left_bend = 'left_only' in c_style or 'both' in c_style
+                    need_right_bend = 'right_only' in c_style or 'both' in c_style
+                    is_offset_mode = 'offset' in c_style
+                    
+                    gap_left = random.randint(3, 6)
+                    gap_right = random.randint(3, 6)
+                    
+                    laser_visible[max(0, c_start - gap_left) : c_start] = False
+                    laser_visible[c_end : min(width, c_end + gap_right)] = False
+                    
+                    if need_left_bend:
+                        bend_len_l = random.randint(4, 12)       
+                        bend_slope_l = random.uniform(-2.5, 2.5) 
+                        x_start_bend_l = c_start - gap_left - bend_len_l
+                        x_end_bend_l = c_start - gap_left
+                        
+                        for x in range(max(0, x_start_bend_l), x_end_bend_l):
+                            dx = bend_slope_l * (x - x_start_bend_l)
+                            for profile in profiles:
+                                profile[x] += dx
+                    
+                    if need_right_bend:
+                        bend_len_r = random.randint(4, 12)
+                        bend_slope_r = random.uniform(-2.5, 2.5)
+                        x_start_bend_r = c_end + gap_right
+                        x_end_bend_r = c_end + gap_right + bend_len_r
+                        
+                        for x in range(x_start_bend_r, min(width, x_end_bend_r)):
+                            dx = bend_slope_r * (x_end_bend_r - x)
+                            for profile in profiles:
+                                profile[x] += dx
+                    
+                    if is_offset_mode:
+                        y_offset = random.choice([1, -1]) * random.randint(10, 22)
+                        inside_slope = random.uniform(-0.15, 0.15) 
+                        
+                        for x in range(c_start, c_end):
+                            for profile in profiles:
+                                profile[x] += y_offset + inside_slope * (x - c_start)
+                            
+                        inner_gap = random.randint(2, 4)
+                        if (c_end - c_start) > (inner_gap * 2):
+                            laser_visible[c_start : c_start + inner_gap] = False
+                            laser_visible[c_end - inner_gap : c_end] = False
+                    else:
+                        laser_visible[c_start : c_end] = False
+
+        # 4. 亚像素连续激光线渲染
+        laser_canvas = np.zeros((height, width), dtype=np.float32)
+        
+        for x in range(1, width):
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            slope = abs(profiles[0][x] - profiles[0][x-1])
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.25)
+            thickness_factor = 1.4 * np.sqrt(1.0 + (slope ** 2) * 0.12)
+            col_intensity = random.randint(190, 245) * energy_attenuation
+            
+            y_scan_points = [p[x] for p in profiles] + [p[x-1] for p in profiles]
+            y_min_scan = int(min(y_scan_points)) - 6
+            y_max_scan = int(max(y_scan_points)) + 6
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                total_w = 0.0
+                for profile in profiles:
+                    pt1 = (x-1, profile[x-1])
+                    pt2 = (x, profile[x])
+                    d = abs((pt2[1]-pt1[1])*x - (pt2[0]-pt1[0])*y + pt2[0]*pt1[1] - pt2[1]*pt1[0]) / (np.sqrt((pt2[1]-pt1[1])**2 + (pt2[0]-pt1[0])**2) + 1e-5)
+                    total_w += np.exp(-(d**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * total_w
+
+        # 5. 工业级随机噪声决策发生器
+        noise_mode = random.choice(['clean', 'v8_standard', 'heavy_speckle', 'salt_pepper'])
+        speckle_low, speckle_high = 0.95, 1.05
+        sensor_sigma = 0.4
+        inject_sp_noise = False
+        
+        if noise_mode == 'v8_standard':
+            speckle_low, speckle_high = 0.75, 1.25
+            sensor_sigma = 1.0
+        elif noise_mode == 'heavy_speckle':
+            speckle_low, speckle_high = 0.60, 1.40
+            sensor_sigma = 1.5
+        elif noise_mode == 'salt_pepper':
+            speckle_low, speckle_high = 0.85, 1.15
+            sensor_sigma = 0.8
+            inject_sp_noise = True
+            
+        speckle_noise = np.random.uniform(speckle_low, speckle_high, laser_canvas.shape).astype(np.float32)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        sensor_noise = np.random.normal(0, sensor_sigma, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        if inject_sp_noise:
+            num_sp = random.randint(15, 40)
+            for _ in range(num_sp):
+                sp_y = random.randint(0, height - 1)
+                sp_x = random.randint(0, width - 1)
+                img[sp_y, sp_x] = random.choice([0, 255])
+
+        # ==========================================
+        # 🔑 【核心升级：V2 象限多级目录分流引擎】
+        # ==========================================
+        # 第一层：根据线数对文件夹分类
+        line_dir_name = "1_line" if num_lines == 1 else "2_lines"
+        # 第二层：根据是否有断裂缺陷对文件夹分类
+        status_dir_name = "defect" if has_crack else "normal"
+        
+        # 拼接出绝对安全的具体子目录
+        target_sub_dir = os.path.join(save_dir, line_dir_name, status_dir_name)
+        if not os.path.exists(target_sub_dir):
+            os.makedirs(target_sub_dir) # 动态逐级构建
+            
+        # 6. 保存到对应的深层文件夹中
+        file_name = f"laser_v8v2_{idx:03d}_{noise_mode}.jpg"
+        final_save_path = os.path.join(target_sub_dir, file_name)
+        cv2.imwrite(final_save_path, img)
+
+    print(f"🎉 V8_Optimized_V2 树状数据集分流生成完毕！请在根目录查看: {save_dir}")
+
+
+def generate_laser_images_v8_optimized_v3(num_images, save_dir="./simulated_laser_data_v8_v3"):
+    """
+    基于 V8_Optimized_V2 架构深度定制的 V3 版本
+    核心升级：
+      - 【光斑物理形变优化】：加粗了激光线的整体线宽，基础厚度系数从 1.4 提升至 2.2~2.8 动态微调。
+      - 【动态边缘保护】：纵向搜索渲染窗口同步从 6px 扩大至 9px，防止线宽变粗后边缘被裁切。
+      - 完美继承 V2 的一切硬核特性：2x2 四象限多级目录自动分流、4种多模态工业噪声、紧凑微位移。
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        
+    width, height = 1200, 300
+    left_boundary = width // 4       
+    right_boundary = (width * 3) // 4 
+    
+    print(f"🚀 开始使用 V8_Optimized_V3 引擎生成图像（已加粗线宽），共计 {num_images} 张...")
+    
+    for idx in range(num_images):
+        # 1. 产生相机芯片暗基底
+        img = np.random.randint(6, 12, (height, width), dtype=np.uint8)
+        
+        # 2. 初始化纯净的结构光基准主曲线
+        center_y = random.randint(140, 180)        
+        amplitude = random.uniform(25, 45)         
+        peak_x = random.randint(width // 2 - 80, width // 2 + 80)
+        
+        x_indices = np.arange(width)
+        x_norm = (x_indices - peak_x) / (width / 2)
+        
+        curve_type = random.choice(['quadratic', 'quartic'])
+        direction = -1 if random.random() < 0.85 else 1
+        
+        if curve_type == 'quadratic':
+            base_curve = center_y + direction * amplitude * (x_norm ** 2)
+        else:
+            weight_4 = random.uniform(0.4, 0.7)
+            weight_2 = 1.0 - weight_4
+            base_curve = center_y + direction * amplitude * (weight_4 * (x_norm ** 4) + weight_2 * (x_norm ** 2))
+            
+        # 动态线数决策
+        num_lines = random.choice([1, 2])
+        profiles = []
+        
+        if num_lines == 1:
+            profiles.append(base_curve.copy())
+        else:
+            laser_gap = random.randint(25, 50)
+            profiles.append(base_curve - laser_gap // 2)
+            profiles.append(base_curve + laser_gap // 2)
+        
+        # 激光可见性控制掩膜
+        laser_visible = np.ones(width, dtype=bool)
+        
+        # 3. 动态构建空间位置互斥的缺陷序列
+        has_crack = random.choice([True, False])
+        
+        if has_crack:
+            cracks_config = []
+            num_cracks = random.randint(1, 7)
+            attempts = 0
+            
+            while len(cracks_config) < num_cracks and attempts < 100:
+                attempts += 1
+                c_width = random.choice([random.randint(6, 25), random.randint(26, 120), random.randint(121, 450)])
+                c_start = random.randint(40, width - c_width - 40)
+                c_end = c_start + c_width
+                c_mid = c_start + c_width // 2
+                
+                overlap = False
+                for (existing_start, existing_end, _) in cracks_config:
+                    if not (c_end < existing_start - 60 or c_start > existing_end + 60):
+                        overlap = True
+                        break
+                        
+                if not overlap:
+                    if c_mid < left_boundary:
+                        crack_style = random.choice(['eraser', 'left_only_offset', 'left_only_gap'])
+                    elif c_mid > right_boundary:
+                        crack_style = random.choice(['eraser', 'right_only_offset', 'right_only_gap'])
+                    else:
+                        crack_style = random.choice(['eraser', 'both_offset', 'both_gap'])
+                        
+                    cracks_config.append((c_start, c_end, crack_style))
+            
+            cracks_config.sort(key=lambda x: x[0])
+            
+            for c_start, c_end, c_style in cracks_config:
+                if c_style == 'eraser':
+                    laser_visible[c_start : c_end] = False
+                else:
+                    need_left_bend = 'left_only' in c_style or 'both' in c_style
+                    need_right_bend = 'right_only' in c_style or 'both' in c_style
+                    is_offset_mode = 'offset' in c_style
+                    
+                    gap_left = random.randint(3, 6)
+                    gap_right = random.randint(3, 6)
+                    
+                    laser_visible[max(0, c_start - gap_left) : c_start] = False
+                    laser_visible[c_end : min(width, c_end + gap_right)] = False
+                    
+                    if need_left_bend:
+                        bend_len_l = random.randint(4, 12)       
+                        bend_slope_l = random.uniform(-2.5, 2.5) 
+                        x_start_bend_l = c_start - gap_left - bend_len_l
+                        x_end_bend_l = c_start - gap_left
+                        
+                        for x in range(max(0, x_start_bend_l), x_end_bend_l):
+                            dx = bend_slope_l * (x - x_start_bend_l)
+                            for profile in profiles:
+                                profile[x] += dx
+                    
+                    if need_right_bend:
+                        bend_len_r = random.randint(4, 12)
+                        bend_slope_r = random.uniform(-2.5, 2.5)
+                        x_start_bend_r = c_end + gap_right
+                        x_end_bend_r = c_end + gap_right + bend_len_r
+                        
+                        for x in range(x_start_bend_r, min(width, x_end_bend_r)):
+                            dx = bend_slope_r * (x_end_bend_r - x)
+                            for profile in profiles:
+                                profile[x] += dx
+                    
+                    if is_offset_mode:
+                        y_offset = random.choice([1, -1]) * random.randint(10, 22)
+                        inside_slope = random.uniform(-0.15, 0.15) 
+                        
+                        for x in range(c_start, c_end):
+                            for profile in profiles:
+                                profile[x] += y_offset + inside_slope * (x - c_start)
+                            
+                        inner_gap = random.randint(2, 4)
+                        if (c_end - c_start) > (inner_gap * 2):
+                            laser_visible[c_start : c_start + inner_gap] = False
+                            laser_visible[c_end - inner_gap : c_end] = False
+                    else:
+                        laser_visible[c_start : c_end] = False
+
+        # 4. 亚像素连续激光线渲染（核心加粗修改区）
+        laser_canvas = np.zeros((height, width), dtype=np.float32)
+        
+        for x in range(1, width):
+            if not laser_visible[x] or not laser_visible[x-1]:
+                continue
+            
+            slope = abs(profiles[0][x] - profiles[0][x-1])
+            energy_attenuation = 1.0 / np.sqrt(1.0 + (slope ** 2) * 0.25)
+            
+            # 🔑 【核心修改 1】：提升基础厚度系数（从原先的 1.4 提高至 2.2 ~ 2.8 动态调节，线条更加饱满）
+            base_thickness = random.uniform(2.2, 3.8)
+            thickness_factor = base_thickness * np.sqrt(1.0 + (slope ** 2) * 0.12)
+            col_intensity = random.randint(190, 255) * energy_attenuation
+            
+            y_scan_points = [p[x] for p in profiles] + [p[x-1] for p in profiles]
+            
+            # 🔑 【核心修改 2】：同步扩大纵向扫描半径（从 6 扩大至 9 像素），防止加粗后的高斯边缘被生硬截断
+            y_min_scan = int(min(y_scan_points)) - 9
+            y_max_scan = int(max(y_scan_points)) + 9
+            
+            for y in range(max(0, y_min_scan), min(height, y_max_scan)):
+                total_w = 0.0
+                for profile in profiles:
+                    pt1 = (x-1, profile[x-1])
+                    pt2 = (x, profile[x])
+                    d = abs((pt2[1]-pt1[1])*x - (pt2[0]-pt1[0])*y + pt2[0]*pt1[1] - pt2[1]*pt1[0]) / (np.sqrt((pt2[1]-pt1[1])**2 + (pt2[0]-pt1[0])**2) + 1e-5)
+                    total_w += np.exp(-(d**2) / thickness_factor)
+                
+                laser_canvas[y, x] += col_intensity * total_w
+
+        # 5. 工业级随机噪声决策发生器
+        noise_mode = random.choice(['clean', 'v8_standard', 'heavy_speckle', 'salt_pepper'])
+        speckle_low, speckle_high = 0.95, 1.05
+        sensor_sigma = 0.4
+        inject_sp_noise = False
+        
+        if noise_mode == 'v8_standard':
+            speckle_low, speckle_high = 0.75, 1.25
+            sensor_sigma = 1.0
+        elif noise_mode == 'heavy_speckle':
+            speckle_low, speckle_high = 0.60, 1.40
+            sensor_sigma = 1.5
+        elif noise_mode == 'salt_pepper':
+            speckle_low, speckle_high = 0.85, 1.15
+            sensor_sigma = 0.8
+            inject_sp_noise = True
+            
+        speckle_noise = np.random.uniform(speckle_low, speckle_high, laser_canvas.shape).astype(np.float32)
+        laser_canvas = np.clip(laser_canvas * speckle_noise, 0, 255).astype(np.uint8)
+        
+        img = cv2.addWeighted(img, 1.0, laser_canvas, 1.0, 0)
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+        
+        sensor_noise = np.random.normal(0, sensor_sigma, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + sensor_noise, 0, 255).astype(np.uint8)
+        
+        if inject_sp_noise:
+            num_sp = random.randint(15, 40)
+            for _ in range(num_sp):
+                sp_y = random.randint(0, height - 1)
+                sp_x = random.randint(0, width - 1)
+                img[sp_y, sp_x] = random.choice([0, 255])
+
+        # 象限多级目录自动分流
+        line_dir_name = "1_line" if num_lines == 1 else "2_lines"
+        status_dir_name = "defect" if has_crack else "normal"
+        
+        target_sub_dir = os.path.join(save_dir, line_dir_name, status_dir_name)
+        if not os.path.exists(target_sub_dir):
+            os.makedirs(target_sub_dir)
+            
+        # 6. 保存最终优化的 V3 图像
+        file_name = f"laser_v8v3_{idx:03d}_{noise_mode}.jpg"
+        final_save_path = os.path.join(target_sub_dir, file_name)
+        cv2.imwrite(final_save_path, img)
+
+    print(f"🎉 V8_Optimized_V3 线宽加粗树状数据集生成完毕！查看路径: {save_dir}")
+
+
+def resize_compare():
+    img_path = r"G:\Gosion\projects\000.Test_Data\images\zidane.jpg"
+    img = cv2.imread(img_path)
+    pil_img = Image.fromarray(img)
+    imgsz = (96, 256)
+    img_cv2_resize = cv2.resize(img, imgsz)
+    img_trans_resize = transforms.Resize(imgsz)(pil_img)
+
+    cv2.imwrite("resize_cv2.jpg", img_cv2_resize)
+    img_trans_resize.save("resize_trans.jpg")
 
 
 
@@ -14428,14 +16728,16 @@ if __name__ == '__main__':
 
     # yolo2labelme(data_path=r"D:\Gosion\Projects\002.Smoking_Det\002", out=None, skip=True)
 
-    # change_txt_content(txt_path=r"G:\Gosion\data\007.PPE_Det\data\v1\fande_yolo_format\labels")
+    # remove_yolo_label_specific_class(data_path=r"G:\Gosion\projects\000.OpenDatasets\SHWD\v3\val2", rm_cls=(0, 3 ))
+    # change_txt_content(txt_path=r"G:\Gosion\projects\000.OpenDatasets\SHWD\v3\val1\labels2")
+    # vis_yolo_labels(data_path=r"G:\Gosion\projects\000.OpenDatasets\SHWD\v3\train")
     # for i in range(10, 12):
     #     change_txt_content(txt_path=r"D:\Gosion\Projects\004.GuardArea_Det\data\v2_labelbee_format\{}_yolo_format\labels".format(i))
 
     # yolo_label_expand_bbox(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001", classes=1, r=1.5)
 
-    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\PlayMobilePhone\v1\000", copy_images=False)  # yolo_format 路径下是 images 和 labels
-    # labelbee_to_yolo(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos_frames_merged", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
+    # yolo_to_labelbee(data_path=r"G:\Gosion\projects\000.OpenDatasets\SHWD\v3\008", copy_images=True)  # yolo_format 路径下是 images 和 labels
+    labelbee_to_yolo(data_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\Train\laser_detect\v5_20260630\train", copy_images=True)  # labelbee_format 路径下是 images 和 jsons
 
     # labelme_det_kpt_to_yolo_labels(data_path=r"D:\Gosion\Projects\006.Belt_Torn_Det\data\det_pose\v1\v1", class_list=["torn"], keypoint_list=["p1", "p2"])
     # labelbee_multi_step_det_kpt_to_yolo_labels(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\DabaZhike_20250827_frames_merged\Random_Selected", save_path="", copy_images=True, small_bbx_thresh=3, cls_plus=-1)
@@ -14448,14 +16750,14 @@ if __name__ == '__main__':
     # labelbee_line_to_png(data_path=r"G:\Gosion\projects\006.Belt_Torn_Det\data\LaserDetLikeLaneMarksDet\labelbee\20260114")
 
     # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\009", classes={"0": "smoke"})
-    # voc_to_yolo(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\002", classes={"0": "smoking"})
+    # voc_to_yolo(data_path=r"G:\Gosion\projects\000.OpenDatasets\SHWD\VOC2028", classes={"0": "hat", "1": "person"})
 
     # coco_to_yolo(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\v1\data\valid", json_name="_annotations.coco.json", save_path="", copy_images=False, small_bbx_thresh=3, cls_plus=0)
 
-    random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\v1\train".replace("\\", "/"), select_num=30, move_or_copy="move", select_mode=0)
+    # random_select_yolo_images_and_labels(data_path=r"G:\Gosion\projects\000.OpenDatasets\SHWD\VOC2028_yolo_format".replace("\\", "/"), select_num=581, move_or_copy="move", select_mode=0)
     # random_select_yolo_images_and_masks(data_path=r"G:\Gosion\data\006.Belt_Torn_Det\data\seg\v1\train_seg_images_labels".replace("\\", "/"), select_num=46, move_or_copy="move", select_mode=0)
 
-    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\forklift\forklift_videos", fps=5, save_path=None)
+    # ffmpeg_extract_video_frames(video_path=r"G:\Gosion\projects\000.Test_Data\videos\1", fps=25, save_path=None)
 
     # data_path = r"G:\Gosion\data\006.Belt_Torn_Det\data\videos\202511_WuBaoYouHua"
     # dirs = sorted(os.listdir(data_path))
@@ -14468,11 +16770,7 @@ if __name__ == '__main__':
 
     # crop_image_via_yolo_labels(data_path=r"D:\Gosion\Projects\001.Leaking_Liquid_Det\data\DET\v2\val", CLS=(0, 1), crop_ratio=(1, ))
 
-    # vis_yolo_labels(data_path=r"G:\Gosion\data\009.TuoGun_Det\data\v1\train")
-
     # process_small_images(img_path=r"D:\Gosion\Projects\002.Smoking_Det\data\Add\Det\v4\001_labelbee_format\images", size=256, mode=0)
-
-    # remove_yolo_label_specific_class(data_path=r"G:\Gosion\data\007.PPE_Det\data\helmet", rm_cls=(2, ))
 
     # make_border_and_change_yolo_labels(data_path=r"D:\Gosion\Projects\002.Smoking_Det\data\v4_exp_make_border\train_base", dstsz=(1080 + 1920, 1920 + 1920))
 
@@ -14931,3 +17229,18 @@ if __name__ == '__main__':
     # print(res)
 
     # change_yolo_labels(txt_base_path=r"G:\Gosion\code\Python\yolov5-6.2\runs\detect\exp4")
+    # move_images(src_folder=r"G:\Gosion\projects\000.OpenDatasets\SHWD\v3\008\images", dst_folder="", m=0)
+
+    # test_str = '{"path":"http://10.10.11.222:8080","jsonObject":{"name":"AlgorithmPlatform","imgDet":"data:text/html;base64","cameraChannel":1,"command":{"interface":"static","seqNum":"10001","time":"2026-05-19 15:46:38","isTest":1},"uiParam":{"id":"","img":"","layerImgs":[],"layerOtherDatas":[],"assistRect":[],"parentRects":[],"isUpdateRect":1},"otherData":"http://10.10.11.29:8091/gx_resourceUrl/image/upload/system_699a4aa3-cf85-4d00-b335-5d45bdf34b02.jpg"},"hostname":"http://10.10.11.29:8091"}'
+    # print(eval(test_str))
+
+    # main_test_20260525()
+    # main_test_20260526()
+    # main_test_20260617()
+    # main_test_20260622()
+    # curvature_test_20260622()
+
+    # img_path = r"G:\Gosion\projects\010.BeltTornDetectionR3\data\test\_home_sy_MVviewer_pictures_Pic_2026_03_06_141328_6_2.jpg"
+    # is_defective, zones = detect_laser_discontinuity(img_path)
+
+    # generate_laser_images_v8_optimized_v3(num_images=2000, save_dir=r"G:\Gosion\projects\010.BeltTornDetectionR3\data\det\v1\simulated_laser_data2")

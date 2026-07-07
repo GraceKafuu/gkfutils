@@ -263,8 +263,12 @@ class YOLO11:
 
 
 def yolo11_inference_example():
-    model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\yolo11s.onnx"
-    img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
+    # model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\yolo11s.onnx"
+    # img_path = r"G:\Gosion\projects\000.Test_Data\images\192.168.22.220_01_20240423104805321.jpg"
+
+    model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\helmet_head_v4\weights\best.onnx"
+    img_path = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\helmet_test.jpg"
+    # img_path = r"G:\Gosion\projects\011.ZhongyuanGuanxi\data\helmet_workCloth\plan_light_2054754412798361601.jpg"
 
     # model_path = r"G:\Gosion\code\Python\ultralytics-8.3.243\runs\detect\train3\weights\best.onnx"
     # img_path = r"G:\Gosion\projects\009.TuoGun_Det\videos\frames\20251221_merged\20251221_101111_output_000000001.jpg"

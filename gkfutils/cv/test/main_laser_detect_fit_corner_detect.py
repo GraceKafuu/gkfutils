@@ -462,37 +462,55 @@ def connected_components_analysis(img, connectivity=8, area_thr=100, h_thr=8, w_
 
 
 def fit_curve(img, deg=4, lower=None, upper=None, laser_color="green", FLAG_RANSAC_FIT=True, select_num=1000, num_iterations=1000, threshold=50):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, binary1 = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-    mask2, result2, binary2, binary_otsu2 = extract_specific_color(img, lower=None, upper=None, color="green")
-    # binary = cv2.bitwise_and(binary1, binary2)
-    binary = cv2.bitwise_or(binary1, binary2)
+    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # _, binary1 = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    # # mask2, result2, binary2, binary_otsu2 = extract_specific_color(img, lower=None, upper=None, color="green")
+    # # # binary = cv2.bitwise_and(binary1, binary2)
+    # # binary = cv2.bitwise_or(binary1, binary2)
     
-    # mask, result, binary, binary_otsu = extract_specific_color(img, lower=lower, upper=upper, color=laser_color)
-    # binary = keep_largest_region(binary)
-    # binary, _ = remove_small_regions_by_area_and_size(binary, 100, 50, 50)
+    # # mask, result, binary, binary_otsu = extract_specific_color(img, lower=lower, upper=upper, color=laser_color)
+    # # binary = keep_largest_region(binary)
+    # # binary, _ = remove_small_regions_by_area_and_size(binary, 100, 50, 50)
 
-    output, num_labels, labels, stats, centroids = connected_components_analysis(binary, connectivity=8, area_thr=16, h_thr=4, w_thr=4)
-    gray2 = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(gray2, 127, 255, cv2.THRESH_BINARY)
+    # output, num_labels, labels, stats, centroids = connected_components_analysis(binary1, connectivity=8, area_thr=16, h_thr=4, w_thr=4)
+    # gray2 = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+    # _, binary = cv2.threshold(gray2, 127, 255, cv2.THRESH_BINARY)
 
     # cv2.imshow("binary", binary)
     # cv2.imshow("binary_otsu", binary_otsu)
     # cv2.waitKey(0)
 
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)[1]
+
     points = np.where(binary == 255)
     points = np.hstack((points[1].reshape(-1, 1), points[0].reshape(-1, 1)))
 
+    # ===================== 过滤代码（直接复制这一段）=====================
+    # 条件1：x < 100 并且 y < 100
+    cond1 = (points[:, 0] < 100) & (points[:, 1] < 100)
+
+    # 条件2：x > 1250 并且 y < 100
+    cond2 = (points[:, 0] > 1250) & (points[:, 1] < 100)
+
+    # 保留：不满足条件1 且 不满足条件2 的点
+    mask = ~cond1 & ~cond2
+
+    # 过滤后的点
+    filtered_points = points[mask]
+    # ====================================================================
+
     fit_model = None
     if FLAG_RANSAC_FIT:
-        fit_model = ransac_fit(points, deg, select_num, num_iterations, threshold)
+        fit_model = ransac_fit(filtered_points, deg, select_num, num_iterations, threshold)
         # if fit_model is not None:
         #     a, b, c = fit_model
         #     print(f"拟合的抛物线方程: y = {a:.12f}x² + {b:.12f}x + {c:.12f}")
         # else:
         #     print("拟合失败")
     else:
-        fit_model = np.polyfit(points[:, 0], points[:, 1], deg)
+        fit_model = np.polyfit(filtered_points[:, 0], filtered_points[:, 1], deg)
 
     # fit_Q.put(fit_model)
 
@@ -607,7 +625,9 @@ def main():
 
 
 def main_000():
-    img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\Video_2025_03_01_165140_1_output_000009359.jpg"
+    # img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\Video_2025_03_01_165140_1_output_000009359.jpg"
+    # img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\Video_2025_03_01_165140_1_output_000009359.jpg"
+    img_path = r"G:\Gosion\projects\006.Belt_Torn_Det\resources\YanjiuBaogao\images\003.jpg"
 
     fname = os.path.basename(img_path)
     img_name = os.path.splitext(fname)[0]
@@ -626,9 +646,11 @@ def main_000():
     # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\binary31.jpg", binary3)
     # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\binary41.jpg", binary4)
 
-    fit_model = fit_curve(img, deg=4, lower=None, upper=None, laser_color="green", FLAG_RANSAC_FIT=True, select_num=1000, num_iterations=1000, threshold=50)
-    img_vis = fit_plot(img, fit_model, deg=4, color=(255, 0, 255))
-    cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\img_vis14.jpg", img_vis)
+    deg = 4
+    fit_model = fit_curve(img, deg=deg, lower=None, upper=None, laser_color="green", FLAG_RANSAC_FIT=True, select_num=1000, num_iterations=1000, threshold=50)
+    img_vis = fit_plot(img, fit_model, deg=deg, color=(255, 0, 255))
+    # cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\img_vis14.jpg", img_vis)
+    cv2.imwrite(r"G:\Gosion\projects\006.Belt_Torn_Det\resources\patent\000\img_vis_deg4.jpg", img_vis)
 
 
 
